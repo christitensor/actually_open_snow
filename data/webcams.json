@@ -1,0 +1,81 @@
+[
+  {
+    "id": "alta-webcam",
+    "name": "Alta",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "pageUrl": "https://www.alta.com/mountain-report",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-webcam",
+    "name": "Snowbird",
+    "resortId": "snowbird",
+    "lat": 40.5820,
+    "lon": -111.6558,
+    "pageUrl": "https://www.snowbird.com/mountain-report/",
+    "source": "resort"
+  },
+  {
+    "id": "brighton-webcam",
+    "name": "Brighton",
+    "resortId": "brighton",
+    "lat": 40.5977,
+    "lon": -111.5836,
+    "pageUrl": "https://www.brightonresort.com/mountain-report",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-webcam",
+    "name": "Solitude",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "pageUrl": "https://www.solitudemountain.com/mountain-report/cameras",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-webcam",
+    "name": "Park City",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.5080,
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-webcam",
+    "name": "Snowbasin",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "pageUrl": "https://www.snowbasin.com/mountain-report/mountain-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "powder-mountain-webcam",
+    "name": "Powder Mountain",
+    "resortId": "powder-mountain",
+    "lat": 41.3797,
+    "lon": -111.7877,
+    "pageUrl": "https://www.powdermountain.com/mountain-report",
+    "source": "resort"
+  },
+  {
+    "id": "udot-little-cottonwood",
+    "name": "UDOT: Little Cottonwood Canyon (SR-210)",
+    "lat": 40.5731,
+    "lon": -111.6725,
+    "pageUrl": "https://udottraffic.utah.gov/cctv",
+    "source": "udot"
+  },
+  {
+    "id": "udot-big-cottonwood",
+    "name": "UDOT: Big Cottonwood Canyon (SR-190)",
+    "lat": 40.6198,
+    "lon": -111.6404,
+    "pageUrl": "https://udottraffic.utah.gov/cctv",
+    "source": "udot"
+  }
+]

@@ -1,0 +1,162 @@
+[
+  {
+    "id": "alta",
+    "name": "Alta",
+    "region": "Northern Utah",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "baseElevationFt": 8530,
+    "midElevationFt": 9500,
+    "summitElevationFt": 10550
+  },
+  {
+    "id": "snowbird",
+    "name": "Snowbird",
+    "region": "Northern Utah",
+    "lat": 40.5820,
+    "lon": -111.6558,
+    "baseElevationFt": 7760,
+    "midElevationFt": 9200,
+    "summitElevationFt": 11000
+  },
+  {
+    "id": "brighton",
+    "name": "Brighton",
+    "region": "Northern Utah",
+    "lat": 40.5977,
+    "lon": -111.5836,
+    "baseElevationFt": 8755,
+    "midElevationFt": 9600,
+    "summitElevationFt": 10500
+  },
+  {
+    "id": "solitude",
+    "name": "Solitude",
+    "region": "Northern Utah",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "baseElevationFt": 7988,
+    "midElevationFt": 9000,
+    "summitElevationFt": 10035
+  },
+  {
+    "id": "park-city",
+    "name": "Park City",
+    "region": "Northern Utah",
+    "lat": 40.6514,
+    "lon": -111.5080,
+    "baseElevationFt": 6900,
+    "midElevationFt": 8400,
+    "summitElevationFt": 10000
+  },
+  {
+    "id": "deer-valley",
+    "name": "Deer Valley",
+    "region": "Northern Utah",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "baseElevationFt": 6570,
+    "midElevationFt": 8100,
+    "summitElevationFt": 9570
+  },
+  {
+    "id": "snowbasin",
+    "name": "Snowbasin",
+    "region": "Northern Utah",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "baseElevationFt": 6400,
+    "midElevationFt": 8000,
+    "summitElevationFt": 9350
+  },
+  {
+    "id": "powder-mountain",
+    "name": "Powder Mountain",
+    "region": "Northern Utah",
+    "lat": 41.3797,
+    "lon": -111.7877,
+    "baseElevationFt": 7000,
+    "midElevationFt": 8000,
+    "summitElevationFt": 8900
+  },
+  {
+    "id": "nordic-valley",
+    "name": "Nordic Valley",
+    "region": "Northern Utah",
+    "lat": 41.3467,
+    "lon": -111.8225,
+    "baseElevationFt": 5400,
+    "midElevationFt": 5900,
+    "summitElevationFt": 6400
+  },
+  {
+    "id": "beaver-mountain",
+    "name": "Beaver Mountain",
+    "region": "Northern Utah",
+    "lat": 41.9738,
+    "lon": -111.5245,
+    "baseElevationFt": 7200,
+    "midElevationFt": 8000,
+    "summitElevationFt": 8860
+  },
+  {
+    "id": "cherry-peak",
+    "name": "Cherry Peak",
+    "region": "Northern Utah",
+    "lat": 41.9856,
+    "lon": -111.7658,
+    "baseElevationFt": 5800,
+    "midElevationFt": 6600,
+    "summitElevationFt": 7400
+  },
+  {
+    "id": "sundance",
+    "name": "Sundance",
+    "region": "Northern Utah",
+    "lat": 40.3908,
+    "lon": -111.5885,
+    "baseElevationFt": 6100,
+    "midElevationFt": 7200,
+    "summitElevationFt": 8250
+  },
+  {
+    "id": "pebble-creek",
+    "name": "Pebble Creek",
+    "region": "Southeast Idaho",
+    "lat": 42.7189,
+    "lon": -111.9647,
+    "baseElevationFt": 6800,
+    "midElevationFt": 7900,
+    "summitElevationFt": 9000
+  },
+  {
+    "id": "kelly-canyon",
+    "name": "Kelly Canyon",
+    "region": "Southeast Idaho",
+    "lat": 43.7256,
+    "lon": -111.5914,
+    "baseElevationFt": 5700,
+    "midElevationFt": 6300,
+    "summitElevationFt": 6800
+  },
+  {
+    "id": "pomerelle",
+    "name": "Pomerelle Mountain Resort",
+    "region": "Southeast Idaho",
+    "lat": 42.1642,
+    "lon": -113.4653,
+    "baseElevationFt": 8000,
+    "midElevationFt": 8500,
+    "summitElevationFt": 9000
+  },
+  {
+    "id": "grand-targhee",
+    "name": "Grand Targhee",
+    "region": "Southeast Idaho",
+    "lat": 43.7904,
+    "lon": -110.9587,
+    "baseElevationFt": 8000,
+    "midElevationFt": 9000,
+    "summitElevationFt": 9862
+  }
+]
