@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { useFavorites } from "@/lib/favorites";
 
-// PERS-02-adjacent: shows saved favorites (resorts or backcountry pins) on
-// the landing page for quick access.
+// PERS-01/MAP-17: saved backcountry pins (resort favorites now live in
+// ResortList's top section instead — see app/page.tsx).
 export default function FavoritesList() {
   const { favorites, toggleFavorite } = useFavorites();
+  const spots = favorites.filter((f) => f.source === "pin");
 
-  if (favorites.length === 0) {
-    return <p className="text-sm text-gray-500">No favorites yet — star a resort or drop a backcountry pin to save it here.</p>;
+  if (spots.length === 0) {
+    return <p className="text-sm text-gray-500">No spots saved yet — drop a pin on the map, then save and name it from that page.</p>;
   }
 
   return (
     <ul className="space-y-1">
-      {favorites.map((f) => {
-        const href = f.source === "resort" ? `/location/${f.resortId}` : `/location/pin?lat=${f.lat}&lon=${f.lon}`;
+      {spots.map((f) => {
+        const href = `/location/pin?lat=${f.lat}&lon=${f.lon}`;
         return (
           <li key={href} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
             <Link href={href} className="font-medium hover:underline">

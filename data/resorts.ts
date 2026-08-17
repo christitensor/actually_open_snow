@@ -12,6 +12,15 @@ import rawResorts from "./resorts.json";
  */
 export const resorts: Resort[] = rawResorts as Resort[];
 
+/**
+ * Resorts to always show at the top of the landing page, ahead of
+ * favorites and everything else — edit this list directly when your
+ * regular rotation changes. Anything favorited via the star toggle joins
+ * this set too (see components/location/ResortList.tsx), so this is just
+ * the starting default, not the only way in.
+ */
+export const primaryResortIds: string[] = ["snowbasin", "beaver-mountain"];
+
 export function getResortById(id: string): Resort | undefined {
   return resorts.find((r) => r.id === id);
 }
