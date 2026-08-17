@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { pinToLocation } from "@/data/resorts";
 import { getLocationDashboardData } from "@/lib/location-dashboard";
 import LocationDashboard from "@/components/location/LocationDashboard";
+import LocationUnavailable from "@/components/location/LocationUnavailable";
 
 // MAP-17: dashboard for a dropped backcountry pin — same component and
 // data pipeline as a resort page, just an uncurated coordinate.
@@ -16,7 +17,14 @@ export default async function PinPage({
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) notFound();
 
   const location = pinToLocation(lat, lon);
-  const data = await getLocationDashboardData(location);
 
+  let data;
+  try {
+    data = await getLocationDashboardData(location);
+  } catch {
+    data = null;
+  }
+
+  if (!data) return <LocationUnavailable retryHref={`/location/pin?lat=${lat}&lon=${lon}`} />;
   return <LocationDashboard data={data} />;
 }

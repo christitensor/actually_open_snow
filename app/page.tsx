@@ -34,7 +34,12 @@ export default async function Home() {
             Open-data snow forecasts for Northern Utah & Southeast Idaho — pick a resort, or drop a pin anywhere for backcountry conditions.
           </p>
         </div>
-        <MyLocationButton />
+        <div className="flex items-center gap-2">
+          <Link href="/webcams" className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:border-blue-400 hover:text-blue-600 dark:border-gray-700">
+            📷 Webcams
+          </Link>
+          <MyLocationButton />
+        </div>
       </header>
 
       <section className="h-[60vh] min-h-[400px] overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">

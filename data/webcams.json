@@ -9,12 +9,23 @@
     "source": "resort"
   },
   {
-    "id": "snowbird-webcam",
-    "name": "Snowbird",
+    "id": "snowbird-peruvian-gulch-webcam",
+    "name": "Snowbird — Peruvian Gulch",
     "resortId": "snowbird",
     "lat": 40.5820,
     "lon": -111.6558,
-    "pageUrl": "https://www.snowbird.com/mountain-report/",
+    "imageUrl": "https://b15.hdrelay.com/camera/544432bd-3910-4888-aa9f-14b6f51a7eb5/snapshot",
+    "pageUrl": "https://www.snowbird.com/the-mountain/webcams/view-all-webcams/peruvian-gulch-webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-little-cloud-webcam",
+    "name": "Snowbird — Little Cloud",
+    "resortId": "snowbird",
+    "lat": 40.5825,
+    "lon": -111.6540,
+    "imageUrl": "https://b15.hdrelay.com/camera/db2a69c5-66e9-4c48-a713-919eaf191fc1/snapshot",
+    "pageUrl": "https://www.snowbird.com/the-mountain/webcams/view-all-webcams/little-cloud-webcam/",
     "source": "resort"
   },
   {

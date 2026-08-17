@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local SQLite dev database (PERS-03 alert subscriptions) — see lib/db/sqlite.ts
+/.data/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

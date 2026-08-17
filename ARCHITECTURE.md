@@ -7,8 +7,9 @@ Technical design for building the features tracked in `TRACE_MATRIX.md`. The P0/
 - **Framework**: Next.js (App Router) + TypeScript — single deployable app covering both UI and API routes.
 - **Styling**: Tailwind CSS.
 - **Maps**: MapLibre GL JS (open-source, no vendor lock-in) with free vector/raster tile sources (MapTiler free tier and/or OpenStreetMap raster tiles).
-- **Database**: Postgres (for resort seed data, favorites, alert subscriptions) — SQLite is fine for local dev, Postgres for anything deployed.
-- **Deployment**: Vercel (pairs naturally with Next.js); cron-based jobs (forecast refresh, alert checks) via Vercel Cron or a small worker if that turns out to be too limited.
+- **Database**: SQLite (Node's built-in `node:sqlite`, no dependency) for the one stateful feature so far — PERS-03 alert subscriptions. Swap for Postgres before a real multi-instance production deploy; SQLite here is a single local file that doesn't survive/share state across serverless instances. Resort seed data and favorites don't use a database at all (static JSON, localStorage).
+- **Email**: Resend's HTTP API (`lib/email.ts`) if `RESEND_API_KEY`/`ALERTS_FROM_EMAIL` are set; otherwise logs what would be sent and returns `sent: false` rather than faking success. This repo has no email credentials of its own.
+- **Deployment**: Vercel (pairs naturally with Next.js); cron-based jobs (`/api/alerts/check`) via Vercel Cron or a small worker — nothing schedules it automatically yet, see "Still open".
 - **No subscription/billing infrastructure** — every feature ships ungated, per the decision to drop OpenSnow's tiering.
 
 ## Phase 1 regional scope
@@ -46,7 +47,12 @@ Anywhere OpenSnow's real feature has no free-data equivalent (forecaster-written
   /app/api/air-quality/route.ts        # ?lat=&lon= — SEV-06/07
   /app/api/historical/route.ts         # ?lat=&lon=&start=&end= — SNOW-05
   /app/api/forecast-grid/route.ts      # ?bbox=south,west,north,east — MAP-05/MAP-10 (sampled point grid, not raster)
-  /app/location/error.tsx              # error boundary for both location pages — see "resolved" section below
+  /app/api/alerts/subscribe/route.ts   # POST {email,locationName,lat,lon,thresholdIn} — PERS-03
+  /app/api/alerts/unsubscribe/route.ts # ?token= — PERS-03, returns an HTML confirmation (clicked from email)
+  /app/api/alerts/check/route.ts       # PERS-03 "cron" entrypoint — nothing schedules calls to this automatically
+  /app/location/error.tsx              # defense-in-depth only — does NOT catch the data-fetch failure case,
+                                        # see "resolved" (third pass) below; each page.tsx handles that explicitly
+  /app/webcams/page.tsx                # MAP-16: dedicated live-webcam grid
   # No /app/api/favorites/route.ts — PERS-01 is localStorage-only (lib/favorites.ts), no backend yet.
   # (location) route group from the original plan wasn't used — plain /location/* is simpler and avoids
   # a top-level catch-all colliding with other routes.
@@ -71,17 +77,24 @@ Anywhere OpenSnow's real feature has no free-data equivalent (forecaster-written
   /lib/models/types.ts     # shared TypeScript types — Location is coordinate-first: { lat, lon, source, resortId?, name, elevationFt? }
   /lib/util/               # geo.ts (haversine distance), api.ts (route param parsing/error helpers)
   /lib/favorites.ts        # PERS-01: useFavorites() hook, localStorage-backed (useSyncExternalStore)
+  /lib/email.ts             # PERS-03: pluggable email sender (Resend or console-log fallback)
+  /lib/db/sqlite.ts          # PERS-03: alert_subscriptions table (node:sqlite), CRUD helpers
+  /lib/alerts/check-and-notify.ts # PERS-03: threshold comparison + once-per-day dedup + send
   /lib/location-dashboard.ts # orchestrates every source above into one payload for a location page
-  # No /lib/db/ yet — no database in this build; everything is either a live API call or localStorage.
 /components
-  /components/map/SkiMap.tsx           # MapLibre wrapper: resort/webcam pins (colored by MAP-10 Powder Finder),
-                                        # pin-drop (MAP-17), piste overlay (MAP-13), radar toggle (MAP-02/03,
-                                        # RainViewer), snow-forecast-grid toggle (MAP-05)
+  /components/map/SkiMap.tsx           # MapLibre wrapper: resort/webcam pins (colored by MAP-10 Powder Finder,
+                                        # live snapshot in webcam popups where available), pin-drop (MAP-17),
+                                        # piste overlay (MAP-13), radar toggle (MAP-02/03, RainViewer),
+                                        # snow-forecast-grid toggle (MAP-05)
   /components/location/LocationDashboard.tsx # the shared resort/pin dashboard UI
+  /components/location/LocationUnavailable.tsx # explicit failure state, rendered by page.tsx on data-fetch error
   /components/location/FavoriteButton.tsx, FavoritesList.tsx, MyLocationButton.tsx (PERS-02)
+  /components/location/AlertSubscribeForm.tsx # PERS-03 signup form, on every location dashboard
+  /components/webcams/WebcamGrid.tsx    # MAP-16: live-image grid with auto-refresh, used by /app/webcams
 /data
   /data/resorts.json, resorts.ts       # RES-01/RES-02: 16 Northern Utah/SE Idaho resorts
-  /data/webcams.json, webcams.ts       # MAP-16 seed: resort/UDOT webcam *page* links (not live images yet)
+  /data/webcams.json, webcams.ts       # MAP-16 seed: 2 verified-live Snowbird camera images, rest are page links
+.data/app.db                           # PERS-03 SQLite file, gitignored, created on first write
 ```
 
 ## Data flow
@@ -91,15 +104,17 @@ Anywhere OpenSnow's real feature has no free-data equivalent (forecaster-written
 3. **Derived features** (powder quality, wet-bulb, snow level, trail conditions, conditions summary) live in `/lib/derive/` as pure functions over normalized forecast data, unit-testable independent of any network call.
    - `conditions-summary.ts` is the one derive function that fans out to multiple sources rather than transforming one: it pulls the AFD text, the multi-model spread, and SNOTEL observations, then applies simple corroboration rules (do the models agree within some tolerance? does the AFD flag uncertainty?) before composing the summary — this is the one place in the app doing source reconciliation rather than a single-source lookup.
 4. **Map layers** are added incrementally as MapLibre GL sources/layers — each map feature in the matrix is one additional layer + a data-source client, not a new map component. Three layer patterns exist so far: real raster tiles (RainViewer radar, MAP-02/03), a sampled point grid rendered as blurred circles where no true gridded product exists for free (MAP-05/MAP-10 Powder Finder — see the caveat in `forecast-grid/route.ts`), and plain pins with a link/popup (webcams, MAP-16; resort pins colored by forecast snowfall for Powder Finder).
-5. **Alerts (PERS-03)** run as a scheduled job comparing latest forecast snapshots against stored user thresholds, then send via an email provider (start here — simplest) before considering push. Not built yet.
+5. **Alerts (PERS-03)**: `/api/alerts/subscribe` stores an email + location + threshold in SQLite; `/api/alerts/check` (meant to be hit on a schedule — nothing calls it automatically yet) compares each subscription's today's forecast snowfall against its threshold and sends via `lib/email.ts`, capped at once per calendar day per subscription (`last_notified_date`). No accounts/login — subscribe-by-email, like a mailing list, not a stored-credential system.
+6. **Failure handling is explicit per-page, not framework-boundary-based.** `app/location/[slug]/page.tsx` and `app/location/pin/page.tsx` wrap `getLocationDashboardData()` in a try/catch and render `LocationUnavailable` directly on failure — **not** `app/location/error.tsx`, which was live-tested against a real Open-Meteo 429 and confirmed not to catch it on Next.js 16.3.1 (see "Resolved," third pass, below). Any new page doing a data fetch that can plausibly fail should follow the same explicit try/catch pattern rather than assuming `error.tsx` will catch it.
 
 ## Build order (maps to matrix priorities)
 
 1. ✅ **P0 slice**: `resorts.json` seed data (Northern Utah/SE Idaho) → `/api/forecast` via Open-Meteo → location dashboard rendering a multi-day + hourly forecast, 24h snow estimate, and snow level vs. elevation (FC-10) → favorites (local-only, no auth).
 2. ✅ **P1 core, backcountry first**: base MapLibre map with resort pins + click-to-drop-pin (MAP-17) reusing the same location pipeline → elevation lookup for pins (FC-11) → avalanche zone lookup by coordinate (BC-02) feeding avalanche forecasts (BC-01). Confirmed working end-to-end for a dropped pin, not just curated resorts.
 3. ✅ **P1 core, remaining**: snow reports (via substitute source, see notes), piste overlay + webcam pins (MAP-16, page-link-only for now), multi-source corroborated conditions summary (SNOW-03), historical lookback (SNOW-05).
-4. **P2 breadth — first pass done**: air quality (SEV-06/07), current radar (MAP-02/03), sampled snowfall map + Powder Finder (MAP-05/MAP-10), estimated trail conditions (SNOW-02), wet-bulb + multi-model UI (FC-05/08), NWS observation stations (finishing DATA-01), My Location (PERS-02).
-5. **P2 breadth — not started**: remaining map overlays (smoke, temperature/wind/cloud forecast layers, true raster snowfall/precip rather than a sampled grid), slope-angle/aspect shading (MAP-18), offline map caching, personalization/alerts backend (PERS-03/04), fall colors (DATA-02), live UDOT/Idaho 511 camera images, precip-by-model (FC-06), NOHRSC's real snow-analysis grid (SNOW-01/MAP-06).
+4. ✅ **P2 breadth — first pass done**: air quality (SEV-06/07), current radar (MAP-02/03), sampled snowfall map + Powder Finder (MAP-05/MAP-10), estimated trail conditions (SNOW-02), wet-bulb + multi-model UI (FC-05/08), NWS observation stations (finishing DATA-01), My Location (PERS-02).
+5. ✅ **P2 breadth — second pass done**: live webcam images for 2 Snowbird cameras + a dedicated `/webcams` page (MAP-16), full alert-subscription backend (PERS-03 — subscribe/unsubscribe/check, SQLite storage, pluggable email, dashboard signup form; email sending itself needs a `RESEND_API_KEY` to actually deliver).
+6. **P2 breadth — not started**: remaining map overlays (smoke, temperature/wind/cloud forecast layers, true raster snowfall/precip rather than a sampled grid), slope-angle/aspect shading (MAP-18), offline map caching, push notifications (PERS-04), fall colors (DATA-02), UDOT/Idaho 511 camera images for resorts beyond Snowbird (needs a developer-key signup someone has to do themselves), precip-by-model (FC-06), NOHRSC's real snow-analysis grid (SNOW-01/MAP-06), scheduling `/api/alerts/check` (needs Vercel Cron config or equivalent once deployed).
 
 ## Resolved during the first build pass
 
@@ -117,12 +132,21 @@ These were open questions in the original design; all three turned out to be rea
 - **Open-Meteo rate limiting** — a single location dashboard originally issued 4 separate calls to the same `api.open-meteo.com/v1/forecast` endpoint (main forecast, a duplicate freezing-level fetch, multi-model comparison, trail-conditions window). Under this session's own repeated live testing that produced a sustained 429 which survived one retry and crashed the page. Fixed by (1) eliminating the duplicate freezing-level fetch — `snow-level.ts` now reuses `getForecast()`'s already-fetched hourly data instead of re-requesting it, (2) upgrading `fetchJson()`'s retry to two attempts with backoff (750ms, 1.5s), and (3) adding `app/location/error.tsx` as a last-resort graceful degradation. Any new Open-Meteo-backed feature should default to reusing already-fetched forecast data before adding a new call.
 - **Next.js fetch data cache has a 2MB response-size ceiling** — the SNOTEL station-list response (~2.1MB for ~225 stations) silently failed to cache on every request. Switched to `cache: "no-store"` to stop the silent failure; a real fix (trim the response server-side to the handful of fields this app uses) is still open.
 
+## Resolved during the third build pass (live webcams + alerts backend)
+
+- **`app/location/error.tsx` doesn't catch the failure it was built for.** Live-tested against a reproducible Open-Meteo 429: the HTTP response was Next's own generic `__next_error__` shell (confirmed by inspecting the raw payload — no trace of the custom component anywhere in it), not this app's error boundary, despite the file being present, correctly named, marked `"use client"`, and compiled into the build without any warning. **Fixed by handling the failure explicitly in each page** (try/catch around `getLocationDashboardData()`, rendering `LocationUnavailable` on failure) rather than relying on the framework convention — verified live afterward, now returns HTTP 200 with the friendly message instead of a 500. `error.tsx` is kept only as defense-in-depth for other, genuinely unexpected render errors; its comment now says so instead of overclaiming. **Don't trust a framework error-boundary convention without hitting it with a real failure and inspecting the actual response** — code review and a clean build both looked correct here.
+- **Live webcam images**: resort-hosted pages can expose real, keyless, direct image URLs even when the vendor's own API requires a key — Snowbird's page server-renders two HD Relay snapshot URLs (`b15.hdrelay.com/camera/{id}/snapshot`) directly in its static HTML, found by fetching the page and grepping for the vendor's asset domain, confirmed live by fetching each and checking it decodes as a current JPEG.
+- **UDOT's developer-key requirement is real**: confirmed live (`Invalid Key` with no key against `udottraffic.utah.gov/api/v2/get/cameras`), and the signup is a human-registration web form (name/email/org) — correctly left for the deployment owner to do themselves.
+- **`node:sqlite` needs `@types/node` ^22**, not the `^20` the original `create-next-app` scaffold shipped with — TypeScript won't recognize the module otherwise. Bumped in `package.json`.
+
 ## Still open
 
 - Lightning risk (SEV-02): evaluate Blitzortung.org reliability/coverage before committing to it.
 - NOHRSC integration (SNOW-01/MAP-06): still using an Open-Meteo reanalysis substitute rather than NOHRSC's actual snow-analysis grid — scope a real point-query approach.
-- Webcam sourcing (MAP-16): UDOT's camera API needs a free developer-key signup (rate-limited, ~10 calls/60s) — not signed up for yet, so MAP-16 currently links to camera *pages* rather than showing live images. Idaho's 511/ITD equivalent needs the same evaluation. Resort-hosted webcam images need per-site terms-of-use review before hotlinking.
+- Full webcam coverage (MAP-16): only 2 Snowbird cameras have verified live images. Other resorts render their camera grids client-side via JS, so the static-HTML scrape that worked for Snowbird didn't find their ids — would need a headless-browser fetch to extract those, or UDOT's/Idaho 511's key-gated APIs (signup not done — see "Resolved" above).
 - Slope-angle shading (MAP-18): this is the one feature requiring an offline raster-processing pipeline rather than a live API client — scope the DEM source (USGS 3DEP vs. NASADEM) and tiling approach before starting.
 - Resort seed data accuracy (RES-01/02): coordinates/elevations in `data/resorts.json` are from general knowledge, not verified against each resort's own published stats or cross-checked against OSM yet.
 - True raster map overlays (MAP-04/07/08/09 and upgrading MAP-05): the sampled-point-grid approach is a real-data stopgap, not a resolution-matched raster product — would need either a self-hosted tile-generation step over Open-Meteo's gridded output or a different provider.
 - SNOTEL response trimming: cache a small `{name, lat, lon, elevation, triplet}` projection of the station list instead of fetching/discarding the full ~2MB payload on every request.
+- Alert delivery: `/api/alerts/check` needs external scheduling (Vercel Cron, GitHub Actions, or a pinger) once deployed, and actual sending needs a `RESEND_API_KEY` + verified sending domain — both intentionally left as deployment-time configuration, not something to fabricate here.
+- Alert subscriptions have no way to list/manage a given email's subscriptions or re-fetch a lost unsubscribe token — fine for a first pass, worth adding if this sees real use.

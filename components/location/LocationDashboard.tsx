@@ -1,5 +1,6 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
+import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
 import SkiMap from "@/components/map/SkiMap";
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -67,6 +68,11 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           ))}
         </div>
       )}
+
+      <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+        <h2 className="mb-2 font-semibold">Snow alerts</h2>
+        <AlertSubscribeForm location={location} />
+      </section>
 
       <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
         <h2 className="mb-2 font-semibold">Conditions summary</h2>

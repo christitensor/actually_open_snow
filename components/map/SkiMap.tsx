@@ -135,16 +135,18 @@ export default function SkiMap({
       new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
     }
 
-    // Webcam pins (MAP-16) — orange, with a popup linking out to the source page.
+    // Webcam pins (MAP-16) — orange. Popup shows a live snapshot for cams
+    // with a verified imageUrl, otherwise falls back to a link-out.
     for (const cam of webcams) {
       const el = document.createElement("div");
       el.style.cssText =
         "width:12px;height:12px;border-radius:2px;background:#f97316;border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);";
       el.title = cam.name;
       el.addEventListener("click", (ev) => ev.stopPropagation());
-      const popup = new Popup({ offset: 12 }).setHTML(
-        `<strong>${cam.name}</strong><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`
-      );
+      const popupHtml = cam.imageUrl
+        ? `<strong>${cam.name}</strong><br/><img src="${cam.imageUrl}?t=${Date.now()}" alt="${cam.name}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
+        : `<strong>${cam.name}</strong><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`;
+      const popup = new Popup({ offset: 12 }).setHTML(popupHtml);
       new Marker({ element: el }).setLngLat([cam.lon, cam.lat]).setPopup(popup).addTo(map);
     }
 

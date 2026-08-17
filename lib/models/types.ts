@@ -154,6 +154,19 @@ export interface HistoricalDay {
   snowfallSumIn: number;
 }
 
+/** PERS-03: an email-based snow alert subscription. No accounts/login — subscribe by email + location, like a mailing list. */
+export interface AlertSubscription {
+  id: number;
+  email: string;
+  locationName: string;
+  lat: number;
+  lon: number;
+  thresholdIn: number;
+  unsubscribeToken: string;
+  createdAt: string;
+  lastNotifiedDate: string | null;
+}
+
 export interface Webcam {
   id: string;
   name: string;

@@ -1,10 +1,16 @@
 "use client";
 
-// Catches failures from getLocationDashboardData (most commonly an
-// upstream API being rate-limited or briefly down) so a location page
-// shows a retriable message instead of Next's generic crash page. Found
-// necessary live: Open-Meteo's free tier genuinely 429s under sustained
-// call volume, even after this app's one built-in retry.
+// Defense-in-depth for render-time errors in LocationDashboard itself
+// (not data-fetching — that's now caught explicitly in each page.tsx's
+// try/catch around getLocationDashboardData, wrapping in
+// LocationUnavailable instead). This boundary was originally written to
+// catch the data-fetch failure too, but live testing against a real
+// Open-Meteo 429 showed Next 16.3.1 does NOT route that failure through
+// this file — the response was Next's own generic `__next_error__` shell,
+// not this component. Kept as a second line of defense for genuinely
+// unexpected render errors, but don't rely on it for the known upstream-
+// API-failure case; that path is verified via the explicit try/catch.
+
 export default function LocationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6 text-center">
