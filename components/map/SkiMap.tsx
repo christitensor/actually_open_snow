@@ -11,7 +11,7 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Webcam } from "@/lib/models/types";
 
@@ -20,6 +20,17 @@ interface MapPin {
   name: string;
   lat: number;
   lon: number;
+  /** MAP-10 Powder Finder: today's forecast snowfall (inches) for this resort, if known — colors the pin */
+  snowfallTodayIn?: number;
+}
+
+function powderColor(inches: number | undefined): string {
+  if (inches == null) return "#2563eb";
+  if (inches >= 8) return "#a21caf";
+  if (inches >= 4) return "#7c3aed";
+  if (inches >= 1) return "#2563eb";
+  if (inches > 0) return "#60a5fa";
+  return "#9ca3af";
 }
 
 // No MapTiler/vector-tile API key configured anywhere in this build, so
@@ -61,7 +72,15 @@ interface SkiMapProps {
   zoom?: number;
   showPistes?: boolean;
   allowPinDrop?: boolean;
+  showRadarToggle?: boolean;
+  showSnowForecastToggle?: boolean;
 }
+
+// RainViewer's public API (free, CORS-open, no key) — MAP-02/03 current
+// radar. Their nowcast/forecast frames aren't used here, only the latest
+// observed frame; see TRACE_MATRIX.md MAP-02 for why forecast radar is
+// out of scope for now.
+const RAINVIEWER_MAPS_URL = "https://api.rainviewer.com/public/weather-maps.json";
 
 export default function SkiMap({
   resorts,
@@ -70,10 +89,18 @@ export default function SkiMap({
   zoom = 9,
   showPistes = true,
   allowPinDrop = true,
+  showRadarToggle = true,
+  showSnowForecastToggle = true,
 }: SkiMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const router = useRouter();
+  const [radarOn, setRadarOn] = useState(false);
+  const [radarReady, setRadarReady] = useState(false);
+  const [radarTime, setRadarTime] = useState<string | null>(null);
+  const [snowOverlayOn, setSnowOverlayOn] = useState(false);
+  const snowOverlayOnRef = useRef(false);
+  const loadSnowGridRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -95,12 +122,12 @@ export default function SkiMap({
       });
     }
 
-    // Resort pins.
+    // Resort pins — colored by today's forecast snowfall when known (MAP-10 Powder Finder).
     for (const resort of resorts) {
       const el = document.createElement("div");
-      el.style.cssText =
-        "width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);";
-      el.title = resort.name;
+      const color = powderColor(resort.snowfallTodayIn);
+      el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);`;
+      el.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
       el.addEventListener("click", (ev) => {
         ev.stopPropagation(); // don't also trigger the map's pin-drop handler
         router.push(`/location/${resort.id}`);
@@ -175,6 +202,93 @@ export default function SkiMap({
       });
     }
 
+    // MAP-04/05: sampled forecast-snowfall grid overlay, toggled like radar.
+    if (showSnowForecastToggle) {
+      let snowDebounce: ReturnType<typeof setTimeout> | undefined;
+
+      const loadSnowGrid = async () => {
+        if (!snowOverlayOnRef.current) return;
+        const bounds = map.getBounds();
+        const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(",");
+        try {
+          const res = await fetch(`/api/forecast-grid?bbox=${bbox}`);
+          if (!res.ok) return;
+          const { grid } = (await res.json()) as { grid: { lat: number; lon: number; valueIn: number }[] };
+
+          const geojson: GeoJSON.FeatureCollection = {
+            type: "FeatureCollection",
+            features: grid.map((p) => ({
+              type: "Feature",
+              properties: { valueIn: p.valueIn },
+              geometry: { type: "Point", coordinates: [p.lon, p.lat] },
+            })),
+          };
+
+          const source = map.getSource("snow-grid") as GeoJSONSource | undefined;
+          if (source) {
+            source.setData(geojson);
+          } else if (map.isStyleLoaded()) {
+            map.addSource("snow-grid", { type: "geojson", data: geojson });
+            map.addLayer({
+              id: "snow-grid-circles",
+              type: "circle",
+              source: "snow-grid",
+              layout: { visibility: "none" },
+              paint: {
+                "circle-radius": 18,
+                "circle-blur": 0.8,
+                "circle-opacity": 0.55,
+                "circle-color": [
+                  "interpolate",
+                  ["linear"],
+                  ["get", "valueIn"],
+                  0,
+                  "#ffffff00",
+                  0.5,
+                  "#93c5fd",
+                  2,
+                  "#3b82f6",
+                  6,
+                  "#7c3aed",
+                  12,
+                  "#db2777",
+                ] as unknown as DataDrivenPropertyValueSpecification<string>,
+              },
+            });
+          }
+        } catch {
+          // A missing snow overlay shouldn't break the rest of the map.
+        }
+      };
+
+      map.on("moveend", () => {
+        clearTimeout(snowDebounce);
+        snowDebounce = setTimeout(loadSnowGrid, 500);
+      });
+      loadSnowGridRef.current = loadSnowGrid;
+    }
+
+    // MAP-02/03: current radar, added once but only shown once toggled on.
+    if (showRadarToggle) {
+      map.on("load", async () => {
+        try {
+          const res = await fetch(RAINVIEWER_MAPS_URL);
+          if (!res.ok) return;
+          const data = (await res.json()) as { host: string; radar: { past: { time: number; path: string }[] } };
+          const latest = data.radar.past.at(-1);
+          if (!latest) return;
+
+          const tileUrl = `${data.host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`;
+          map.addSource("radar", { type: "raster", tiles: [tileUrl], tileSize: 256 });
+          map.addLayer({ id: "radar-layer", type: "raster", source: "radar", paint: { "raster-opacity": 0.6 }, layout: { visibility: "none" } });
+          setRadarTime(new Date(latest.time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+          setRadarReady(true);
+        } catch {
+          // RainViewer being unreachable shouldn't break the rest of the map.
+        }
+      });
+    }
+
     return () => {
       map.remove();
       mapRef.current = null;
@@ -182,5 +296,41 @@ export default function SkiMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map is initialized once; props are read at mount time
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !radarReady) return;
+    map.setLayoutProperty("radar-layer", "visibility", radarOn ? "visible" : "none");
+  }, [radarOn, radarReady]);
+
+  useEffect(() => {
+    snowOverlayOnRef.current = snowOverlayOn;
+    const map = mapRef.current;
+    if (!map || !map.getLayer("snow-grid-circles")) return;
+    map.setLayoutProperty("snow-grid-circles", "visibility", snowOverlayOn ? "visible" : "none");
+    if (snowOverlayOn) loadSnowGridRef.current?.();
+  }, [snowOverlayOn]);
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+      <div className="absolute bottom-3 left-3 z-10 flex gap-2">
+        {showRadarToggle && radarReady && (
+          <button
+            onClick={() => setRadarOn((v) => !v)}
+            className="rounded-lg border border-gray-300 bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/90 dark:hover:bg-gray-900"
+          >
+            {radarOn ? "Hide" : "Show"} radar{radarTime ? ` (${radarTime})` : ""} · RainViewer
+          </button>
+        )}
+        {showSnowForecastToggle && (
+          <button
+            onClick={() => setSnowOverlayOn((v) => !v)}
+            className="rounded-lg border border-gray-300 bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/90 dark:hover:bg-gray-900"
+          >
+            {snowOverlayOn ? "Hide" : "Show"} today&apos;s snow forecast (est.)
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

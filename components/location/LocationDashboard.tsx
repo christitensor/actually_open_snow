@@ -13,8 +13,34 @@ function fmtDate(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
+const AQI_LABEL = (aqi: number): { label: string; color: string } => {
+  if (aqi <= 50) return { label: "Good", color: "text-green-600" };
+  if (aqi <= 100) return { label: "Moderate", color: "text-yellow-600" };
+  if (aqi <= 150) return { label: "Unhealthy (sensitive)", color: "text-orange-600" };
+  if (aqi <= 200) return { label: "Unhealthy", color: "text-red-600" };
+  return { label: "Very unhealthy+", color: "text-purple-700" };
+};
+
 export default function LocationDashboard({ data }: { data: LocationDashboardData }) {
-  const { location, elevationFt, forecast, snowLevel, snowLineStatus, powderQualityToday, alerts, avalancheZone, avalancheForecast, conditionsSummary, nearestSnotel } = data;
+  const {
+    location,
+    elevationFt,
+    forecast,
+    snowLevel,
+    snowLineStatus,
+    powderQualityToday,
+    trailConditions,
+    wetBulbNowF,
+    alerts,
+    avalancheZone,
+    avalancheForecast,
+    conditionsSummary,
+    nearestSnotel,
+    nearestNwsStations,
+    airQuality,
+    multiModelTodaySnowfallIn,
+    pastWeek,
+  } = data;
 
   const currentSnowLevelFt = snowLevel.points[0]?.snowLevelFt ?? snowLevel.points[0]?.freezingLevelFt ?? null;
 
@@ -60,6 +86,13 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         <StatTile label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above ❄️" : "Below 🌧️"} />
         <StatTile label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
         <StatTile label="Powder quality" value={powderQualityToday?.quality ?? "No new snow"} sub={powderQualityToday ? `~${powderQualityToday.estimatedRatio}:1 (est.)` : undefined} />
+        <StatTile label="Trail conditions (est.)" value={trailConditions?.label ?? "—"} sub={trailConditions?.detail} />
+        <StatTile label="Wet-bulb temp" value={wetBulbNowF != null ? `${Math.round(wetBulbNowF)}°F` : "—"} sub="Snowmaking-relevant" />
+        <StatTile
+          label="Air quality"
+          value={airQuality?.currentUsAqi != null ? `${airQuality.currentUsAqi} AQI` : "—"}
+          sub={airQuality?.currentUsAqi != null ? AQI_LABEL(airQuality.currentUsAqi).label : undefined}
+        />
       </section>
 
       <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
@@ -90,6 +123,20 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         </div>
       </section>
 
+      {multiModelTodaySnowfallIn && (
+        <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <h2 className="mb-2 font-semibold">Today&apos;s new snow — by model</h2>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {Object.entries(multiModelTodaySnowfallIn).map(([model, inches]) => (
+              <div key={model} className="rounded-lg border border-gray-200 px-3 py-1.5 dark:border-gray-800">
+                <span className="text-gray-500">{model.replace(/_seamless|_ifs04/g, "")}</span>{" "}
+                <span className="font-semibold">{inches.toFixed(1)}&quot;</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
         <h2 className="mb-2 font-semibold">Avalanche forecast</h2>
         {avalancheForecast ? (
@@ -111,14 +158,47 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         )}
       </section>
 
-      {nearestSnotel && (
+      {pastWeek.length > 0 && (
         <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-          <h2 className="mb-1 font-semibold">Nearest SNOTEL station</h2>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            {nearestSnotel.station.name} ({nearestSnotel.station.distanceMi.toFixed(1)} mi away, {nearestSnotel.station.elevationFt.toLocaleString()} ft) —{" "}
-            {nearestSnotel.snowDepthIn != null ? `${nearestSnotel.snowDepthIn}" snow depth` : "no depth reading"}
-            {nearestSnotel.sweIn != null ? `, ${nearestSnotel.sweIn}" SWE` : ""} as of {nearestSnotel.date}.
-          </p>
+          <h2 className="mb-3 font-semibold">Past 7 days</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] text-sm">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="py-1 pr-4">Day</th>
+                  <th className="py-1 pr-4">High / Low</th>
+                  <th className="py-1">Snow</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pastWeek.map((d) => (
+                  <tr key={d.date} className="border-t border-gray-100 dark:border-gray-800">
+                    <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
+                    <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
+                    <td className="py-1.5">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {(nearestSnotel || nearestNwsStations.length > 0) && (
+        <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <h2 className="mb-1 font-semibold">Nearby stations</h2>
+          {nearestSnotel && (
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              <strong>SNOTEL</strong> — {nearestSnotel.station.name} ({nearestSnotel.station.distanceMi.toFixed(1)} mi away, {nearestSnotel.station.elevationFt.toLocaleString()} ft) —{" "}
+              {nearestSnotel.snowDepthIn != null ? `${nearestSnotel.snowDepthIn}" snow depth` : "no depth reading"}
+              {nearestSnotel.sweIn != null ? `, ${nearestSnotel.sweIn}" SWE` : ""} as of {nearestSnotel.date}.
+            </p>
+          )}
+          {nearestNwsStations.length > 0 && (
+            <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+              <strong>NWS observation stations</strong> — {nearestNwsStations.slice(0, 3).map((s) => s.name).join(", ")}
+            </p>
+          )}
         </section>
       )}
 
@@ -129,6 +209,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           zoom={11}
           showPistes={false}
           allowPinDrop={false}
+          showRadarToggle={false}
+          showSnowForecastToggle={false}
         />
       </section>
     </div>

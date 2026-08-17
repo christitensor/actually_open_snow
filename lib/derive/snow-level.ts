@@ -4,7 +4,7 @@
 // inside. Resolves against a location's elevation so the UI can say
 // "raining at base, snowing above 8,200 ft."
 
-import { getFreezingLevelFt } from "@/lib/data-sources/open-meteo";
+import { getForecast } from "@/lib/data-sources/open-meteo";
 import { getSnowLevel } from "@/lib/data-sources/nws";
 import type { SnowLevelPoint, SnowLevelResponse } from "@/lib/models/types";
 
@@ -17,8 +17,22 @@ function nearestByTime<T extends { time: string }>(list: T[], targetIso: string)
   }, undefined)?.item;
 }
 
-export async function getSnowLevelForLocation(lat: number, lon: number): Promise<SnowLevelResponse> {
-  const freezingLevel = await getFreezingLevelFt(lat, lon);
+/**
+ * @param hourlyFreezingLevel Reuse the freezing level already present in a
+ *   ForecastResponse's `hourly` array when the caller has one (the main
+ *   dashboard path does) — `getForecast()` requests
+ *   `freezing_level_height` as part of its normal hourly call, so a
+ *   second Open-Meteo request just for freezing level was a genuinely
+ *   redundant call, caught by live load-testing. Only fetched here as a
+ *   fallback for callers (like the standalone `/api/snow-level` route)
+ *   that don't already have a forecast in hand.
+ */
+export async function getSnowLevelForLocation(
+  lat: number,
+  lon: number,
+  hourlyFreezingLevel?: { time: string; freezingLevelFt: number }[]
+): Promise<SnowLevelResponse> {
+  const freezingLevel = hourlyFreezingLevel ?? (await getForecast(lat, lon)).hourly;
 
   let nwsPoints: SnowLevelPoint[] = [];
   let nwsAvailable = true;

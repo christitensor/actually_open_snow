@@ -35,6 +35,7 @@ export interface HourlyForecastPoint {
   windSpeedMph: number;
   windGustMph: number;
   weatherCode: number;
+  freezingLevelFt: number;
 }
 
 export interface DailyForecastDay {
@@ -135,6 +136,22 @@ export interface ConditionsSummary {
     afdMentionsUncertainty: boolean;
     recentSnotelMatchesForecast: boolean | null;
   };
+}
+
+export interface AirQuality {
+  location: { lat: number; lon: number };
+  currentUsAqi: number | null;
+  currentPm25: number | null;
+  currentPm10: number | null;
+  forecastUsAqi: { time: string; usAqi: number | null }[];
+}
+
+export interface HistoricalDay {
+  date: string;
+  tempMaxF: number;
+  tempMinF: number;
+  precipitationSumIn: number;
+  snowfallSumIn: number;
 }
 
 export interface Webcam {

@@ -28,7 +28,14 @@ const PHASE_1_TRIPLETS = "*:UT:SNTL,*:ID:SNTL";
 
 async function fetchPhase1Stations(): Promise<AwdbStation[]> {
   const url = `${BASE}/stations?stationTriplets=${PHASE_1_TRIPLETS}&activeOnly=true`;
-  const res = await fetch(url, { next: { revalidate: 86400 } }); // station metadata changes rarely
+  // Not using Next's `next: { revalidate }` data cache here: the AWDB
+  // response for ~225 UT/ID stations is ~2.1MB (each station's
+  // `associatedHucs` array is large), over Next's 2MB fetch-cache ceiling
+  // — caching silently failed with a console warning every request before
+  // this was explicit. `no-store` matches what was actually happening
+  // already; a real fix would trim the response to the ~4 fields this app
+  // uses and cache that instead, not attempted yet.
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`SNOTEL stations request failed (${res.status})`);
   }
