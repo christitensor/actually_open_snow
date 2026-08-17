@@ -6,6 +6,20 @@ This project does **not** replicate OpenSnow's subscription tiering — every fe
 
 See `ARCHITECTURE.md` for the technical design these data sources plug into.
 
+## Phase 1 regional scope: Northern Utah & Southeast Idaho
+
+To maximize data quality while the app is being built, all P0/P1 work targets **Northern Utah and Southeast Idaho** only — everything in this matrix is designed to generalize nationally later, but the seed data (RES-01/RES-02) and any manual curation (webcams, trail maps) starts scoped to this region. Reasons this region specifically maximizes free-data quality:
+
+- **Single/dual NWS forecast office coverage** — Salt Lake City (WFO SLC) covers northern Utah; Pocatello (WFO PIH) covers southeast Idaho. Fewer offices to reconcile than a nationwide launch.
+- **Dense SNOTEL network** — the Intermountain West (Utah/Idaho) has one of the densest NRCS SNOTEL station networks in the country, so snowpack ground-truth data (DATA-01, SNOW-03 corroboration) is unusually good here.
+- **Utah Avalanche Center** covers the Salt Lake, Ogden, Logan, and Provo zones (northern Utah); backcountry near the Utah/Idaho border and the Tetons is covered by neighboring centers — exact zone-to-resort mapping needs confirming per location during BC-01 build-out.
+- **UDOT** publishes a free (developer-key-required, no cost) camera API covering the Cottonwood Canyons and other Wasatch corridors — a strong seed for MAP-16. **Idaho 511 / ITD** is the parallel source for southeast Idaho corridors.
+
+Initial resort/location seed list (editable, not exhaustive) for RES-01:
+
+- **Northern Utah**: Alta, Snowbird, Brighton, Solitude, Park City, Deer Valley, Snowbasin, Powder Mountain, Nordic Valley, Beaver Mountain, Cherry Peak, Sundance
+- **Southeast Idaho**: Pebble Creek, Kelly Canyon, Pomerelle Mountain Resort, Grand Targhee (borderline — technically Wyoming, but the primary access/gateway community is Driggs, ID, so worth including)
+
 ## Status legend
 
 | Status | Meaning |
@@ -37,6 +51,7 @@ See `ARCHITECTURE.md` for the technical design these data sources plug into.
 | FC-07 | Powder Quality (snow density/quality estimate) | Qualitative read on whether new snow will be light/dense | Derived heuristic: temp-at-precip-time vs. NWS/Open-Meteo snow ratio guidance (e.g. Cobb's Rule) | P1 | Not Started | No free API gives this directly; needs a formula |
 | FC-08 | Snowmaking (wet-bulb temp) forecast | Wet-bulb temp forecast for resort snowmaking ops | Derived: wet-bulb calc from Open-Meteo temp + humidity + pressure | P2 | Not Started | Formula-based, not a raw feed |
 | FC-09 | Powder Vision (visual powder-day likelihood) | At-a-glance "how good will it be" indicator | Derived composite score from FC-01/03/07 | P2 | Not Started | Original OpenSnow feature; needs our own scoring design |
+| FC-10 | Snow level (rain/snow line) by elevation | Elevation at which precip transitions from rain to snow, shown against each resort's base/mid/summit elevation so users can tell "raining at base, snowing up top" | NWS gridpoint `snowLevel` property (`api.weather.gov`, primary, US only, direct field — no derivation needed) + Open-Meteo `freezing_level_height` hourly variable (fallback/corroboration, global) | P0 | Not Started | Cross-reference against RES-02 base/mid/summit elevations to render as a simple "above/below snow line" indicator per resort |
 
 ## 2. Maps & Visualization
 
@@ -57,6 +72,7 @@ See `ARCHITECTURE.md` for the technical design these data sources plug into.
 | MAP-13 | Offline ski resort trail maps | Downloadable piste/trail maps | OpenStreetMap `piste:*` tags via Overpass API (free, open data) | P1 | Not Started | Resort-published trail map PDFs are typically copyrighted — OSM piste data is the legally clean free alternative; coverage varies by resort |
 | MAP-14 | Land boundary & ownership maps | Public/private/wilderness boundary overlay | USGS PAD-US (Protected Areas Database) + USFS/BLM open GIS data (free, public domain) | P2 | Not Started | |
 | MAP-15 | Recent satellite maps | Recent satellite imagery layer | NASA GIBS (Global Imagery Browse Services) — free WMTS tiles | P2 | Not Started | |
+| MAP-16 | Webcam map | Map showing every available webcam so users can visually confirm current snow/road conditions, not just trust a forecast number | Curated pins combining: **UDOT** camera API (`udottraffic.utah.gov/api/v2/get/cameras`, free but requires a no-cost developer key — covers Cottonwood Canyons/Wasatch corridors) + **Idaho 511/ITD** camera feed (parallel source for SE Idaho corridors) + manually curated resort-hosted webcam links (Alta, Snowbird, Brighton, Solitude, Snowbasin, Powder Mountain, Park City, Deer Valley each publish public webcams on their own sites) | P1 | Not Started | Depends on MAP-01 base map. Resort-hosted cams need per-resort verification of a linkable/embeddable image URL vs. just deep-linking to their webcam page — check each site's terms before hotlinking images directly |
 
 ## 3. Severe Weather
 
@@ -76,7 +92,7 @@ See `ARCHITECTURE.md` for the technical design these data sources plug into.
 |---|---|---|---|---|---|---|
 | SNOW-01 | Estimated 24-hour snow reports | New snow in the last 24h per resort | NOAA NOHRSC snowfall analysis, sampled at resort coordinates | P0 | Not Started | Core "did it snow" feature |
 | SNOW-02 | Estimated trail conditions | Rough groomed/powder/icy condition estimate | Derived heuristic from recent precip + temp swings (no free direct feed) | P2 | Not Started | Needs our own scoring logic |
-| SNOW-03 | Conditions summary | Human-readable daily conditions blurb per resort | Generated summary from FC/SNOW data, template or LLM-assisted copy | P1 | Not Started | |
+| SNOW-03 | Conditions summary (multi-source corroborated) | A written, human-readable daily summary per resort that pulls from **NOAA's own forecaster-written text** — the NWS Area Forecast Discussion (AFD) product, which explains model reasoning/uncertainty in plain language — alongside our own derived forecast (FC-01/03/07/10) and SNOTEL/NOHRSC ground-truth observations, then reconciles them into one summary. Where sources agree, state it plainly; where they disagree (e.g. models split on totals, or the AFD flags uncertainty), say so explicitly rather than picking one number silently | Primary: NWS text products API (`api.weather.gov/products`, AFD product type, filtered to WFO SLC / WFO PIH for Phase 1 — exact product-type/location query needs confirming during build) + Open-Meteo multi-model spread (FC-05) for model agreement/disagreement + SNOTEL actuals (DATA-01) as ground truth to check forecast skill against + NOHRSC (SNOW-01) for recent observed snow | P1 | Not Started | This is the closest free-data substitute for OpenSnow's human "Daily Snow" forecaster posts (EXP-01) — corroboration logic (agree/disagree detection across sources) is new design work, not a simple template |
 | SNOW-04 | Live snow (real-time updates during storms) | Fast-refreshing snow total ticker during active storms | Poll NOHRSC/Open-Meteo on a short interval during active precip | P2 | Not Started | |
 | SNOW-05 | Historical hourly & daily weather | Look back at past conditions for a location | Open-Meteo Historical Weather API (free, no key, global archive) | P1 | Not Started | |
 
@@ -99,7 +115,7 @@ See `ARCHITECTURE.md` for the technical design these data sources plug into.
 
 | ID | Feature | Description | Data Source Plan | Priority | Status | Notes |
 |---|---|---|---|---|---|---|
-| EXP-01 | Local "Daily Snow" forecaster posts | Daily human-written regional forecast commentary | No equivalent free data feed — this is OpenSnow's human forecaster team, not a data product | P2 | Blocked | Either skip, write our own periodic summary posts, or generate templated commentary from FC/SNOW data |
+| EXP-01 | Local "Daily Snow" forecaster posts | Daily human-written regional forecast commentary | No equivalent free data feed — this is OpenSnow's human forecaster team, not a data product | P2 | Blocked | SNOW-03's multi-source corroborated summary is the practical substitute for now; revisit whether a dedicated "posts" feature is still needed once SNOW-03 ships |
 
 ## 8. Data & Stations
 
@@ -112,8 +128,8 @@ See `ARCHITECTURE.md` for the technical design these data sources plug into.
 
 | ID | Feature | Description | Data Source Plan | Priority | Status | Notes |
 |---|---|---|---|---|---|---|
-| RES-01 | Resort database (name, lat/lon, region) | Seed list of ski resorts/backcountry zones to power location pages | Manually curated JSON seed (no single free authoritative API); cross-check against OpenStreetMap `landuse=winter_sports` nodes | P0 | Not Started | This underlies almost every other feature — build first |
-| RES-02 | Resort base/summit elevation | Elevation stats per resort | Manually curated alongside RES-01, or USGS elevation API lookup by coordinate | P0 | Not Started | |
+| RES-01 | Resort database (name, lat/lon, region) | Seed list of ski resorts/backcountry zones to power location pages | Manually curated JSON seed (no single free authoritative API); cross-check against OpenStreetMap `landuse=winter_sports` nodes | P0 | Not Started | This underlies almost every other feature — build first. Phase 1 seed list is scoped to Northern Utah/SE Idaho — see "Phase 1 regional scope" above |
+| RES-02 | Resort base/mid/summit elevation | Elevation stats per resort, at base/mid-mountain/summit granularity | Manually curated alongside RES-01, or USGS elevation API lookup by coordinate | P0 | Not Started | Needed at base/mid/summit granularity (not just base) to power FC-10's snow-level-vs-elevation indicator |
 
 ---
 
