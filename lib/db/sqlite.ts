@@ -5,16 +5,21 @@
 // matching ARCHITECTURE.md's original plan ("SQLite is fine for local
 // dev, Postgres for anything deployed"). Swap this module for a Postgres
 // client before a real multi-instance production deploy: SQLite here is a
-// single file on local disk, which does not survive or share state across
-// serverless instances.
-
+// single file, which does not survive or share state across serverless
+// instances — on Vercel specifically, each function instance gets its own
+// ephemeral copy that resets on cold start/redeploy, so subscriptions
+// aren't durable there. Using os.tmpdir() (not process.cwd()) is what
+// makes this not crash on Vercel at all: the deployment bundle itself is
+// read-only at runtime, so writing next to it throws EROFS the moment
+// this route is hit.
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { AlertSubscription } from "@/lib/models/types";
 
-const DB_PATH = join(process.cwd(), ".data", "app.db");
+const DB_PATH = join(tmpdir(), "actually-open-snow", "app.db");
 
 let db: DatabaseSync | null = null;
 
