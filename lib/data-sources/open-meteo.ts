@@ -177,7 +177,7 @@ export async function getElevationAdjustedDaily(
   const url =
     `${FORECAST_BASE}?latitude=${lat}&longitude=${lon}&elevation=${elevationM}` +
     `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum` +
-    `&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7`;
+    `&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=14`;
   const raw = await fetchJson<{
     daily: {
       time: string[];

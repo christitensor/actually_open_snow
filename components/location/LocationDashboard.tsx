@@ -1,7 +1,7 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
-import ElevationAdjuster from "@/components/location/ElevationAdjuster";
+import ForecastTable from "@/components/location/ForecastTable";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
@@ -9,11 +9,6 @@ import { webcams as allWebcams } from "@/data/webcams";
 import { degToCompass } from "@/lib/util/wind";
 
 const HOURLY_DISPLAY_HOURS = 24;
-
-// Open-Meteo's model blend (getForecast, forecast_days=16) already returns
-// this many days — capped at 14 to match what we're comfortable actually
-// showing as guidance (day 15-16 gets noticeably noisier).
-const FORECAST_DISPLAY_DAYS = 14;
 
 const SEVERITY_COLOR: Record<string, string> = {
   Extreme: "bg-red-600 text-white",
@@ -63,7 +58,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
 
   const currentSnowLevelFt = snowLevel.points[0]?.snowLevelFt ?? snowLevel.points[0]?.freezingLevelFt ?? null;
   const resortWebcams = location.resortId ? allWebcams.filter((w) => w.resortId === location.resortId) : [];
-  const todayForBaseline = forecast.daily[0];
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
@@ -125,49 +119,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             />
           </section>
 
-          <section className="card p-4">
-            <h2 className="mb-1 font-bold tracking-tight">{FORECAST_DISPLAY_DAYS}-day forecast</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Days 8+ are lower-confidence trend guidance from Open-Meteo&apos;s model blend, not a precise day-by-day
-              call — treat them as a heads-up on pattern changes, not a packing list.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
-                  <tr className="text-left text-muted-foreground">
-                    <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Day</th>
-                    <th className="py-1 pr-4 font-medium">High / Low</th>
-                    <th className="py-1 pr-4 font-medium">New snow</th>
-                    <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
-                    <th className="py-1 pr-4 font-medium">Snow line</th>
-                    <th className="py-1 font-medium">Wind</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {forecast.daily.slice(0, FORECAST_DISPLAY_DAYS).map((d, i) => {
-                    const snowLine = dailySnowLines[i];
-                    return (
-                      <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
-                        <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
-                        <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
-                        <td className="py-1.5 pr-4">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
-                        <td className="py-1.5 pr-4">{d.precipitationSumIn.toFixed(2)}&quot;</td>
-                        <td className="py-1.5 pr-4">{snowLine?.snowLineFt != null ? `${snowLine.snowLineFt.toLocaleString()} ft` : "—"}</td>
-                        <td className="py-1.5">
-                          {Math.round(d.windSpeedMaxMph)}
-                          {d.windGustMaxMph > d.windSpeedMaxMph + 3 ? ` G${Math.round(d.windGustMaxMph)}` : ""} mph {degToCompass(d.windDirectionDominantDeg)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Snow line is an afternoon estimate — {dailySnowLines.some((d) => d.source === "nws") ? "NWS gridpoint forecast where available, Open-Meteo freezing level beyond its ~7-day range." : "Open-Meteo freezing level (no NWS coverage for this point)."}
-              {" "}Precip (liquid) is total rain+snow water content for the day — it&apos;s not snow depth and includes rain, so it won&apos;t match New snow on warm days. New snow is Open-Meteo&apos;s own modeled snow accumulation, already converted from liquid using a temperature-based ratio (not a flat 10:1).
-            </p>
-          </section>
+          <ForecastTable location={location} elevationFt={elevationFt} dailyForecast={forecast.daily} dailySnowLines={dailySnowLines} />
 
           {upcomingHours.length > 0 && (
             <section className="card p-4">
@@ -201,10 +153,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 </table>
               </div>
             </section>
-          )}
-
-          {todayForBaseline && (
-            <ElevationAdjuster location={location} elevationFt={elevationFt} baselineToday={todayForBaseline} />
           )}
 
           {resortWebcams.length > 0 && (
