@@ -38,6 +38,8 @@ const DAILY_PARAMS = [
   "wind_gusts_10m_max",
   "wind_direction_10m_dominant",
   "weather_code",
+  "sunrise",
+  "sunset",
 ].join(",");
 
 interface OpenMeteoForecastRaw {
@@ -64,6 +66,8 @@ interface OpenMeteoForecastRaw {
     wind_gusts_10m_max: number[];
     wind_direction_10m_dominant: number[];
     weather_code: number[];
+    sunrise: string[];
+    sunset: string[];
   };
 }
 
@@ -135,6 +139,8 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     windGustMaxMph: raw.daily.wind_gusts_10m_max[i],
     windDirectionDominantDeg: raw.daily.wind_direction_10m_dominant[i],
     weatherCode: raw.daily.weather_code[i],
+    sunrise: raw.daily.sunrise[i],
+    sunset: raw.daily.sunset[i],
   }));
 
   return {

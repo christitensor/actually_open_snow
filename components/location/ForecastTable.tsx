@@ -123,7 +123,7 @@ export default function ForecastTable({
           <thead>
             <tr className="text-left text-muted-foreground">
               <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Day</th>
-              <th className="py-1 pr-4 font-medium">High / Low</th>
+              <th className="py-1 pr-4 pl-4 font-medium">High / Low</th>
               <th className="py-1 pr-4 font-medium">New snow</th>
               <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
               <th className="py-1 pr-4 font-medium">Snow line</th>
@@ -138,7 +138,7 @@ export default function ForecastTable({
               return (
                 <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
                   <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
-                  <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
+                  <td className={`py-1.5 pr-4 pl-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
                     {Math.round(row.tempMaxF)}° / {Math.round(row.tempMinF)}°
                   </td>
                   <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>

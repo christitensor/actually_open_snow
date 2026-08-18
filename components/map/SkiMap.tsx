@@ -69,6 +69,8 @@ interface PisteWay {
 interface SkiMapProps {
   resorts: MapPin[];
   webcams?: Webcam[];
+  /** Highlights where the current page's location is, distinct from the clickable resort pins — not itself clickable-to-navigate. */
+  currentLocation?: { name: string; lat: number; lon: number };
   center: [number, number]; // [lon, lat]
   zoom?: number;
   showPistes?: boolean;
@@ -86,6 +88,7 @@ const RAINVIEWER_MAPS_URL = "https://api.rainviewer.com/public/weather-maps.json
 export default function SkiMap({
   resorts,
   webcams = [],
+  currentLocation,
   center,
   zoom = 9,
   showPistes = true,
@@ -119,6 +122,19 @@ export default function SkiMap({
     mapRef.current = map;
     map.addControl(new NavigationControl(), "top-right");
 
+    // Sticky/flex sidebars (the desktop layout on both the home page and
+    // location pages) don't necessarily have their final size yet when
+    // this effect runs — MapLibre computes its projection matrix from
+    // the container's size at that moment and never re-checks it on its
+    // own. Live-verified: without this, marker positions ended up
+    // computed against a stale container box, landing hundreds to
+    // thousands of pixels outside the actually-visible map — clickable
+    // in theory, but nowhere the user could see or reach. A
+    // ResizeObserver keeps the map's internal size in sync with
+    // whatever its container actually ends up being, not just at mount.
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(containerRef.current);
+
     // MAP-17: click anywhere that isn't a marker drops a backcountry pin.
     if (allowPinDrop) {
       map.on("click", (e: MapMouseEvent) => {
@@ -131,13 +147,31 @@ export default function SkiMap({
     for (const resort of resorts) {
       const el = document.createElement("div");
       const color = powderColor(resort.snowfallTodayIn);
-      el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);`;
+      // z-index above webcam pins: a few resorts (Alta, Brighton, Park City,
+      // Powder Mountain) have a webcam sitting at effectively the same
+      // coordinates, and without this the webcam pin — added after, so
+      // painted on top by default — silently ate the click (its own handler
+      // only stops propagation, no navigation), live-verified as the actual
+      // cause of "clicking the map does nothing" for those resorts.
+      el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);z-index:2;`;
       el.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
       el.addEventListener("click", (ev) => {
         ev.stopPropagation(); // don't also trigger the map's pin-drop handler
         router.push(`/location/${resort.id}`);
       });
       new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
+    }
+
+    // "You are here" — distinct from the clickable resort pins above, and
+    // deliberately not wired to navigate anywhere (you're already on this
+    // location's page).
+    if (currentLocation) {
+      const el = document.createElement("div");
+      el.style.cssText =
+        "width:18px;height:18px;border-radius:50%;background:var(--color-accent, #f59e0b);border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.5);";
+      el.title = `${currentLocation.name} (this location)`;
+      el.addEventListener("click", (ev) => ev.stopPropagation());
+      new Marker({ element: el }).setLngLat([currentLocation.lon, currentLocation.lat]).addTo(map);
     }
 
     // Webcam pins (MAP-16) — orange. Popup shows a live snapshot for cams
@@ -297,6 +331,7 @@ export default function SkiMap({
     }
 
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };

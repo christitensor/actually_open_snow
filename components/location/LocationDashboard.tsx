@@ -5,6 +5,7 @@ import ForecastTable from "@/components/location/ForecastTable";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
+import { resorts } from "@/data/resorts";
 import { webcams as allWebcams } from "@/data/webcams";
 import { degToCompass } from "@/lib/util/wind";
 
@@ -23,6 +24,12 @@ function fmtDate(iso: string) {
 
 function fmtHour(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric" });
+}
+
+// Unlike hourly forecast points, sunrise/sunset don't fall on the hour —
+// fmtHour's hour-only formatting would round "6:40 AM" down to "6 AM".
+function fmtSunTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 const AQI_LABEL = (aqi: number): { label: string; color: string } => {
@@ -60,6 +67,12 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
 
   const currentSnowLevelFt = snowLevel.points[0]?.snowLevelFt ?? snowLevel.points[0]?.freezingLevelFt ?? null;
   const resortWebcams = location.resortId ? allWebcams.filter((w) => w.resortId === location.resortId) : [];
+
+  // Next-24-hours can span into tomorrow — surface sunrise/sunset for
+  // every calendar day the window actually covers, not just today's.
+  const upcomingSunTimes = Array.from(new Set(upcomingHours.map((h) => h.time.slice(0, 10))))
+    .map((date) => forecast.daily.find((d) => d.date === date))
+    .filter((d): d is NonNullable<typeof d> => d != null);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
@@ -125,14 +138,25 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
 
           {upcomingHours.length > 0 && (
             <section className="card p-4">
-              <h2 className="mb-3 font-bold tracking-tight">Next {HOURLY_DISPLAY_HOURS} hours</h2>
+              <h2 className="mb-1 font-bold tracking-tight">Next {HOURLY_DISPLAY_HOURS} hours</h2>
+              {upcomingSunTimes.length > 0 && (
+                <p className="mb-1 text-xs text-muted-foreground">
+                  {upcomingSunTimes.map((d, i) => (
+                    <span key={d.date}>
+                      {i > 0 && " · "}
+                      {upcomingSunTimes.length > 1 && `${fmtDate(d.date)}: `}
+                      Sunrise {fmtSunTime(d.sunrise)} · Sunset {fmtSunTime(d.sunset)}
+                    </span>
+                  ))}
+                </p>
+              )}
               <p className="mb-2 text-xs text-muted-foreground">Precip (liquid) is rain+snow water content, not snow depth — see New snow for that.</p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
                       <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Time</th>
-                      <th className="py-1 pr-4 font-medium">Temp</th>
+                      <th className="py-1 pr-4 pl-4 font-medium">Temp</th>
                       <th className="py-1 pr-4 font-medium">Snow</th>
                       <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
                       <th className="py-1 font-medium">Wind</th>
@@ -142,7 +166,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                     {upcomingHours.map((h) => (
                       <tr key={h.time} className="border-t border-border">
                         <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtHour(h.time)}</td>
-                        <td className="py-1.5 pr-4">{Math.round(h.temperatureF)}°</td>
+                        <td className="py-1.5 pr-4 pl-4">{Math.round(h.temperatureF)}°</td>
                         <td className="py-1.5 pr-4">{h.snowfallIn > 0 ? `${h.snowfallIn.toFixed(2)}"` : "—"}</td>
                         <td className="py-1.5 pr-4">{h.precipitationIn > 0 ? `${h.precipitationIn.toFixed(2)}"` : "—"}</td>
                         <td className="py-1.5">
@@ -207,7 +231,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   <thead>
                     <tr className="text-left text-muted-foreground">
                       <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Day</th>
-                      <th className="py-1 pr-4 font-medium">High / Low</th>
+                      <th className="py-1 pr-4 pl-4 font-medium">High / Low</th>
                       <th className="py-1 font-medium">Snow</th>
                     </tr>
                   </thead>
@@ -215,7 +239,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                     {pastDays.slice(-7).map((d) => (
                       <tr key={d.date} className="border-t border-border">
                         <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
-                        <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
+                        <td className="py-1.5 pr-4 pl-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
                         <td className="py-1.5">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
                       </tr>
                     ))}
@@ -278,11 +302,13 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         <aside className="mt-5 lg:mt-0 lg:w-96 lg:shrink-0">
           <section className="card h-72 overflow-hidden lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
             <SkiMap
-              resorts={[{ id: "current", name: location.name, lat: location.lat, lon: location.lon }]}
+              resorts={resorts}
+              webcams={allWebcams}
+              currentLocation={{ name: location.name, lat: location.lat, lon: location.lon }}
               center={[location.lon, location.lat]}
-              zoom={11}
+              zoom={9}
               showPistes={false}
-              allowPinDrop={false}
+              allowPinDrop
               showRadarToggle={false}
               showSnowForecastToggle={false}
             />

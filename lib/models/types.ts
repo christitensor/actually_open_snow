@@ -52,6 +52,9 @@ export interface DailyForecastDay {
   windGustMaxMph: number;
   windDirectionDominantDeg: number;
   weatherCode: number;
+  /** Local wall-clock ISO datetime (no offset), same convention as HourlyForecastPoint.time */
+  sunrise: string;
+  sunset: string;
 }
 
 /** A lightweight, elevation-overridden daily forecast — see FC-10-adj (elevation adjuster). Not the full ForecastResponse: no hourly block, no wind. */
