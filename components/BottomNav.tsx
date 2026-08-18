@@ -2,25 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NAV_TABS } from "@/lib/nav-tabs";
 
-const TABS = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/webcams", label: "Webcams", icon: "📷" },
-];
-
-// Mobile-app-style bottom tab bar — the primary nav surface, matching how
-// the app is actually used (phone/iPad). Fixed + safe-area padding for
-// the iOS home indicator.
+// Mobile-app-style bottom tab bar — the primary nav surface on phone/iPad.
+// Hidden at sm+ in favor of HeaderNav's inline links (a fixed bottom bar
+// reads as a mobile-only pattern; on desktop it just floated over content
+// with nothing to justify the persistent chrome). Fixed + safe-area
+// padding for the iOS home indicator.
 export default function BottomNav() {
   const pathname = usePathname();
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md sm:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto flex max-w-5xl">
-        {TABS.map((tab) => {
+        {NAV_TABS.map((tab) => {
           const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
           return (
             <Link

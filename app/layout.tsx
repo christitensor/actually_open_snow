@@ -48,7 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
         <AppHeader />
-        <main className="flex flex-1 flex-col pb-20">{children}</main>
+        <main className="flex flex-1 flex-col pb-20 sm:pb-0">{children}</main>
         <BottomNav />
       </body>
     </html>
