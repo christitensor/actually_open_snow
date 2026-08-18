@@ -135,7 +135,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="text-left text-muted-foreground">
-                    <th className="py-1 pr-4 font-medium">Day</th>
+                    <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Day</th>
                     <th className="py-1 pr-4 font-medium">High / Low</th>
                     <th className="py-1 pr-4 font-medium">New snow</th>
                     <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
@@ -148,7 +148,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                     const snowLine = dailySnowLines[i];
                     return (
                       <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
-                        <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
+                        <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
                         <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
                         <td className="py-1.5 pr-4">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
                         <td className="py-1.5 pr-4">{d.precipitationSumIn.toFixed(2)}&quot;</td>
@@ -177,7 +177,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
-                      <th className="py-1 pr-4 font-medium">Time</th>
+                      <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Time</th>
                       <th className="py-1 pr-4 font-medium">Temp</th>
                       <th className="py-1 pr-4 font-medium">Snow</th>
                       <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
@@ -187,7 +187,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   <tbody>
                     {upcomingHours.map((h) => (
                       <tr key={h.time} className="border-t border-border">
-                        <td className="py-1.5 pr-4 font-medium">{fmtHour(h.time)}</td>
+                        <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtHour(h.time)}</td>
                         <td className="py-1.5 pr-4">{Math.round(h.temperatureF)}°</td>
                         <td className="py-1.5 pr-4">{h.snowfallIn > 0 ? `${h.snowfallIn.toFixed(2)}"` : "—"}</td>
                         <td className="py-1.5 pr-4">{h.precipitationIn > 0 ? `${h.precipitationIn.toFixed(2)}"` : "—"}</td>
@@ -256,7 +256,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <table className="w-full min-w-[420px] text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground">
-                      <th className="py-1 pr-4 font-medium">Day</th>
+                      <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Day</th>
                       <th className="py-1 pr-4 font-medium">High / Low</th>
                       <th className="py-1 font-medium">Snow</th>
                     </tr>
@@ -264,7 +264,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   <tbody>
                     {pastDays.slice(-7).map((d) => (
                       <tr key={d.date} className="border-t border-border">
-                        <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
+                        <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
                         <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
                         <td className="py-1.5">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
                       </tr>
