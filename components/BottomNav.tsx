@@ -14,10 +14,15 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-border sm:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto flex max-w-5xl">
+      {/* Backdrop-filter on the same element as the tappable links can eat
+          touches on iOS Safari (a known WebKit compositing bug) — keep the
+          blur on an inert layer behind the content instead of on the nav
+          itself. */}
+      <div className="pointer-events-none absolute inset-0 bg-background/90 backdrop-blur-md" />
+      <div className="relative mx-auto flex max-w-5xl">
         {NAV_TABS.map((tab) => {
           const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
           return (
