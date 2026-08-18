@@ -7,25 +7,28 @@
 // Ogden-Hinckley, Provo, etc — none of which tell you anything about
 // conditions at elevation).
 //
-// Sourced from a real backcountry-skier reference doc (Bear River Range
-// list), then verified against api.weather.gov/stations/{id} to confirm
-// each is a real, currently-reporting station reachable through the same
-// free NWS API this app already uses (no new API key/vendor needed) —
-// these are RAWS/co-op sites that happen to also be in NWS's network, not
-// a separate data source.
+// Originally seeded from a real backcountry-skier reference doc (Bear
+// River Range list). Extended to every avalanche.org zone this app's
+// resorts fall in — Logan, Ogden, Salt Lake, Provo, Uintas (Utah
+// Avalanche Center), and Tetons (Bridger-Teton Avalanche Center, for
+// Grand Targhee) — by pulling the *complete* NWS station list for UT/ID/WY
+// (api.weather.gov/stations?state=..., paginated past its 500-result
+// page size — the single-page version misses stations, which is why an
+// earlier pass wrongly concluded Logan Peak wasn't in NWS's network: it
+// was simply past the first page), point-in-polygon matching each
+// station against avalanche.org's own zone boundaries
+// (lib/derive/avalanche-zone-lookup.ts), then ranking by elevation to
+// separate real mountain/RAWS/study-plot stations from valley ASOS
+// stations. Every station below was individually verified live via
+// api.weather.gov/stations/{id}/observations/latest to confirm it's
+// real and currently reporting, not just present in a stale list.
 //
-// Keyed by avalanche.org zone ID (AvalancheZone.zoneId from
-// lib/derive/avalanche-zone-lookup.ts) so a location's dashboard can look
-// up "does this UAC zone have curated stations" the same way it already
-// looks up the zone's avalanche forecast. Only zones with a real,
-// verified list should be added here — an empty/guessed list is worse
-// than the generic nearest-station fallback.
-//
-// Not included: Logan Peak (9,714') — the other station on the source
-// list — because it's a standalone Campbell Scientific datalogger
-// (weather.campbellsci.com), not part of NWS's network, and would need
-// its own separate, more fragile scrape. Flagged here rather than
-// silently omitted.
+// Not covered: Pebble Creek, Kelly Canyon, and Pomerelle (SE Idaho
+// resorts in data/resorts.ts) don't fall inside any avalanche.org
+// forecast zone at all — there's no avalanche center for that part of
+// Idaho, so there's no zone to key curated stations off of. Flagged
+// here rather than silently unhandled; a resort-keyed (not zone-keyed)
+// fallback would be needed to cover them.
 
 export interface KeyStation {
   /** api.weather.gov station identifier */
@@ -47,9 +50,54 @@ export const KEY_STATIONS_BY_ZONE: ZoneKeyStations[] = [
     avalancheZoneId: "1736", // Utah Avalanche Center — Logan zone
     rangeName: "Bear River Range",
     stations: [
-      { nwsId: "CRDUT", name: "Card Canyon", elevationFt: 8700 },
+      { nwsId: "LGP", name: "Logan Peak", elevationFt: 9714 },
       { nwsId: "PRSUT", name: "Paris Peak", elevationFt: 9541 },
-      { nwsId: "TGLU1", name: "Tony Grove", elevationFt: 8400 },
+      { nwsId: "CRDUT", name: "Card Canyon", elevationFt: 8715 },
+      { nwsId: "TGLU1", name: "Tony Grove", elevationFt: 8438 },
+    ],
+  },
+  {
+    avalancheZoneId: "1737", // Utah Avalanche Center — Ogden zone
+    rangeName: "Ogden Range",
+    stations: [
+      { nwsId: "OGP", name: "Snowbasin — Mount Ogden", elevationFt: 9570 },
+      { nwsId: "MCRU1", name: "Monte Cristo", elevationFt: 8931 },
+      { nwsId: "PWDU1", name: "Powder Mountain", elevationFt: 8505 },
+    ],
+  },
+  {
+    avalancheZoneId: "1738", // Utah Avalanche Center — Salt Lake zone
+    rangeName: "Salt Lake / Park City",
+    stations: [
+      { nwsId: "AMB", name: "Alta — Mt Baldy", elevationFt: 11066 },
+      { nwsId: "BRW", name: "Brighton — Great Western", elevationFt: 10565 },
+      { nwsId: "PKC", name: "Park City — Jupiter", elevationFt: 10015 },
+    ],
+  },
+  {
+    avalancheZoneId: "1739", // Utah Avalanche Center — Provo zone
+    rangeName: "Provo / Timpanogos",
+    stations: [
+      { nwsId: "CSC", name: "Cascade Peak", elevationFt: 10875 },
+      { nwsId: "TIMU1", name: "Timpanogos Divide", elevationFt: 8170 },
+      { nwsId: "PC010", name: "Sundance", elevationFt: 6435 },
+    ],
+  },
+  {
+    avalancheZoneId: "1740", // Utah Avalanche Center — Uintas zone
+    rangeName: "Uinta Mountains",
+    stations: [
+      { nwsId: "LOFTY", name: "Lofty Lake Peak", elevationFt: 11186 },
+      { nwsId: "UTBMP", name: "Bald Mountain Pass", elevationFt: 10727 },
+      { nwsId: "TRLU1", name: "Trial Lake", elevationFt: 9945 },
+    ],
+  },
+  {
+    avalancheZoneId: "2855", // Bridger-Teton Avalanche Center — Tetons zone (Grand Targhee)
+    rangeName: "Teton Range",
+    stations: [
+      { nwsId: "GTHW4", name: "Grand Targhee", elevationFt: 9260 },
+      { nwsId: "KTET", name: "Teton Pass", elevationFt: 8428 },
     ],
   },
 ];
