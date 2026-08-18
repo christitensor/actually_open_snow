@@ -50,6 +50,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     conditionsSummary,
     nearestSnotel,
     nearestNwsStations,
+    keyStations,
+    keyStationsRangeName,
     airQuality,
     multiModelTodaySnowfallIn,
     pastDays,
@@ -219,6 +221,32 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          )}
+
+          {keyStations.length > 0 && (
+            <section className="card p-4">
+              <h2 className="mb-1 font-bold tracking-tight">{keyStationsRangeName} weather stations</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Curated high-elevation stations backcountry travelers actually watch here — the generic
+                &quot;nearest station&quot; is almost always a valley airport, which doesn&apos;t tell you much about
+                conditions up high.
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {keyStations.map((s) => (
+                  <div key={s.name} className="stat-tile">
+                    <div className="text-xs text-muted-foreground">
+                      {s.name} · {s.elevationFt.toLocaleString()} ft
+                    </div>
+                    <div className="text-lg font-bold tracking-tight">{s.tempF != null ? `${Math.round(s.tempF)}°F` : "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {s.windSpeedMph != null
+                        ? `${Math.round(s.windSpeedMph)} mph${s.windDirectionDeg != null ? ` ${degToCompass(s.windDirectionDeg)}` : ""}`
+                        : "No wind data"}
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}

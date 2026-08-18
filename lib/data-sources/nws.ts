@@ -137,7 +137,11 @@ export interface NwsStation {
   lon: number;
 }
 
-/** DATA-01: nearby NWS observation stations for a point's grid. */
+/** DATA-01: nearby NWS observation stations for a point's grid. Ordered by
+ * NWS's own relevance ranking, not distance — in practice this is almost
+ * always valley/airport ASOS stations (live-verified), which is why
+ * data/key-stations.ts exists as a curated alternative for zones that
+ * have one. */
 export async function getNearbyStations(lat: number, lon: number): Promise<NwsStation[]> {
   const meta = await getPointMeta(lat, lon);
   const raw = await fetchJson<StationsResponse>(meta.observationStationsUrl);
@@ -147,4 +151,34 @@ export async function getNearbyStations(lat: number, lon: number): Promise<NwsSt
     lat: f.geometry.coordinates[1],
     lon: f.geometry.coordinates[0],
   }));
+}
+
+interface StationObservationResponse {
+  properties: {
+    timestamp: string;
+    temperature: { value: number | null };
+    windSpeed: { value: number | null }; // km/h per NWS API (wmoUnit:km_h-1)
+    windDirection: { value: number | null };
+  };
+}
+
+export interface NwsStationObservation {
+  tempF: number | null;
+  windSpeedMph: number | null;
+  windDirectionDeg: number | null;
+  timestamp: string;
+}
+
+/** Latest observation for a specific, known station identifier (e.g. a
+ * curated key station) — as opposed to getNearbyStations, which discovers
+ * stations by proximity to a point. */
+export async function getStationObservation(stationId: string): Promise<NwsStationObservation | null> {
+  const raw = await fetchJson<StationObservationResponse>(`${BASE}/stations/${stationId}/observations/latest`);
+  const p = raw.properties;
+  return {
+    tempF: p.temperature.value != null ? (p.temperature.value * 9) / 5 + 32 : null,
+    windSpeedMph: p.windSpeed.value != null ? p.windSpeed.value * 0.621371 : null,
+    windDirectionDeg: p.windDirection.value,
+    timestamp: p.timestamp,
+  };
 }

@@ -178,6 +178,16 @@ export interface HistoricalDay {
   snowfallSumIn: number;
 }
 
+/** A curated key station (data/key-stations.ts) with its latest live reading merged in. */
+export interface KeyStationReading {
+  name: string;
+  elevationFt: number;
+  tempF: number | null;
+  windSpeedMph: number | null;
+  windDirectionDeg: number | null;
+  timestamp: string | null;
+}
+
 /** PERS-03: an email-based snow alert subscription. No accounts/login — subscribe by email + location, like a mailing list. */
 export interface AlertSubscription {
   id: number;

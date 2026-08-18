@@ -11,7 +11,8 @@ import {
   getMultiModelDailySnowfall,
   getRecentHourlyWindow,
 } from "@/lib/data-sources/open-meteo";
-import { getActiveAlerts, getNearbyStations, getPointMeta, type NwsStation } from "@/lib/data-sources/nws";
+import { getActiveAlerts, getNearbyStations, getPointMeta, getStationObservation, type NwsStation } from "@/lib/data-sources/nws";
+import { getKeyStationsForZone } from "@/data/key-stations";
 import { getLatestAfd } from "@/lib/data-sources/nws-products";
 import { getZoneMapLayer, getAvalancheForecast } from "@/lib/data-sources/avalanche-org";
 import { findNearbyStations, getLatestReading } from "@/lib/data-sources/snotel";
@@ -34,6 +35,7 @@ import type {
   DailySnowLine,
   ForecastResponse,
   HistoricalDay,
+  KeyStationReading,
   Location,
   NwsAlert,
   SnotelReading,
@@ -58,6 +60,9 @@ export interface LocationDashboardData {
   conditionsSummary: ConditionsSummary;
   nearestSnotel: SnotelReading | null;
   nearestNwsStations: NwsStation[];
+  /** DATA-01-adj: curated high-elevation stations (data/key-stations.ts) for this location's avalanche zone, if it has any — the generic nearest-station picker above tends to surface valley airports instead. */
+  keyStations: KeyStationReading[];
+  keyStationsRangeName: string | null;
   airQuality: AirQuality | null;
   /** FC-05/06: today's forecast snowfall (inches) per model, for the "do models agree" UI */
   multiModelTodaySnowfallIn: Record<string, number> | null;
@@ -113,11 +118,28 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     ? await getAvalancheForecast(avalancheZoneResult.zoneId).catch(() => null)
     : null;
 
-  const [afd, multiModel] = await Promise.all([
+  const zoneKeyStations = getKeyStationsForZone(avalancheZoneResult?.zoneId);
+
+  const [afd, multiModel, keyStationReadings] = await Promise.all([
     getPointMeta(lat, lon)
       .then((meta) => getLatestAfd(meta.wfo))
       .catch(() => null),
     getMultiModelDailySnowfall(lat, lon).catch(() => null),
+    zoneKeyStations
+      ? Promise.all(
+          zoneKeyStations.stations.map(async (s) => {
+            const obs = await getStationObservation(s.nwsId).catch(() => null);
+            return {
+              name: s.name,
+              elevationFt: s.elevationFt,
+              tempF: obs?.tempF ?? null,
+              windSpeedMph: obs?.windSpeedMph ?? null,
+              windDirectionDeg: obs?.windDirectionDeg ?? null,
+              timestamp: obs?.timestamp ?? null,
+            } satisfies KeyStationReading;
+          })
+        )
+      : Promise.resolve([] as KeyStationReading[]),
   ]);
 
   const multiModelTodaySnowfallIn = multiModel
@@ -155,6 +177,8 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     conditionsSummary,
     nearestSnotel: snotelResult,
     nearestNwsStations: nwsStations,
+    keyStations: keyStationReadings,
+    keyStationsRangeName: zoneKeyStations?.rangeName ?? null,
     airQuality,
     multiModelTodaySnowfallIn,
     pastDays,
