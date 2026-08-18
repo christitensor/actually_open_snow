@@ -134,7 +134,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <th className="py-1 pr-4 font-medium">Day</th>
                 <th className="py-1 pr-4 font-medium">High / Low</th>
                 <th className="py-1 pr-4 font-medium">New snow</th>
-                <th className="py-1 pr-4 font-medium">Precip</th>
+                <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
                 <th className="py-1 pr-4 font-medium">Snow line</th>
                 <th className="py-1 font-medium">Wind</th>
               </tr>
@@ -161,12 +161,14 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Snow line is an afternoon estimate — {dailySnowLines.some((d) => d.source === "nws") ? "NWS gridpoint forecast where available, Open-Meteo freezing level beyond its ~7-day range." : "Open-Meteo freezing level (no NWS coverage for this point)."}
+          {" "}Precip (liquid) is total rain+snow water content for the day — it&apos;s not snow depth and includes rain, so it won&apos;t match New snow on warm days. New snow is Open-Meteo&apos;s own modeled snow accumulation, already converted from liquid using a temperature-based ratio (not a flat 10:1).
         </p>
       </section>
 
       {upcomingHours.length > 0 && (
         <section className="card p-4">
           <h2 className="mb-3 font-bold tracking-tight">Next {HOURLY_DISPLAY_HOURS} hours</h2>
+          <p className="mb-2 text-xs text-muted-foreground">Precip (liquid) is rain+snow water content, not snow depth — see New snow for that.</p>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
@@ -174,7 +176,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   <th className="py-1 pr-4 font-medium">Time</th>
                   <th className="py-1 pr-4 font-medium">Temp</th>
                   <th className="py-1 pr-4 font-medium">Snow</th>
-                  <th className="py-1 pr-4 font-medium">Precip</th>
+                  <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
                   <th className="py-1 font-medium">Wind</th>
                 </tr>
               </thead>

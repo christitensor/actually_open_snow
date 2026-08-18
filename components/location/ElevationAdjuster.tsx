@@ -92,7 +92,7 @@ export default function ElevationAdjuster({
           value={today ? `${Math.round(today.tempMaxF)}° / ${Math.round(today.tempMinF)}°` : showLoading ? "…" : `${Math.round(baselineToday.tempMaxF)}° / ${Math.round(baselineToday.tempMinF)}°`}
         />
         <StatTile label="New snow" value={today ? `${today.snowfallSumIn.toFixed(1)}"` : showLoading ? "…" : `${baselineToday.snowfallSumIn.toFixed(1)}"`} />
-        <StatTile label="Precip" value={today ? `${today.precipitationSumIn.toFixed(2)}"` : showLoading ? "…" : `${baselineToday.precipitationSumIn.toFixed(2)}"`} />
+        <StatTile label="Precip (liquid)" value={today ? `${today.precipitationSumIn.toFixed(2)}"` : showLoading ? "…" : `${baselineToday.precipitationSumIn.toFixed(2)}"`} />
         <StatTile
           label="vs. base elevation"
           value={!isAdjusted ? "No change" : `${selected > (elevationFt ?? selected) ? "+" : ""}${(selected - (elevationFt ?? selected)).toLocaleString()} ft`}
