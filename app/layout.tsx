@@ -27,15 +27,24 @@ export const viewport: Viewport = {
   ],
 };
 
-// Sets .dark/.light on <html> before first paint, from localStorage or
-// system preference — this is what prevents a flash of the wrong theme
-// on load. See components/ThemeToggle.tsx for the toggle itself.
+// Fully automatic light/dark — no manual toggle, always follows the OS/
+// browser setting. Sets .dark/.light on <html> before first paint (avoids
+// a flash of the wrong theme), then keeps listening for live OS-level
+// changes for the rest of the session (e.g. the device switching to dark
+// mode at sunset while the app is still open) — components read the class
+// via lib/theme.ts's useSyncExternalStore + MutationObserver, so they pick
+// up either the initial paint or a later live change the same way.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
-    var stored = localStorage.getItem("theme");
-    var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.add(dark ? "dark" : "light");
+    localStorage.removeItem("theme"); // clear any override from a previous build's manual toggle
+    var mql = window.matchMedia("(prefers-color-scheme: dark)");
+    var apply = function (isDark) {
+      document.documentElement.classList.remove("light", "dark");
+      document.documentElement.classList.add(isDark ? "dark" : "light");
+    };
+    apply(mql.matches);
+    mql.addEventListener("change", function (e) { apply(e.matches); });
   } catch (e) {}
 })();
 `;

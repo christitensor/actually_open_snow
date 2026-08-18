@@ -21,7 +21,7 @@ export default function HeaderNav() {
               active ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {tab.icon} {tab.label}
+            {tab.label}
           </Link>
         );
       })}

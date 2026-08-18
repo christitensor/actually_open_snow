@@ -80,7 +80,7 @@ export default function SnowSummary({
   return (
     <section className="card p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-bold tracking-tight">❄️ Snow Summary</h2>
+        <h2 className="font-bold tracking-tight">Snow Summary</h2>
         <span className="text-xs text-muted-foreground">Past 15 days · next {TIMELINE_FUTURE_DAYS} days</span>
       </div>
 

@@ -14,7 +14,6 @@
 export default function LocationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6 text-center">
-      <div className="text-4xl">⛅</div>
       <h1 className="text-lg font-bold tracking-tight">Conditions temporarily unavailable</h1>
       <p className="text-sm text-muted-foreground">
         One of the upstream weather/avalanche APIs didn&apos;t respond in time — this is usually a rate limit or a brief

@@ -43,7 +43,7 @@ export default function FavoriteButton({ location }: { location: Location }) {
         className="input"
       />
       <button onClick={() => toggleFavorite({ ...location, name: name.trim() || location.name })} className="btn-secondary shrink-0">
-        💾 Save spot
+        Save spot
       </button>
     </div>
   );

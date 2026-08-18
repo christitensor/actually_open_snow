@@ -28,7 +28,7 @@ export default function MyLocationButton() {
 
   return (
     <button onClick={handleClick} className="btn-primary shrink-0">
-      {status === "loading" ? "Locating…" : "📍 My location"}
+      {status === "loading" ? "Locating…" : "My location"}
       {status === "error" && <span className="ml-1 text-xs opacity-80">(unavailable)</span>}
     </button>
   );

@@ -24,11 +24,10 @@ export default function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition ${
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              className={`flex flex-1 items-center justify-center py-3 text-sm transition ${
+                active ? "font-semibold text-primary" : "font-medium text-muted-foreground hover:text-foreground"
               }`}
             >
-              <span className={`text-lg transition ${active ? "scale-110" : ""}`}>{tab.icon}</span>
               {tab.label}
             </Link>
           );

@@ -67,7 +67,7 @@ export default function ElevationAdjuster({
 
   return (
     <section className="card p-4">
-      <h2 className="mb-1 font-bold tracking-tight">🏔️ Elevation adjuster</h2>
+      <h2 className="mb-1 font-bold tracking-tight">Elevation adjuster</h2>
       <p className="mb-3 text-xs text-muted-foreground">
         Drag to see today&apos;s forecast recalculated for a different elevation on this mountain.
       </p>

@@ -97,7 +97,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
       <div className="lg:flex lg:items-start lg:gap-6">
         <div className="space-y-5 lg:min-w-0 lg:flex-1">
           <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">🔔 Snow alerts</h2>
+            <h2 className="mb-2 font-bold tracking-tight">Snow alerts</h2>
             <AlertSubscribeForm location={location} />
           </section>
 
@@ -117,14 +117,13 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           <SnowSummary pastDays={pastDays} forecastDaily={forecast.daily} />
 
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatTile icon="🌨️" label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
-            <StatTile icon="📍" label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above ❄️" : "Below 🌧️"} />
-            <StatTile icon="❄️" label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
-            <StatTile icon="🥐" label="Powder quality" value={powderQualityToday?.quality ?? "No new snow"} sub={powderQualityToday ? `~${powderQualityToday.estimatedRatio}:1 (est.)` : undefined} />
-            <StatTile icon="⛷️" label="Trail conditions (est.)" value={trailConditions?.label ?? "—"} sub={trailConditions?.detail} />
-            <StatTile icon="🌡️" label="Wet-bulb temp" value={wetBulbNowF != null ? `${Math.round(wetBulbNowF)}°F` : "—"} sub="Snowmaking-relevant" />
+            <StatTile label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
+            <StatTile label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above" : "Below"} />
+            <StatTile label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
+            <StatTile label="Powder quality" value={powderQualityToday?.quality ?? "No new snow"} sub={powderQualityToday ? `~${powderQualityToday.estimatedRatio}:1 (est.)` : undefined} />
+            <StatTile label="Trail conditions (est.)" value={trailConditions?.label ?? "—"} sub={trailConditions?.detail} />
+            <StatTile label="Wet-bulb temp" value={wetBulbNowF != null ? `${Math.round(wetBulbNowF)}°F` : "—"} sub="Snowmaking-relevant" />
             <StatTile
-              icon="🌫️"
               label="Air quality"
               value={airQuality?.currentUsAqi != null ? `${airQuality.currentUsAqi} AQI` : "—"}
               sub={airQuality?.currentUsAqi != null ? AQI_LABEL(airQuality.currentUsAqi).label : undefined}
@@ -215,7 +214,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
 
           {resortWebcams.length > 0 && (
             <section className="card p-4">
-              <h2 className="mb-3 font-bold tracking-tight">📷 Live webcams</h2>
+              <h2 className="mb-3 font-bold tracking-tight">Live webcams</h2>
               <WebcamGrid webcams={resortWebcams} />
             </section>
           )}
@@ -235,7 +234,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           )}
 
           <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">🏔️ Avalanche forecast</h2>
+            <h2 className="mb-2 font-bold tracking-tight">Avalanche forecast</h2>
             {avalancheForecast ? (
               <div className="space-y-3 text-sm">
                 <div className="flex gap-4">
@@ -318,13 +317,10 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
   );
 }
 
-function StatTile({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) {
+function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="stat-tile">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span>{icon}</span>
-        <span>{label}</span>
-      </div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-bold tracking-tight">{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </div>
