@@ -2,6 +2,7 @@ import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
 import ElevationAdjuster from "@/components/location/ElevationAdjuster";
+import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
 import { webcams as allWebcams } from "@/data/webcams";
@@ -56,7 +57,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     nearestNwsStations,
     airQuality,
     multiModelTodaySnowfallIn,
-    pastWeek,
+    pastDays,
     upcomingHours,
   } = data;
 
@@ -112,6 +113,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               )}
             </div>
           </section>
+
+          <SnowSummary pastDays={pastDays} forecastDaily={forecast.daily} />
 
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile icon="🌨️" label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
@@ -252,7 +255,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             )}
           </section>
 
-          {pastWeek.length > 0 && (
+          {pastDays.length > 0 && (
             <section className="card p-4">
               <h2 className="mb-3 font-bold tracking-tight">Past 7 days</h2>
               <div className="overflow-x-auto">
@@ -265,7 +268,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                     </tr>
                   </thead>
                   <tbody>
-                    {pastWeek.map((d) => (
+                    {pastDays.slice(-7).map((d) => (
                       <tr key={d.date} className="border-t border-border">
                         <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
                         <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>

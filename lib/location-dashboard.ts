@@ -61,13 +61,14 @@ export interface LocationDashboardData {
   airQuality: AirQuality | null;
   /** FC-05/06: today's forecast snowfall (inches) per model, for the "do models agree" UI */
   multiModelTodaySnowfallIn: Record<string, number> | null;
-  /** SNOW-05: last 7 days, most recent last */
-  pastWeek: HistoricalDay[];
+  /** SNOW-05: last 15 days, most recent last — feeds both the "Past 7 days" table (last 7 of these) and the Snow Summary timeline's past-day buckets */
+  pastDays: HistoricalDay[];
   /** FC-02: next 24 hours from now, for the hourly forecast table. Computed here (not in the component) since Date.now() is an impure call React's hooks lint won't allow in render. */
   upcomingHours: ForecastResponse["hourly"];
 }
 
 const HOURLY_DISPLAY_HOURS = 24;
+const PAST_DAYS_LOOKBACK = 15; // matches the Snow Summary timeline's "Prev 11-15 Days" bucket
 
 export async function getLocationDashboardData(location: Location): Promise<LocationDashboardData> {
   const { lat, lon } = location;
@@ -97,11 +98,11 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     ]);
 
   const today = new Date();
-  const weekAgo = new Date(today.getTime() - 7 * 86400000);
-  const pastWeek = await getHistoricalWeather(
+  const lookbackStart = new Date(today.getTime() - PAST_DAYS_LOOKBACK * 86400000);
+  const pastDays = await getHistoricalWeather(
     lat,
     lon,
-    weekAgo.toISOString().slice(0, 10),
+    lookbackStart.toISOString().slice(0, 10),
     today.toISOString().slice(0, 10)
   ).catch(() => [] as HistoricalDay[]);
 
@@ -156,7 +157,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     nearestNwsStations: nwsStations,
     airQuality,
     multiModelTodaySnowfallIn,
-    pastWeek,
+    pastDays,
     upcomingHours: forecast.hourly.filter((h) => new Date(h.time).getTime() >= Date.now()).slice(0, HOURLY_DISPLAY_HOURS),
   };
 }
