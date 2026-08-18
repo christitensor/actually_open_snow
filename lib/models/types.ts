@@ -197,8 +197,10 @@ export interface Webcam {
   resortId?: string;
   lat: number;
   lon: number;
-  /** Direct hotlinkable image URL, when verified — not yet confirmed for any seed entry, see data/webcams.ts */
+  /** Direct hotlinkable still-image URL, when verified — see data/webcams.ts for how each was found. */
   imageUrl?: string;
+  /** Embeddable live-video URL (YouTube livestream `embed/{id}`, etc.), when a resort publishes its cams that way instead of a still image. At most one of imageUrl/videoEmbedUrl is set per entry. */
+  videoEmbedUrl?: string;
   pageUrl: string;
   source: "resort" | "udot" | "idaho-511";
 }

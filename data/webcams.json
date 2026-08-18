@@ -5,7 +5,7 @@
     "resortId": "alta",
     "lat": 40.5884,
     "lon": -111.6386,
-    "pageUrl": "https://www.alta.com/mountain-report",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
     "source": "resort"
   },
   {
@@ -34,16 +34,107 @@
     "resortId": "brighton",
     "lat": 40.5977,
     "lon": -111.5836,
-    "pageUrl": "https://www.brightonresort.com/mountain-report",
+    "pageUrl": "https://www.brightonresort.com/conditions",
     "source": "resort"
   },
   {
-    "id": "solitude-webcam",
-    "name": "Solitude",
+    "id": "solitude-sunshine-bowl",
+    "name": "Solitude — Sunshine Bowl",
     "resortId": "solitude",
     "lat": 40.6199,
     "lon": -111.5924,
-    "pageUrl": "https://www.solitudemountain.com/mountain-report/cameras",
+    "videoEmbedUrl": "https://www.youtube.com/embed/Lnznapxh2xM?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-moonbeam-lift-line",
+    "name": "Solitude — Moonbeam Lift Line",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/NSiItCGabfo?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-snow-stake",
+    "name": "Solitude — Snow Stake",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/QCqYmOGzULs?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-link-lift-line",
+    "name": "Solitude — Link Lift Line",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/Yx3QmuKfwjY?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-powderhorn",
+    "name": "Solitude — Powderhorn",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/fKLVbvQhPsc?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-honeycomb-canyon",
+    "name": "Solitude — Honeycomb Canyon",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/gfHReYIuydU?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-apex-sunrise-lift-lines",
+    "name": "Solitude — Apex Express & Sunrise Lift Lines",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/l2X9DlRzX54?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-summit-express-lift-line",
+    "name": "Solitude — Summit Express Lift Line",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/rUXoOLxKKX4?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-moonbeam-parking-lot",
+    "name": "Solitude — Moonbeam Parking Lot",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/ta-4QZbfMXc?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "solitude-powderhorn-ii-lift-line",
+    "name": "Solitude — Powderhorn II Lift Line",
+    "resortId": "solitude",
+    "lat": 40.6199,
+    "lon": -111.5924,
+    "videoEmbedUrl": "https://www.youtube.com/embed/yeoBog_kSzc?autoplay=1&mute=1&controls=0",
+    "pageUrl": "https://www.solitudemountain.com/mountain-and-village/webcams",
     "source": "resort"
   },
   {
@@ -52,16 +143,77 @@
     "resortId": "park-city",
     "lat": 40.6514,
     "lon": -111.5080,
-    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "pageUrl": "https://www.parkcitymountain.com/todays-conditions",
     "source": "resort"
   },
   {
-    "id": "snowbasin-webcam",
-    "name": "Snowbasin",
+    "id": "snowbasin-winter",
+    "name": "Snowbasin — Winter",
     "resortId": "snowbasin",
     "lat": 41.2160,
     "lon": -111.8570,
-    "pageUrl": "https://www.snowbasin.com/mountain-report/mountain-cams/",
+    "imageUrl": "https://b15b.hdrelay.com/camera/6192dd615233cdcad76d7dba/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-snowstake",
+    "name": "Snowbasin — Snowstake",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "imageUrl": "https://b15b.hdrelay.com/camera/09f922af-169d-4949-9bb7-295c6a859daa/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-needles",
+    "name": "Snowbasin — Needles",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "imageUrl": "https://b15b.hdrelay.com/camera/1b6ed87c-f919-4e59-b9cc-7480e3ca31c3/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-strawberry-patio",
+    "name": "Snowbasin — Strawberry Patio",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "imageUrl": "https://b15b.hdrelay.com/camera/65652b36eb0e282336694064/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-base-area",
+    "name": "Snowbasin — Base Area",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "imageUrl": "https://b15b.hdrelay.com/camera/621944828db58d080b9eac8b/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-middle-bowl-base",
+    "name": "Snowbasin — Middle Bowl Base",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "imageUrl": "https://b15b.hdrelay.com/camera/62101a0b8db58d080b9eac83/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowbasin-base-of-wildcat",
+    "name": "Snowbasin — Base of Wildcat",
+    "resortId": "snowbasin",
+    "lat": 41.2160,
+    "lon": -111.8570,
+    "imageUrl": "https://b15b.hdrelay.com/camera/61e1c2e0faf0bf0b5629ac59/get_image",
+    "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
   },
   {
@@ -70,7 +222,7 @@
     "resortId": "powder-mountain",
     "lat": 41.3797,
     "lon": -111.7877,
-    "pageUrl": "https://www.powdermountain.com/mountain-report",
+    "pageUrl": "https://www.powdermountain.com",
     "source": "resort"
   },
   {
