@@ -57,7 +57,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
         <AppHeader />
-        <main className="flex flex-1 flex-col pb-20 sm:pb-0">{children}</main>
+        {/* min-w-0, not flex/flex-col: main only ever wraps one child, and
+            making main itself a flex container turned that child into a
+            flex item — which by default won't shrink below its widest
+            descendant's content size (a wide table further down the tree),
+            ballooning the whole page's width instead of letting that one
+            table scroll on its own. flex-1 alone still grows main to fill
+            body's column layout without that side effect. */}
+        <main className="min-w-0 flex-1 pb-20 sm:pb-0">{children}</main>
         <BottomNav />
       </body>
     </html>
