@@ -1,4 +1,3 @@
-import Link from "next/link";
 import SkiMap from "@/components/map/SkiMap";
 import FavoritesList from "@/components/location/FavoritesList";
 import MyLocationButton from "@/components/location/MyLocationButton";
@@ -27,37 +26,29 @@ export default async function Home() {
   }));
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Actually Open Snow</h1>
-          <p className="text-sm text-gray-500">
-            Open-data snow forecasts for Northern Utah & Southeast Idaho — pick a resort, or drop a pin anywhere for backcountry conditions.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/webcams" className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:border-blue-400 hover:text-blue-600 dark:border-gray-700">
-            📷 Webcams
-          </Link>
-          <MyLocationButton />
-        </div>
-      </header>
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-xl text-sm text-muted-foreground">
+          Pick a resort, or drop a pin anywhere for backcountry conditions.
+        </p>
+        <MyLocationButton />
+      </div>
 
-      <section className="h-[60vh] min-h-[400px] overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+      <section className="card h-[55vh] min-h-[360px] overflow-hidden">
         <SkiMap resorts={resortsWithSnow} webcams={webcams} center={REGION_CENTER} zoom={8} />
       </section>
-      <p className="-mt-4 text-xs text-gray-400">
+      <p className="-mt-4 text-xs text-muted-foreground">
         Resort pins are colored by today&apos;s forecast snowfall (Powder Finder, est.), orange pins are webcams — click either for details, or click anywhere else on the map to drop a backcountry pin.
       </p>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <section>
-          <h2 className="mb-2 font-semibold">Resorts</h2>
+          <h2 className="mb-2 font-bold tracking-tight">Resorts</h2>
           <ResortList resorts={resortsWithSnow} primaryIds={primaryResortIds} />
         </section>
 
         <section>
-          <h2 className="mb-2 font-semibold">Your backcountry spots</h2>
+          <h2 className="mb-2 font-bold tracking-tight">Your backcountry spots</h2>
           <FavoritesList />
         </section>
       </div>

@@ -10,19 +10,23 @@ export default function FavoritesList() {
   const spots = favorites.filter((f) => f.source === "pin");
 
   if (spots.length === 0) {
-    return <p className="text-sm text-gray-500">No spots saved yet — drop a pin on the map, then save and name it from that page.</p>;
+    return (
+      <p className="card px-4 py-3 text-sm text-muted-foreground">
+        No spots saved yet — drop a pin on the map, then save and name it from that page.
+      </p>
+    );
   }
 
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-2">
       {spots.map((f) => {
         const href = `/location/pin?lat=${f.lat}&lon=${f.lon}`;
         return (
-          <li key={href} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
-            <Link href={href} className="font-medium hover:underline">
+          <li key={href} className="card flex items-center justify-between px-4 py-3 text-sm">
+            <Link href={href} className="font-medium hover:text-primary">
               {f.name}
             </Link>
-            <button onClick={() => toggleFavorite(f)} className="text-xs text-gray-400 hover:text-gray-600">
+            <button onClick={() => toggleFavorite(f)} className="btn-ghost !px-2 !py-1 text-xs">
               remove
             </button>
           </li>

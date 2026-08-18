@@ -14,14 +14,7 @@ export default function FavoriteButton({ location }: { location: Location }) {
 
   if (location.source === "resort") {
     return (
-      <button
-        onClick={() => toggleFavorite(location)}
-        className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
-          active
-            ? "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-            : "border-gray-300 text-gray-600 hover:border-gray-400 dark:border-gray-700 dark:text-gray-300"
-        }`}
-      >
+      <button onClick={() => toggleFavorite(location)} className={active ? "btn-primary bg-accent" : "btn-secondary"}>
         {active ? "★ In your resorts" : "☆ Add to your resorts"}
       </button>
     );
@@ -33,10 +26,8 @@ export default function FavoriteButton({ location }: { location: Location }) {
     );
     return (
       <div className="flex items-center gap-2">
-        <span className="rounded-full border border-amber-500 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-          ★ Saved as &quot;{saved?.name ?? location.name}&quot;
-        </span>
-        <button onClick={() => toggleFavorite(location)} className="text-xs text-gray-400 hover:text-gray-600">
+        <span className="pill bg-accent text-accent-foreground">★ Saved as &quot;{saved?.name ?? location.name}&quot;</span>
+        <button onClick={() => toggleFavorite(location)} className="btn-ghost !px-2 !py-1 text-xs">
           remove
         </button>
       </div>
@@ -49,12 +40,9 @@ export default function FavoriteButton({ location }: { location: Location }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Name this spot (optional)"
-        className="rounded-lg border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+        className="input"
       />
-      <button
-        onClick={() => toggleFavorite({ ...location, name: name.trim() || location.name })}
-        className="shrink-0 rounded-full border border-gray-300 px-3 py-1 text-sm font-medium text-gray-600 hover:border-gray-400 dark:border-gray-700 dark:text-gray-300"
-      >
+      <button onClick={() => toggleFavorite({ ...location, name: name.trim() || location.name })} className="btn-secondary shrink-0">
         💾 Save spot
       </button>
     </div>

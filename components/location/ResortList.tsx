@@ -28,26 +28,19 @@ function Row({ r }: { r: ResortRow }) {
 
   return (
     <li className="flex items-center gap-2">
-      <Link
-        href={`/location/${r.id}`}
-        className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:border-blue-400 hover:text-blue-600 dark:border-gray-800"
-      >
+      <Link href={`/location/${r.id}`} className="card flex flex-1 items-center justify-between px-4 py-3 text-sm font-medium transition hover:border-primary">
         <span>
           {r.name}
-          <span className="ml-1 text-xs font-normal text-gray-400">{r.region}</span>
+          <span className="ml-1.5 text-xs font-normal text-muted-foreground">{r.region}</span>
         </span>
-        <span className="text-xs font-semibold text-gray-500">
+        <span className="pill bg-muted text-muted-foreground">
           {r.snowfallTodayIn != null ? `${r.snowfallTodayIn.toFixed(1)}"` : "—"}
         </span>
       </Link>
       <button
         onClick={() => toggleFavorite(toLocation(r))}
         aria-label={starred ? "Remove from your resorts" : "Add to your resorts"}
-        className={`shrink-0 rounded-lg border px-2 py-2 text-sm ${
-          starred
-            ? "border-amber-500 bg-amber-50 text-amber-600 dark:bg-amber-950"
-            : "border-gray-200 text-gray-300 hover:text-gray-500 dark:border-gray-800"
-        }`}
+        className={`card shrink-0 px-2.5 py-3 text-base transition ${starred ? "text-accent" : "text-muted-foreground hover:text-accent"}`}
       >
         {starred ? "★" : "☆"}
       </button>
@@ -71,7 +64,7 @@ export default function ResortList({ resorts, primaryIds }: { resorts: ResortRow
 
   return (
     <div>
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {top.map((r) => (
           <Row key={r.id} r={r} />
         ))}
@@ -79,14 +72,11 @@ export default function ResortList({ resorts, primaryIds }: { resorts: ResortRow
 
       {rest.length > 0 && (
         <>
-          <button
-            onClick={() => setShowAll((v) => !v)}
-            className="mt-3 text-xs font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-          >
+          <button onClick={() => setShowAll((v) => !v)} className="btn-ghost mt-3 !px-0">
             {showAll ? "Hide" : `Show all ${resorts.length} resorts`} {showAll ? "▲" : "▼"}
           </button>
           {showAll && (
-            <ul className="mt-2 space-y-1">
+            <ul className="mt-2 space-y-2">
               {rest.map((r) => (
                 <Row key={r.id} r={r} />
               ))}

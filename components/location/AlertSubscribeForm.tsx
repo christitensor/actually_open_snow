@@ -52,7 +52,7 @@ export default function AlertSubscribeForm({ location }: { location: Location })
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
       <div>
-        <label className="block text-xs text-gray-500" htmlFor="alert-email">
+        <label className="mb-1 block text-xs text-muted-foreground" htmlFor="alert-email">
           Email
         </label>
         <input
@@ -62,14 +62,14 @@ export default function AlertSubscribeForm({ location }: { location: Location })
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+          className="input"
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500" htmlFor="alert-threshold">
+        <label className="mb-1 block text-xs text-muted-foreground" htmlFor="alert-threshold">
           Alert me at
         </label>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <input
             id="alert-threshold"
             type="number"
@@ -78,16 +78,12 @@ export default function AlertSubscribeForm({ location }: { location: Location })
             step={1}
             value={thresholdIn}
             onChange={(e) => setThresholdIn(Number(e.target.value))}
-            className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className="input w-16"
           />
-          <span className="text-sm text-gray-500">&quot;+ forecast</span>
+          <span className="text-sm text-muted-foreground">&quot;+ forecast</span>
         </div>
       </div>
-      <button
-        type="submit"
-        disabled={status === "loading"}
-        className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:border-blue-400 hover:text-blue-600 disabled:opacity-50 dark:border-gray-700"
-      >
+      <button type="submit" disabled={status === "loading"} className="btn-primary">
         {status === "loading" ? "Subscribing…" : "Get snow alerts"}
       </button>
       {status === "error" && <p className="w-full text-xs text-red-500">{message}</p>}

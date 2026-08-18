@@ -27,12 +27,9 @@ export default function MyLocationButton() {
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium hover:border-blue-400 hover:text-blue-600 dark:border-gray-700"
-    >
+    <button onClick={handleClick} className="btn-primary shrink-0">
       {status === "loading" ? "Locating…" : "📍 My location"}
-      {status === "error" && <span className="ml-1 text-xs text-red-500">(unavailable)</span>}
+      {status === "error" && <span className="ml-1 text-xs opacity-80">(unavailable)</span>}
     </button>
   );
 }

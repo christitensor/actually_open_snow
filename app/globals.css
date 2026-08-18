@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
+/* Manual light/dark toggle instead of pure prefers-color-scheme — see
+   components/ThemeToggle.tsx and the beforeInteractive script in
+   app/layout.tsx that sets this class before first paint. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --accent: #f97316;
+  --accent-foreground: #ffffff;
+  --ring: #2563eb;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --card-foreground: #f1f5f9;
+  --border: #1e293b;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --accent: #fb923c;
+  --accent-foreground: #1c0a00;
+  --ring: #3b82f6;
+}
+
+/* Fallback for the rare case JS never ran (theme-init script failed/blocked) */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --background: #020617;
+    --foreground: #f1f5f9;
+    --card: #0f172a;
+    --card-foreground: #f1f5f9;
+    --border: #1e293b;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --accent: #fb923c;
+    --accent-foreground: #1c0a00;
+    --ring: #3b82f6;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-border bg-card text-card-foreground shadow-sm shadow-black/[0.03] dark:shadow-black/20;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-110 active:brightness-95 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-primary hover:text-primary disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+  .input {
+    @apply rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring;
+  }
+  .stat-tile {
+    @apply flex flex-col gap-1 rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm shadow-black/[0.03] dark:shadow-black/20;
+  }
+  /* Dark-mode map tiles: OSM raster tiles have no dark variant, so invert
+     the whole map then invert markers/popups back to true color — a
+     standard trick for slippy maps without a dedicated dark tile set. */
+  .map-dark-tiles .maplibregl-canvas-container canvas {
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+  }
+  .map-dark-tiles .maplibregl-marker,
+  .map-dark-tiles .maplibregl-popup {
+    filter: invert(1) hue-rotate(180deg);
+  }
 }

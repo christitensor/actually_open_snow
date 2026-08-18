@@ -14,19 +14,17 @@
 export default function LocationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <div className="mx-auto max-w-md space-y-4 p-6 text-center">
-      <h1 className="text-lg font-semibold">Conditions temporarily unavailable</h1>
-      <p className="text-sm text-gray-500">
+      <div className="text-4xl">⛅</div>
+      <h1 className="text-lg font-bold tracking-tight">Conditions temporarily unavailable</h1>
+      <p className="text-sm text-muted-foreground">
         One of the upstream weather/avalanche APIs didn&apos;t respond in time — this is usually a rate limit or a brief
         outage, not a bug in this page. Try again in a moment.
       </p>
-      <button
-        onClick={reset}
-        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:border-blue-400 hover:text-blue-600 dark:border-gray-700"
-      >
+      <button onClick={reset} className="btn-primary">
         Retry
       </button>
       {process.env.NODE_ENV === "development" && (
-        <pre className="mt-4 overflow-x-auto rounded bg-gray-100 p-3 text-left text-xs text-gray-600 dark:bg-gray-900">
+        <pre className="mt-4 overflow-x-auto rounded-xl bg-muted p-3 text-left text-xs text-muted-foreground">
           {error.message}
         </pre>
       )}

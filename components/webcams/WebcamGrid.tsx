@@ -23,10 +23,10 @@ export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
     <div className="space-y-8">
       {live.length > 0 && (
         <section>
-          <h2 className="mb-3 font-semibold">Live</h2>
+          <h2 className="mb-3 font-bold tracking-tight">Live</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {live.map((cam) => (
-              <div key={cam.id} className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+              <div key={cam.id} className="card overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element -- external live snapshot, not an optimizable static asset */}
                 <img
                   src={`${cam.imageUrl}?t=${tick}`}
@@ -36,7 +36,7 @@ export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
                 />
                 <div className="flex items-center justify-between px-3 py-2 text-sm">
                   <span className="font-medium">{cam.name}</span>
-                  <a href={cam.pageUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                  <a href={cam.pageUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary hover:underline">
                     Full page ↗
                   </a>
                 </div>
@@ -48,19 +48,14 @@ export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
 
       {linkOnly.length > 0 && (
         <section>
-          <h2 className="mb-3 font-semibold">More webcams (link out)</h2>
-          <p className="mb-2 text-xs text-gray-500">
+          <h2 className="mb-3 font-bold tracking-tight">More webcams (link out)</h2>
+          <p className="mb-2 text-xs text-muted-foreground">
             These sources don&apos;t have a verified direct image URL yet — click through to the resort/DOT&apos;s own page.
           </p>
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {linkOnly.map((cam) => (
               <li key={cam.id}>
-                <a
-                  href={cam.pageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium hover:border-blue-400 hover:text-blue-600 dark:border-gray-800"
-                >
+                <a href={cam.pageUrl} target="_blank" rel="noopener noreferrer" className="card block px-3 py-2 text-sm font-medium transition hover:border-primary hover:text-primary">
                   {cam.name} ↗
                 </a>
               </li>

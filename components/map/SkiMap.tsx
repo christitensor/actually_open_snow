@@ -11,9 +11,10 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { Webcam } from "@/lib/models/types";
+import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
 
 interface MapPin {
   id: string;
@@ -101,6 +102,10 @@ export default function SkiMap({
   const [snowOverlayOn, setSnowOverlayOn] = useState(false);
   const snowOverlayOnRef = useRef(false);
   const loadSnowGridRef = useRef<(() => void) | null>(null);
+  // Tracks the theme toggle (in AppHeader) so the map's OSM tiles can be
+  // inverted for dark mode — this component has no other awareness of the
+  // theme system, so it watches the <html> class directly.
+  const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkSnapshot, getIsDarkServerSnapshot);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -314,12 +319,12 @@ export default function SkiMap({
 
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className={`h-full w-full ${isDark ? "map-dark-tiles" : ""}`} />
       <div className="absolute bottom-3 left-3 z-10 flex gap-2">
         {showRadarToggle && radarReady && (
           <button
             onClick={() => setRadarOn((v) => !v)}
-            className="rounded-lg border border-gray-300 bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/90 dark:hover:bg-gray-900"
+            className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
           >
             {radarOn ? "Hide" : "Show"} radar{radarTime ? ` (${radarTime})` : ""} · RainViewer
           </button>
@@ -327,7 +332,7 @@ export default function SkiMap({
         {showSnowForecastToggle && (
           <button
             onClick={() => setSnowOverlayOn((v) => !v)}
-            className="rounded-lg border border-gray-300 bg-white/90 px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/90 dark:hover:bg-gray-900"
+            className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
           >
             {snowOverlayOn ? "Hide" : "Show"} today&apos;s snow forecast (est.)
           </button>
