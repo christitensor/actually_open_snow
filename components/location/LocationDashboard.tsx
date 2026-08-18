@@ -3,6 +3,11 @@ import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
 import SkiMap from "@/components/map/SkiMap";
 
+// Open-Meteo's model blend (getForecast, forecast_days=16) already returns
+// this many days — capped at 14 to match what we're comfortable actually
+// showing as guidance (day 15-16 gets noticeably noisier).
+const FORECAST_DISPLAY_DAYS = 14;
+
 const SEVERITY_COLOR: Record<string, string> = {
   Extreme: "bg-red-600 text-white",
   Severe: "bg-orange-500 text-white",
@@ -103,7 +108,11 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
       </section>
 
       <section className="card p-4">
-        <h2 className="mb-3 font-bold tracking-tight">7-day forecast</h2>
+        <h2 className="mb-1 font-bold tracking-tight">{FORECAST_DISPLAY_DAYS}-day forecast</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Days 8+ are lower-confidence trend guidance from Open-Meteo&apos;s model blend, not a precise day-by-day
+          call — treat them as a heads-up on pattern changes, not a packing list.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[500px] text-sm">
             <thead>
@@ -116,8 +125,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               </tr>
             </thead>
             <tbody>
-              {forecast.daily.slice(0, 7).map((d) => (
-                <tr key={d.date} className="border-t border-border">
+              {forecast.daily.slice(0, FORECAST_DISPLAY_DAYS).map((d, i) => (
+                <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
                   <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
                   <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
                   <td className="py-1.5 pr-4">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>

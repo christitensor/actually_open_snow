@@ -44,7 +44,7 @@ Initial resort/location seed list (editable, not exhaustive) for RES-01:
 
 | ID | Feature | Description | Data Source Plan | Priority | Status | Notes |
 |---|---|---|---|---|---|---|
-| FC-01 | Multi-day forecast | Daily temp/precip/wind outlook for a location | Open-Meteo Forecast API (up to 16 days, free, no key) | P0 | Done | `lib/data-sources/open-meteo.ts`, `/api/forecast` — verified live |
+| FC-01 | Multi-day forecast | Daily temp/precip/wind outlook for a location | Open-Meteo Forecast API (up to 16 days, free, no key) | P0 | Done | `lib/data-sources/open-meteo.ts`, `/api/forecast` — verified live. `LocationDashboard` displays 14 of the 16 days fetched (days 8-14 flagged as lower-confidence trend guidance in the UI); days 15-16 are fetched but not shown. |
 | FC-02 | Hourly forecast | Hour-by-hour temp/precip/wind | Open-Meteo Forecast API (hourly block) | P0 | Done | Same client/route as FC-01 |
 | FC-03 | Snow forecast (inches by day) | Forecasted new snowfall per day | Derived: Open-Meteo `snowfall` hourly variable, summed to daily | P0 | Done | Accuracy will trail OpenSnow's mountain-tuned PEAKS model — flagged as approximate in the UI |
 | FC-04 | Forecast Anywhere | Forecast for any lat/lon, not just curated resorts | Open-Meteo (global coverage) + reverse geocoding (Open-Meteo Geocoding API) | P1 | Done | Delivered via MAP-17's coordinate-first location model rather than a separate search-by-address flow; reverse geocoding not built |
