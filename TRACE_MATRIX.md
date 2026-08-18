@@ -62,7 +62,7 @@ Initial resort/location seed list (editable, not exhaustive) for RES-01:
 
 | ID | Feature | Description | Data Source Plan | Priority | Status | Notes |
 |---|---|---|---|---|---|---|
-| MAP-01 | Base map (3D/terrain) | Interactive terrain map | MapLibre GL JS + free vector tiles (MapTiler free tier or OSM raster fallback) | P1 | Done | `components/map/SkiMap.tsx` — shipped with plain OSM raster tiles (no MapTiler key configured yet), no 3D/terrain mode yet |
+| MAP-01 | Base map (3D/terrain) | Interactive terrain map | MapLibre GL JS + free vector tiles (MapTiler free tier or OSM raster fallback) | P1 | Done | `components/map/SkiMap.tsx` — street (OSM), topo (OpenTopoMap), and satellite (Esri World Imagery) raster layers, swappable via a top-left control, all free/no-key; still no 3D/terrain mode |
 | MAP-02 | Current & forecast radar | Animated precip radar, now + forecast | RainViewer public API (free, no key) for current radar; forecast radar is a gap — flag Blocked | P1 | Done (current only) | `components/map/SkiMap.tsx` — toggleable radar layer, live-verified (fetched a real tile, confirmed valid PNG). Forecast radar remains out of scope, as originally flagged — RainViewer only covers current/nowcast |
 | MAP-03 | Global radar | Radar outside the US | RainViewer (has global coverage) | P1 | Done | Same RainViewer layer as MAP-02 — it's inherently global, no extra work needed |
 | MAP-04 | Forecast precipitation map | Map overlay of forecast precip by area | Open-Meteo gridded forecast, rendered as heatmap tiles we generate | P2 | Not Started | MAP-05's approach (below) generalizes to precip; not built yet |

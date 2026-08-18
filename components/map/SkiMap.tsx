@@ -35,10 +35,19 @@ function powderColor(inches: number | undefined): string {
 }
 
 // No MapTiler/vector-tile API key configured anywhere in this build, so
-// the base map is plain OSM raster tiles — free, no key, always works.
-// Swap in a vector style (MapTiler free tier) later for MAP-01's "3D
-// terrain" ambition; this gets a working map shipped first.
-const OSM_RASTER_STYLE: StyleSpecification = {
+// the base map is plain raster tiles — free, no key, always works. Three
+// swappable base layers, all free/open, no key: OSM street, OpenTopoMap
+// (topo, built from OSM + SRTM elevation), and Esri World Imagery
+// (satellite, Esri's public tile service). All three are added as
+// sources/layers up front with only one visible at a time (same pattern
+// as the radar/snow-forecast toggles below) rather than swapping the
+// whole style — that would blow away the pistes/radar/snow-grid layers
+// added at runtime.
+type BaseLayerId = "osm" | "topo" | "satellite";
+const BASE_LAYER_IDS: BaseLayerId[] = ["osm", "topo", "satellite"];
+const BASE_LAYER_LABELS: Record<BaseLayerId, string> = { osm: "Street", topo: "Topo", satellite: "Satellite" };
+
+const BASE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     osm: {
@@ -47,8 +56,31 @@ const OSM_RASTER_STYLE: StyleSpecification = {
       tileSize: 256,
       attribution: "&copy; OpenStreetMap contributors",
     },
+    topo: {
+      type: "raster",
+      tiles: [
+        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      maxzoom: 17,
+      attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)",
+    },
+    satellite: {
+      type: "raster",
+      // Esri's public World Imagery tile service — free, no key, {z}/{y}/{x} order (not the usual {z}/{x}/{y}).
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    },
   },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
+  layers: [
+    { id: "osm", type: "raster", source: "osm" },
+    { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
+    { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
+  ],
 };
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -105,6 +137,14 @@ export default function SkiMap({
   const [snowOverlayOn, setSnowOverlayOn] = useState(false);
   const snowOverlayOnRef = useRef(false);
   const loadSnowGridRef = useRef<(() => void) | null>(null);
+  const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
+  // Deliberately not map.isStyleLoaded(): it also factors in whether every
+  // source's tiles have finished loading, so one slow/failed tile fetch
+  // (e.g. a flaky connection) can leave it false long after the style
+  // itself is mutation-ready — live-verified this stalls the base-layer
+  // switcher indefinitely. The map's one-time "load" event is what
+  // actually marks the style ready for setLayoutProperty calls.
+  const styleReadyRef = useRef(false);
   // Tracks the theme toggle (in AppHeader) so the map's OSM tiles can be
   // inverted for dark mode — this component has no other awareness of the
   // theme system, so it watches the <html> class directly.
@@ -115,11 +155,14 @@ export default function SkiMap({
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: OSM_RASTER_STYLE,
+      style: BASE_STYLE,
       center,
       zoom,
     });
     mapRef.current = map;
+    map.once("load", () => {
+      styleReadyRef.current = true;
+    });
     map.addControl(new NavigationControl(), "top-right");
 
     // Sticky/flex sidebars (the desktop layout on both the home page and
@@ -352,9 +395,41 @@ export default function SkiMap({
     if (snowOverlayOn) loadSnowGridRef.current?.();
   }, [snowOverlayOn]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      for (const id of BASE_LAYER_IDS) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", id === baseLayer ? "visible" : "none");
+      }
+    };
+    // On mount this can fire before the initial style has finished loading
+    // (setLayoutProperty throws on an unloaded style); everything after
+    // mount, the style is already loaded and this runs immediately.
+    if (styleReadyRef.current) apply();
+    else map.once("load", apply);
+  }, [baseLayer]);
+
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} className={`h-full w-full ${isDark ? "map-dark-tiles" : ""}`} />
+      {/* The dark-mode invert trick (see globals.css) only reads right on
+          the plain OSM street tiles — inverting topo's relief colors or a
+          satellite photo produces a false-color mess, so it's skipped for
+          those two. */}
+      <div ref={containerRef} className={`h-full w-full ${isDark && baseLayer === "osm" ? "map-dark-tiles" : ""}`} />
+      <div className="absolute top-3 left-3 z-10 flex gap-1 rounded-full border border-border bg-card/90 p-1 text-xs shadow-sm backdrop-blur-sm">
+        {BASE_LAYER_IDS.map((id) => (
+          <button
+            key={id}
+            onClick={() => setBaseLayer(id)}
+            className={`rounded-full px-2.5 py-1 font-semibold transition ${
+              baseLayer === id ? "bg-primary text-primary-foreground" : "text-foreground hover:text-primary"
+            }`}
+          >
+            {BASE_LAYER_LABELS[id]}
+          </button>
+        ))}
+      </div>
       <div className="absolute bottom-3 left-3 z-10 flex gap-2">
         {showRadarToggle && radarReady && (
           <button
