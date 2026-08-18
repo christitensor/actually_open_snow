@@ -97,11 +97,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
       <div className="lg:flex lg:items-start lg:gap-6">
         <div className="space-y-5 lg:min-w-0 lg:flex-1">
           <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Snow alerts</h2>
-            <AlertSubscribeForm location={location} />
-          </section>
-
-          <section className="card p-4">
             <h2 className="mb-2 font-bold tracking-tight">Conditions summary</h2>
             <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -297,6 +292,11 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               )}
             </section>
           )}
+
+          <section className="card p-4">
+            <h2 className="mb-2 font-bold tracking-tight">Snow alerts</h2>
+            <AlertSubscribeForm location={location} />
+          </section>
         </div>
 
         <aside className="mt-5 lg:mt-0 lg:w-96 lg:shrink-0">
