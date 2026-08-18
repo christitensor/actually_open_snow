@@ -1,7 +1,13 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
+import ElevationAdjuster from "@/components/location/ElevationAdjuster";
+import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
+import { webcams as allWebcams } from "@/data/webcams";
+import { degToCompass } from "@/lib/util/wind";
+
+const HOURLY_DISPLAY_HOURS = 24;
 
 // Open-Meteo's model blend (getForecast, forecast_days=16) already returns
 // this many days — capped at 14 to match what we're comfortable actually
@@ -19,6 +25,10 @@ function fmtDate(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
+function fmtHour(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric" });
+}
+
 const AQI_LABEL = (aqi: number): { label: string; color: string } => {
   if (aqi <= 50) return { label: "Good", color: "text-green-600 dark:text-green-400" };
   if (aqi <= 100) return { label: "Moderate", color: "text-yellow-600 dark:text-yellow-400" };
@@ -34,6 +44,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     forecast,
     snowLevel,
     snowLineStatus,
+    dailySnowLines,
     powderQualityToday,
     trailConditions,
     wetBulbNowF,
@@ -46,9 +57,12 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     airQuality,
     multiModelTodaySnowfallIn,
     pastWeek,
+    upcomingHours,
   } = data;
 
   const currentSnowLevelFt = snowLevel.points[0]?.snowLevelFt ?? snowLevel.points[0]?.freezingLevelFt ?? null;
+  const resortWebcams = location.resortId ? allWebcams.filter((w) => w.resortId === location.resortId) : [];
+  const todayForBaseline = forecast.daily[0];
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-4 sm:p-6">
@@ -114,30 +128,85 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           call — treat them as a heads-up on pattern changes, not a packing list.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px] text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-left text-muted-foreground">
                 <th className="py-1 pr-4 font-medium">Day</th>
                 <th className="py-1 pr-4 font-medium">High / Low</th>
                 <th className="py-1 pr-4 font-medium">New snow</th>
                 <th className="py-1 pr-4 font-medium">Precip</th>
+                <th className="py-1 pr-4 font-medium">Snow line</th>
                 <th className="py-1 font-medium">Wind</th>
               </tr>
             </thead>
             <tbody>
-              {forecast.daily.slice(0, FORECAST_DISPLAY_DAYS).map((d, i) => (
-                <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
-                  <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
-                  <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
-                  <td className="py-1.5 pr-4">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
-                  <td className="py-1.5 pr-4">{d.precipitationSumIn.toFixed(2)}&quot;</td>
-                  <td className="py-1.5">{Math.round(d.windSpeedMaxMph)} mph</td>
-                </tr>
-              ))}
+              {forecast.daily.slice(0, FORECAST_DISPLAY_DAYS).map((d, i) => {
+                const snowLine = dailySnowLines[i];
+                return (
+                  <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
+                    <td className="py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
+                    <td className="py-1.5 pr-4">{Math.round(d.tempMaxF)}° / {Math.round(d.tempMinF)}°</td>
+                    <td className="py-1.5 pr-4">{d.snowfallSumIn > 0 ? `${d.snowfallSumIn.toFixed(1)}"` : "—"}</td>
+                    <td className="py-1.5 pr-4">{d.precipitationSumIn.toFixed(2)}&quot;</td>
+                    <td className="py-1.5 pr-4">{snowLine?.snowLineFt != null ? `${snowLine.snowLineFt.toLocaleString()} ft` : "—"}</td>
+                    <td className="py-1.5">
+                      {Math.round(d.windSpeedMaxMph)}
+                      {d.windGustMaxMph > d.windSpeedMaxMph + 3 ? ` G${Math.round(d.windGustMaxMph)}` : ""} mph {degToCompass(d.windDirectionDominantDeg)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Snow line is an afternoon estimate — {dailySnowLines.some((d) => d.source === "nws") ? "NWS gridpoint forecast where available, Open-Meteo freezing level beyond its ~7-day range." : "Open-Meteo freezing level (no NWS coverage for this point)."}
+        </p>
       </section>
+
+      {upcomingHours.length > 0 && (
+        <section className="card p-4">
+          <h2 className="mb-3 font-bold tracking-tight">Next {HOURLY_DISPLAY_HOURS} hours</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-1 pr-4 font-medium">Time</th>
+                  <th className="py-1 pr-4 font-medium">Temp</th>
+                  <th className="py-1 pr-4 font-medium">Snow</th>
+                  <th className="py-1 pr-4 font-medium">Precip</th>
+                  <th className="py-1 font-medium">Wind</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcomingHours.map((h) => (
+                  <tr key={h.time} className="border-t border-border">
+                    <td className="py-1.5 pr-4 font-medium">{fmtHour(h.time)}</td>
+                    <td className="py-1.5 pr-4">{Math.round(h.temperatureF)}°</td>
+                    <td className="py-1.5 pr-4">{h.snowfallIn > 0 ? `${h.snowfallIn.toFixed(2)}"` : "—"}</td>
+                    <td className="py-1.5 pr-4">{h.precipitationIn > 0 ? `${h.precipitationIn.toFixed(2)}"` : "—"}</td>
+                    <td className="py-1.5">
+                      {Math.round(h.windSpeedMph)}
+                      {h.windGustMph > h.windSpeedMph + 3 ? ` G${Math.round(h.windGustMph)}` : ""} mph {degToCompass(h.windDirectionDeg)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {todayForBaseline && (
+        <ElevationAdjuster location={location} elevationFt={elevationFt} baselineToday={todayForBaseline} />
+      )}
+
+      {resortWebcams.length > 0 && (
+        <section className="card p-4">
+          <h2 className="mb-3 font-bold tracking-tight">📷 Live webcams</h2>
+          <WebcamGrid webcams={resortWebcams} />
+        </section>
+      )}
 
       {multiModelTodaySnowfallIn && (
         <section className="card p-4">

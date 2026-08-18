@@ -33,6 +33,8 @@ export function resortToLocation(resort: Resort): Location {
     resortId: resort.id,
     name: resort.name,
     elevationFt: resort.baseElevationFt,
+    minElevationFt: resort.baseElevationFt,
+    maxElevationFt: resort.summitElevationFt,
   };
 }
 

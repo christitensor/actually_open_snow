@@ -34,7 +34,7 @@ export default async function Home() {
         <MyLocationButton />
       </div>
 
-      <section className="card h-[55vh] min-h-[360px] overflow-hidden">
+      <section className="card h-[38vh] min-h-[280px] overflow-hidden sm:h-[55vh]">
         <SkiMap resorts={resortsWithSnow} webcams={webcams} center={REGION_CENTER} zoom={8} />
       </section>
       <p className="-mt-4 text-xs text-muted-foreground">

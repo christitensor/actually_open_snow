@@ -5,6 +5,7 @@
 import type {
   AirQuality,
   DailyForecastDay,
+  ElevationAdjustedDay,
   ElevationResponse,
   ForecastResponse,
   HistoricalDay,
@@ -23,6 +24,7 @@ const HOURLY_PARAMS = [
   "snowfall",
   "wind_speed_10m",
   "wind_gusts_10m",
+  "wind_direction_10m",
   "weather_code",
   "freezing_level_height",
 ].join(",");
@@ -33,10 +35,13 @@ const DAILY_PARAMS = [
   "precipitation_sum",
   "snowfall_sum",
   "wind_speed_10m_max",
+  "wind_gusts_10m_max",
+  "wind_direction_10m_dominant",
   "weather_code",
 ].join(",");
 
 interface OpenMeteoForecastRaw {
+  utc_offset_seconds: number;
   hourly: {
     time: string[];
     temperature_2m: number[];
@@ -45,6 +50,7 @@ interface OpenMeteoForecastRaw {
     snowfall: number[];
     wind_speed_10m: number[];
     wind_gusts_10m: number[];
+    wind_direction_10m: number[];
     weather_code: number[];
     freezing_level_height: number[];
   };
@@ -55,6 +61,8 @@ interface OpenMeteoForecastRaw {
     precipitation_sum: number[];
     snowfall_sum: number[];
     wind_speed_10m_max: number[];
+    wind_gusts_10m_max: number[];
+    wind_direction_10m_dominant: number[];
     weather_code: number[];
   };
 }
@@ -102,8 +110,19 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     snowfallIn: raw.hourly.snowfall[i],
     windSpeedMph: raw.hourly.wind_speed_10m[i],
     windGustMph: raw.hourly.wind_gusts_10m[i],
+    windDirectionDeg: raw.hourly.wind_direction_10m[i],
     weatherCode: raw.hourly.weather_code[i],
-    freezingLevelFt: Math.round(raw.hourly.freezing_level_height[i] * 3.28084),
+    // No unit conversion here: Open-Meteo ties freezing_level_height's unit
+    // to the imperial/metric params on this request. Live-verified via
+    // hourly_units.freezing_level_height in the raw response — with
+    // temperature_unit=fahrenheit set (as this request always does), it
+    // comes back already in feet, not meters. Multiplying by 3.28084 here
+    // (an easy mistake — every *other* height/elevation conversion in this
+    // file legitimately needs it, since getElevation() hits a separate,
+    // always-metric endpoint) silently ~3.3x'd every freezing-level
+    // reading; caught via a wildly implausible 51,990 ft "snow line" in
+    // the new per-day forecast table.
+    freezingLevelFt: Math.round(raw.hourly.freezing_level_height[i]),
   }));
 
   const daily: DailyForecastDay[] = raw.daily.time.map((date, i) => ({
@@ -113,6 +132,8 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     precipitationSumIn: raw.daily.precipitation_sum[i],
     snowfallSumIn: raw.daily.snowfall_sum[i],
     windSpeedMaxMph: raw.daily.wind_speed_10m_max[i],
+    windGustMaxMph: raw.daily.wind_gusts_10m_max[i],
+    windDirectionDominantDeg: raw.daily.wind_direction_10m_dominant[i],
     weatherCode: raw.daily.weather_code[i],
   }));
 
@@ -122,6 +143,7 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     hourly,
     daily,
     source: "open-meteo",
+    utcOffsetSeconds: raw.utc_offset_seconds,
   };
 }
 
@@ -136,6 +158,43 @@ export async function getElevation(lat: number, lon: number): Promise<ElevationR
     elevationFt: Math.round(meters * 3.28084),
     source: "open-meteo-elevation",
   };
+}
+
+/**
+ * FC-10-adj: re-requests the daily forecast with Open-Meteo's `elevation`
+ * override, which downscales temperature (and, live-verified, precipitation
+ * too — not just a lapse-rate-on-temperature trick) to a specific elevation
+ * rather than the weather model's native grid elevation. Backs the
+ * elevation-adjuster slider (components/location/ElevationAdjuster.tsx) —
+ * deliberately a narrow daily-only request (no hourly, 7 days) since it's
+ * refetched on every slider move.
+ */
+export async function getElevationAdjustedDaily(
+  lat: number,
+  lon: number,
+  elevationM: number
+): Promise<ElevationAdjustedDay[]> {
+  const url =
+    `${FORECAST_BASE}?latitude=${lat}&longitude=${lon}&elevation=${elevationM}` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum` +
+    `&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7`;
+  const raw = await fetchJson<{
+    daily: {
+      time: string[];
+      temperature_2m_max: number[];
+      temperature_2m_min: number[];
+      precipitation_sum: number[];
+      snowfall_sum: number[];
+    };
+  }>(url);
+
+  return raw.daily.time.map((date, i) => ({
+    date,
+    tempMaxF: raw.daily.temperature_2m_max[i],
+    tempMinF: raw.daily.temperature_2m_min[i],
+    precipitationSumIn: raw.daily.precipitation_sum[i],
+    snowfallSumIn: raw.daily.snowfall_sum[i],
+  }));
 }
 
 /**

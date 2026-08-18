@@ -16,7 +16,12 @@ import { getLatestAfd } from "@/lib/data-sources/nws-products";
 import { getZoneMapLayer, getAvalancheForecast } from "@/lib/data-sources/avalanche-org";
 import { findNearbyStations, getLatestReading } from "@/lib/data-sources/snotel";
 import { findZoneForPoint } from "@/lib/derive/avalanche-zone-lookup";
-import { getSnowLevelForLocation, elevationVsSnowLine, type ElevationVsSnowLine } from "@/lib/derive/snow-level";
+import {
+  getSnowLevelForLocation,
+  elevationVsSnowLine,
+  computeDailySnowLines,
+  type ElevationVsSnowLine,
+} from "@/lib/derive/snow-level";
 import { estimateDailyPowderQuality } from "@/lib/derive/powder-quality";
 import { estimateTrailConditions, type TrailConditionsEstimate } from "@/lib/derive/trail-conditions";
 import { wetBulbF } from "@/lib/derive/wet-bulb";
@@ -26,6 +31,7 @@ import type {
   AvalancheForecast,
   AvalancheZone,
   ConditionsSummary,
+  DailySnowLine,
   ForecastResponse,
   HistoricalDay,
   Location,
@@ -41,6 +47,8 @@ export interface LocationDashboardData {
   snowLevel: SnowLevelResponse;
   /** How this location's (base) elevation compares to the current snow level — see components/location for per-band (base/mid/summit) resort detail */
   snowLineStatus: ElevationVsSnowLine;
+  /** FC-10: one afternoon snow-line estimate per day in `forecast.daily`, same order/length */
+  dailySnowLines: DailySnowLine[];
   powderQualityToday: ReturnType<typeof estimateDailyPowderQuality>;
   trailConditions: TrailConditionsEstimate | null;
   wetBulbNowF: number | null;
@@ -55,7 +63,11 @@ export interface LocationDashboardData {
   multiModelTodaySnowfallIn: Record<string, number> | null;
   /** SNOW-05: last 7 days, most recent last */
   pastWeek: HistoricalDay[];
+  /** FC-02: next 24 hours from now, for the hourly forecast table. Computed here (not in the component) since Date.now() is an impure call React's hooks lint won't allow in render. */
+  upcomingHours: ForecastResponse["hourly"];
 }
+
+const HOURLY_DISPLAY_HOURS = 24;
 
 export async function getLocationDashboardData(location: Location): Promise<LocationDashboardData> {
   const { lat, lon } = location;
@@ -132,6 +144,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     forecast,
     snowLevel,
     snowLineStatus: elevationFt != null ? elevationVsSnowLine(elevationFt, latestSnowLevelPoint) : "unknown",
+    dailySnowLines: computeDailySnowLines(forecast.daily, forecast.hourly, snowLevel.points, forecast.utcOffsetSeconds),
     powderQualityToday: estimateDailyPowderQuality(todaysHours),
     trailConditions: estimateTrailConditions(recentWindow),
     wetBulbNowF,
@@ -144,5 +157,6 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     airQuality,
     multiModelTodaySnowfallIn,
     pastWeek,
+    upcomingHours: forecast.hourly.filter((h) => new Date(h.time).getTime() >= Date.now()).slice(0, HOURLY_DISPLAY_HOURS),
   };
 }

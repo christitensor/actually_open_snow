@@ -13,6 +13,9 @@ export interface Location {
   /** Human-readable label, e.g. resort name or "Custom Pin" */
   name: string;
   elevationFt?: number;
+  /** Resort base/summit, when known — bounds the elevation-adjuster slider (ElevationAdjuster.tsx). Pins fall back to elevationFt +/- a fixed range. */
+  minElevationFt?: number;
+  maxElevationFt?: number;
 }
 
 export interface Resort {
@@ -34,6 +37,7 @@ export interface HourlyForecastPoint {
   snowfallIn: number;
   windSpeedMph: number;
   windGustMph: number;
+  windDirectionDeg: number;
   weatherCode: number;
   freezingLevelFt: number;
 }
@@ -45,7 +49,18 @@ export interface DailyForecastDay {
   precipitationSumIn: number;
   snowfallSumIn: number;
   windSpeedMaxMph: number;
+  windGustMaxMph: number;
+  windDirectionDominantDeg: number;
   weatherCode: number;
+}
+
+/** A lightweight, elevation-overridden daily forecast — see FC-10-adj (elevation adjuster). Not the full ForecastResponse: no hourly block, no wind. */
+export interface ElevationAdjustedDay {
+  date: string;
+  tempMaxF: number;
+  tempMinF: number;
+  precipitationSumIn: number;
+  snowfallSumIn: number;
 }
 
 export interface ForecastResponse {
@@ -54,6 +69,8 @@ export interface ForecastResponse {
   hourly: HourlyForecastPoint[];
   daily: DailyForecastDay[];
   source: "open-meteo";
+  /** Seconds east of UTC for this location (e.g. -21600 for MDT) — lets callers build a correct absolute timestamp from a local wall-clock string, since `hourly`/`daily` times carry no offset of their own (Open-Meteo's `timezone=auto`). */
+  utcOffsetSeconds: number;
 }
 
 export interface SnowLevelPoint {
@@ -67,6 +84,13 @@ export interface SnowLevelResponse {
   points: SnowLevelPoint[];
   /** Only present when the point falls inside an NWS forecast zone (US only) */
   nwsAvailable: boolean;
+}
+
+/** FC-10 per-day rollup for the daily forecast table — afternoon snow line for each forecast date. */
+export interface DailySnowLine {
+  date: string;
+  snowLineFt: number | null;
+  source: "nws" | "estimated";
 }
 
 export interface ElevationResponse {
