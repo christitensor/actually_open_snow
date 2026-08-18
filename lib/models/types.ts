@@ -204,6 +204,11 @@ export interface AlertSubscription {
   lastNotifiedDate: string | null;
 }
 
+/** PERS-01 favorite: a Location plus when it was saved. Shared shape between
+ * the localStorage store (signed-out) and the server-side favorites table
+ * (signed-in) so the same data moves between them without translation. */
+export type FavoriteLocation = Location & { savedAt: string };
+
 export interface Webcam {
   id: string;
   name: string;

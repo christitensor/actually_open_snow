@@ -23,7 +23,13 @@ const DB_PATH = join(tmpdir(), "actually-open-snow", "app.db");
 
 let db: DatabaseSync | null = null;
 
-function getDb(): DatabaseSync {
+// Exported so lib/db/users.ts (PERS-04 accounts/sessions/favorites) shares
+// this same connection/file instead of opening a second DatabaseSync
+// pointed at the same path — SQLite tolerates that, but there's no reason
+// to. Same ephemeral-storage caveat above applies to every table here,
+// accounts included: fine for a low-traffic app on one warm instance, not
+// guaranteed to survive multiple concurrent Vercel instances or a redeploy.
+export function getDb(): DatabaseSync {
   if (db) return db;
   mkdirSync(dirname(DB_PATH), { recursive: true });
   db = new DatabaseSync(DB_PATH);
@@ -38,6 +44,32 @@ function getDb(): DatabaseSync {
       unsubscribe_token TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
       last_notified_date TEXT
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS magic_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      favorite_key TEXT NOT NULL,
+      location_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL,
+      UNIQUE(user_id, favorite_key)
     )
   `);
   return db;

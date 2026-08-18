@@ -1,5 +1,6 @@
 import Link from "next/link";
 import HeaderNav from "@/components/HeaderNav";
+import AuthControl from "@/components/auth/AuthControl";
 
 export default function AppHeader() {
   return (
@@ -13,7 +14,10 @@ export default function AppHeader() {
         <Link href="/" className="font-bold tracking-tight">
           Actually Open Snow
         </Link>
-        <HeaderNav />
+        <div className="flex items-center gap-3">
+          <HeaderNav />
+          <AuthControl />
+        </div>
       </div>
     </header>
   );
