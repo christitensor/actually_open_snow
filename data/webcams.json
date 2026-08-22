@@ -375,6 +375,7 @@
     "lat": 41.9738,
     "lon": -111.5245,
     "imageUrl": "https://www.skiutah.com/files/blob/webcam/1072144413",
+    "cacheBustParam": "_ts",
     "pageUrl": "https://www.skiutah.com/resorts/webcams",
     "source": "resort"
   },
@@ -385,6 +386,7 @@
     "lat": 41.9738,
     "lon": -111.5245,
     "imageUrl": "https://www.skiutah.com/files/blob/webcam/1453631994",
+    "cacheBustParam": "_ts",
     "pageUrl": "https://www.skiutah.com/resorts/webcams",
     "source": "resort"
   },
@@ -395,6 +397,7 @@
     "lat": 41.9738,
     "lon": -111.5245,
     "imageUrl": "https://www.skiutah.com/files/blob/webcam/VYbnKiTTjEruJB9UP6z5vs",
+    "cacheBustParam": "_ts",
     "pageUrl": "https://www.skiutah.com/resorts/webcams",
     "source": "resort"
   },
@@ -405,6 +408,7 @@
     "lat": 41.9738,
     "lon": -111.5245,
     "imageUrl": "https://www.skiutah.com/files/blob/webcam/1758577868",
+    "cacheBustParam": "_ts",
     "pageUrl": "https://www.skiutah.com/resorts/webcams",
     "source": "resort"
   },

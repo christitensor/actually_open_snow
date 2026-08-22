@@ -16,8 +16,13 @@ const REFRESH_MS = 60_000;
 // instead treats the whole thing as a single malformed query, returning a
 // tiny broken-image placeholder instead of the real snapshot (confirmed
 // live: 184 bytes vs. 416KB for the same URL with "&t=" instead).
-function withCacheBust(url: string, tick: number): string {
-  return `${url}${url.includes("?") ? "&" : "?"}t=${tick}`;
+//
+// Some CDNs go further and 404 on any param name they don't recognize
+// instead of just ignoring it (confirmed live: skiutah.com's blob endpoint
+// returns 200 for "?_ts=…" but 404 for "?t=…") — cacheBustParam lets a
+// webcam entry specify the name that CDN actually accepts.
+function withCacheBust(url: string, tick: number, paramName = "t"): string {
+  return `${url}${url.includes("?") ? "&" : "?"}${paramName}=${tick}`;
 }
 
 export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
@@ -59,7 +64,7 @@ export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
               <div key={cam.id} className="card overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element -- external live snapshot, not an optimizable static asset */}
                 <img
-                  src={withCacheBust(cam.imageUrl!, tick)}
+                  src={withCacheBust(cam.imageUrl!, tick, cam.cacheBustParam)}
                   alt={cam.name}
                   className="aspect-video w-full object-cover"
                   loading="lazy"

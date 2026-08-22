@@ -236,6 +236,8 @@ export interface Webcam {
   lon: number;
   /** Direct hotlinkable still-image URL, when verified — see data/webcams.ts for how each was found. */
   imageUrl?: string;
+  /** Query param name used to cache-bust imageUrl, when the CDN 404s on any param it doesn't recognize (e.g. skiutah.com's blob endpoint only accepts "_ts") rather than just ignoring unknown ones. Defaults to "t". */
+  cacheBustParam?: string;
   /** Embeddable live-video URL (YouTube livestream `embed/{id}`, etc.), when a resort publishes its cams that way instead of a still image. At most one of imageUrl/videoEmbedUrl is set per entry. */
   videoEmbedUrl?: string;
   pageUrl: string;

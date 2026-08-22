@@ -253,9 +253,12 @@ export default function SkiMap({
       // preview endpoint, ?c=65&s=720) — a bare "?t=" would double up the
       // "?" and break the request (confirmed live: the endpoint returns a
       // tiny broken-image placeholder for a malformed double-"?" URL, a
-      // real image for the same URL with "&t=" instead).
+      // real image for the same URL with "&t=" instead). Some CDNs also
+      // 404 on any param name they don't recognize (skiutah.com's blob
+      // endpoint wants "_ts", not "t") — cam.cacheBustParam overrides it.
+      const cacheBustParam = cam.cacheBustParam ?? "t";
       const cacheBustedImageUrl = cam.imageUrl
-        ? `${cam.imageUrl}${cam.imageUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
+        ? `${cam.imageUrl}${cam.imageUrl.includes("?") ? "&" : "?"}${cacheBustParam}=${Date.now()}`
         : undefined;
       const popupHtml = cacheBustedImageUrl
         ? `<strong>${cam.name}</strong><br/><img src="${cacheBustedImageUrl}" alt="${cam.name}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
