@@ -11,7 +11,7 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
@@ -519,18 +519,26 @@ export default function SkiMap({
     };
   }, [obsOn, observations]);
 
+  // Shared between the render-effect below and the empty-state message in
+  // the JSX, so "nothing plotted" and "nothing to plot" never disagree.
+  const filteredObservations = useMemo(
+    () =>
+      (observations ?? []).filter((o) => {
+        if (obsTypeFilter !== "all" && o.type !== obsTypeFilter) return false;
+        if (obsAspectFilter !== "all" && o.aspect !== obsAspectFilter) return false;
+        if (obsMinElevationFt > 0 && (o.elevationFt == null || o.elevationFt < obsMinElevationFt)) return false;
+        return true;
+      }),
+    [observations, obsTypeFilter, obsAspectFilter, obsMinElevationFt]
+  );
+
   // Apply the type/aspect/elevation filters and (re)draw whenever the data
   // or any filter changes; separately toggle layer visibility with obsOn.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    const filtered = (observations ?? []).filter((o) => {
-      if (obsTypeFilter !== "all" && o.type !== obsTypeFilter) return false;
-      if (obsAspectFilter !== "all" && o.aspect !== obsAspectFilter) return false;
-      if (obsMinElevationFt > 0 && (o.elevationFt == null || o.elevationFt < obsMinElevationFt)) return false;
-      return true;
-    });
+    const filtered = filteredObservations;
 
     const geojson: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
@@ -560,7 +568,7 @@ export default function SkiMap({
     if (map.getLayer("avalanche-observations-circles")) {
       map.setLayoutProperty("avalanche-observations-circles", "visibility", obsOn ? "visible" : "none");
     }
-  }, [observations, obsTypeFilter, obsAspectFilter, obsMinElevationFt, obsOn]);
+  }, [filteredObservations, obsOn]);
 
   return (
     <div className="relative h-full w-full">
@@ -621,6 +629,19 @@ export default function SkiMap({
               ))}
             </select>
             {obsLoading && <span className="px-1 text-muted-foreground">Loading…</span>}
+          </div>
+        )}
+        {obsOn && !obsLoading && observations != null && (
+          <div className="max-w-[260px] rounded-2xl border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+            {observations.length === 0
+              ? "No recent avalanche observations from UAC right now."
+              : filteredObservations.length === 0
+                ? `${observations.length} UAC observation${observations.length === 1 ? "" : "s"} statewide, but none match the current filters.`
+                : /* Statewide points, not filtered to this location — nothing is
+                     wrong if none of them happen to sit inside the current map
+                     view; this caption is the only signal the user gets that the
+                     layer loaded real data rather than silently doing nothing. */
+                  `${filteredObservations.length} UAC observation${filteredObservations.length === 1 ? "" : "s"} loaded statewide — pan or zoom out if none are visible near this spot.`}
           </div>
         )}
         <div className="flex flex-wrap gap-2">
