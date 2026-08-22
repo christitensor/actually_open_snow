@@ -24,17 +24,17 @@ export async function POST(req: NextRequest) {
   const nextPath = typeof next === "string" && next.startsWith("/") ? next : "/";
 
   try {
-    const { token } = createMagicLink(email);
+    const { token, code } = createMagicLink(email);
     const origin = req.nextUrl.origin;
     const verifyUrl = `${origin}/api/auth/verify?token=${token}&next=${encodeURIComponent(nextPath)}`;
 
     await sendEmail({
       to: email,
       subject: "Sign in to Actually Open Snow",
-      text: `Click to sign in: ${verifyUrl}\n\nThis link works once and expires in 15 minutes. If you didn't request this, ignore it.`,
+      text: `Click to sign in: ${verifyUrl}\n\nUsing this saved to your home screen? Tapping the link above opens Safari instead of the saved app, so it won't sign that in. Open the app and enter this code instead: ${code}\n\nThe link and code both work once and expire in 15 minutes. If you didn't request this, ignore it.`,
     });
 
-    return NextResponse.json({ message: `Check ${email} for a sign-in link.` });
+    return NextResponse.json({ message: `Check ${email} for a sign-in link and code.` });
   } catch (err) {
     return serverError(err);
   }

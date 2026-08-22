@@ -23,13 +23,20 @@ interface UserRow {
 
 // --- Magic links ---------------------------------------------------------
 
-export function createMagicLink(email: string): { token: string; expiresAt: string } {
+function generateCode(): string {
+  // 6-digit numeric, zero-padded — short enough to type by hand from an
+  // email into a saved-to-home-screen app (see consumeMagicLinkByCode).
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+}
+
+export function createMagicLink(email: string): { token: string; code: string; expiresAt: string } {
   const token = randomUUID();
+  const code = generateCode();
   const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS).toISOString();
   getDb()
-    .prepare(`INSERT INTO magic_links (email, token, expires_at, used_at) VALUES (?, ?, ?, NULL)`)
-    .run(email, token, expiresAt);
-  return { token, expiresAt };
+    .prepare(`INSERT INTO magic_links (email, token, code, expires_at, used_at) VALUES (?, ?, ?, ?, NULL)`)
+    .run(email, token, code, expiresAt);
+  return { token, code, expiresAt };
 }
 
 /** Validates + burns a magic-link token, returning the email it was issued to (or null if invalid/expired/already used). */
@@ -43,6 +50,28 @@ export function consumeMagicLink(token: string): string | null {
 
   db.prepare(`UPDATE magic_links SET used_at = ? WHERE token = ?`).run(new Date().toISOString(), token);
   return row.email;
+}
+
+// iOS treats a "saved to home screen" web app as a separate storage silo
+// from Safari — a magic link opened from Mail always opens in Safari, so
+// it can never set a cookie the saved app can see. This lets someone who
+// already has the saved app open finish sign-in entirely within it: type
+// the short code from the email instead of tapping the link, so the
+// session cookie gets set in the right context to begin with. Rate-limited
+// naturally by the same 15-minute expiry + single-use burn as the token —
+// a brute-force guesser gets one attempt window per requested code.
+export function consumeMagicLinkByCode(email: string, code: string): boolean {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT id, token, expires_at, used_at FROM magic_links WHERE email = ? AND code = ? ORDER BY id DESC LIMIT 1`
+    )
+    .get(email, code) as { id: number; token: string; expires_at: string; used_at: string | null } | undefined;
+  if (!row || row.used_at) return false;
+  if (new Date(row.expires_at).getTime() < Date.now()) return false;
+
+  db.prepare(`UPDATE magic_links SET used_at = ? WHERE id = ?`).run(new Date().toISOString(), row.id);
+  return true;
 }
 
 // --- Users -----------------------------------------------------------------

@@ -16,7 +16,29 @@ interface AuthContextValue {
   signInError: boolean;
   clearSignInError: () => void;
   requestMagicLink: (email: string) => Promise<{ ok: boolean; message: string }>;
+  verifyCode: (email: string, code: string) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
+}
+
+// Shared by both sign-in paths: the link-click redirect (query-param
+// triggered) and the in-app code entry (called directly on success).
+// Idempotent server-side (INSERT OR IGNORE keyed by favorite_key), so
+// there's no harm importing an empty or already-imported list.
+async function importLocalFavorites() {
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY) ?? "[]";
+    const local: unknown = JSON.parse(raw);
+    if (Array.isArray(local) && local.length > 0) {
+      await fetch("/api/favorites/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ favorites: local }),
+      });
+      window.dispatchEvent(new Event(FAVORITES_CHANGE_EVENT));
+    }
+  } catch {
+    // Best-effort — a missed import just means re-starring on this device.
+  }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,16 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY) ?? "[]";
-        const local: unknown = JSON.parse(raw);
-        if (Array.isArray(local) && local.length > 0) {
-          await fetch("/api/favorites/import", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ favorites: local }),
-          });
-          window.dispatchEvent(new Event(FAVORITES_CHANGE_EVENT));
-        }
+        await importLocalFavorites();
       } finally {
         params.delete("signedIn");
         const qs = params.toString();
@@ -100,6 +113,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const verifyCode = useCallback(async (emailInput: string, code: string) => {
+    try {
+      const res = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput, code }),
+      });
+      const body = (await res.json()) as { email?: string; error?: string };
+      if (!res.ok || !body.email) return { ok: false, message: body.error ?? "That code didn't work." };
+
+      setEmail(body.email);
+      setStatus("signed-in");
+      await importLocalFavorites();
+      return { ok: true };
+    } catch {
+      return { ok: false, message: "Network error — try again." };
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setEmail(null);
@@ -108,7 +140,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ status, email, signInError, clearSignInError: () => setSignInError(false), requestMagicLink, signOut }}
+      value={{
+        status,
+        email,
+        signInError,
+        clearSignInError: () => setSignInError(false),
+        requestMagicLink,
+        verifyCode,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

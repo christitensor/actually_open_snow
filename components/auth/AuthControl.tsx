@@ -6,11 +6,14 @@ import { useAuth } from "@/lib/auth";
 // PERS-04: sign-in control in the header. Signed out: a button that opens
 // a small magic-link email form. Signed in: the account's email + sign out.
 export default function AuthControl() {
-  const { status, email, signInError, clearSignInError, requestMagicLink, signOut } = useAuth();
+  const { status, email, signInError, clearSignInError, requestMagicLink, verifyCode, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [inputEmail, setInputEmail] = useState("");
   const [formStatus, setFormStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeStatus, setCodeStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [codeMessage, setCodeMessage] = useState<string | null>(null);
 
   // A magic link that was invalid, expired, or already used redirects back
   // here with signInError — pop the form open with an explanation instead
@@ -48,6 +51,18 @@ export default function AuthControl() {
     setMessage(result.message);
   };
 
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCodeStatus("loading");
+    const result = await verifyCode(inputEmail, codeInput);
+    if (result.ok) {
+      setOpen(false); // status flips to signed-in and re-renders this component entirely
+      return;
+    }
+    setCodeStatus("error");
+    setCodeMessage(result.message ?? "That code didn't work.");
+  };
+
   return (
     <div className="relative">
       <button onClick={() => setOpen((v) => !v)} className="btn-ghost !px-2.5 !py-1.5 text-xs">
@@ -56,7 +71,32 @@ export default function AuthControl() {
       {open && (
         <div className="card absolute right-0 top-full z-30 mt-2 w-64 p-4">
           {formStatus === "done" ? (
-            <p className="text-sm text-green-700 dark:text-green-400">{message}</p>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-green-700 dark:text-green-400">{message}</p>
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Saved this to your home screen? The link opens Safari instead — enter the 6-digit code from the
+                  email here instead to sign in on this saved app.
+                </p>
+                <form onSubmit={handleCodeSubmit} className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    required
+                    value={codeInput}
+                    onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, ""))}
+                    placeholder="123456"
+                    className="input w-24"
+                  />
+                  <button type="submit" disabled={codeStatus === "loading"} className="btn-secondary shrink-0">
+                    {codeStatus === "loading" ? "Checking…" : "Confirm"}
+                  </button>
+                </form>
+                {codeStatus === "error" && <p className="mt-1 text-xs text-red-500">{codeMessage}</p>}
+              </div>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
               <p className="text-xs text-muted-foreground">

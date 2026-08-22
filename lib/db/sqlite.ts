@@ -54,6 +54,7 @@ export function getDb(): DatabaseSync {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL,
       token TEXT NOT NULL UNIQUE,
+      code TEXT,
       expires_at TEXT NOT NULL,
       used_at TEXT
     );
