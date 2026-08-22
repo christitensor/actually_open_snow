@@ -34,25 +34,43 @@ import rawWebcams from "./webcams.json";
  * `Webcam.videoEmbedUrl` in lib/models/types.ts and WebcamGrid's iframe
  * branch.
  *
- * **Alta, Brighton, Powder Mountain, Park City**: still page-link-only.
- * Alta and Powder Mountain use a *different* third-party widget ("PrismCam"
- * / `js.prismcam.com`) whose camera list is populated entirely client-side
- * from custom elements with no server-rendered ids or embedded config to
- * scrape — resolving those would need to actually execute the page's JS
- * (a headless browser), which this deployment's sandbox network policy
- * doesn't allow outbound access for (confirmed: Chromium can't reach any
- * external host here, even a trivial one, while this app's own
- * server-side `fetch()`/curl calls work fine through the same proxy — a
- * browser-specific restriction, not a per-site block). Brighton's current
- * conditions page has no obvious camera embed at all. Park City's stored
- * page URL from the original seed had gone stale (a dead legacy `.aspx`
- * redirect returning an internal error page) and was updated to the
- * resort's current conditions page, itself also without a scrapable
- * embed. UDOT's real camera images require a free developer-key signup at
- * udottraffic.utah.gov/developers/doc (name/email/org registration) —
- * that's a step for whoever owns this deployment to do themselves, not
- * something to fabricate credentials for. Once a key exists, wire it into
- * `lib/data-sources/udot.ts` (not built yet) following the same pattern as
- * the other data-source clients.
+ * **Alta** (7 cams): the earlier note here claimed this needed a headless
+ * browser to resolve — wrong. `alta.com/weather` server-renders a
+ * `window.Alta.weather.mountainCams` array directly in a `<script>` tag
+ * (plain curl/fetch finds it, no JS execution needed): 5 are direct JPEGs
+ * on a DigitalOcean Spaces CDN (`alta-webcams.sfo3.cdn.digitaloceanspaces.com`),
+ * 2 are PrismCam preview endpoints (`app.prismcam.com/public/helpers/
+ * realtime_preview.php?c={id}&s=720`) that also just return a JPEG
+ * directly — confirmed live for all 7.
+ *
+ * **Powder Mountain** (3 cams): also PrismCam-branded, but a completely
+ * different mechanism per-site — its own Next.js page embeds a
+ * `nav_webcams` array in the React Server Components payload
+ * (`self.__next_f.push(...)`), pointing at plain JPEGs on Google Cloud
+ * Storage (`storage.googleapis.com/prism-cam-{id}/360.jpg`). Same lesson
+ * as Alta: "client-side widget" doesn't mean the data isn't already
+ * sitting in the initial HTML/payload — check there before assuming a
+ * headless browser is required.
+ *
+ * **Park City** (7 cams): a different vendor again (Brown Rice Media) —
+ * `parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx`
+ * embeds 7 `<iframe src="//player.brownrice.com/embed/{id}">` players
+ * directly in static HTML, each with a plain-text title next to it (e.g.
+ * "Lookout Cabin Camera"). No X-Frame-Options/CSP on the player responses,
+ * so they embed fine — wired as `videoEmbedUrl` like Solitude's YouTube
+ * cams. The stored page URL from the original seed had gone stale (a dead
+ * legacy `.aspx` redirect) and is fixed to the real cams page above.
+ *
+ * **Brighton**: genuinely still page-link-only — checked its Sanity CMS
+ * conditions-page data model directly (`"webcam":null` on every stat
+ * entry) and every guessed `/webcams`-style path 404s. Unlike the three
+ * above, there's actually no camera data to find on their current site.
+ *
+ * UDOT's real highway camera images (a separate, non-resort source) still
+ * require a free developer-key signup at udottraffic.utah.gov/developers/doc
+ * (name/email/org registration) — that's a step for whoever owns this
+ * deployment to do themselves, not something to fabricate credentials
+ * for. Once a key exists, wire it into `lib/data-sources/udot.ts` (not
+ * built yet) following the same pattern as the other data-source clients.
  */
 export const webcams: Webcam[] = rawWebcams as Webcam[];

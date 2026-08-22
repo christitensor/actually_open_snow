@@ -1,10 +1,71 @@
 [
   {
-    "id": "alta-webcam",
-    "name": "Alta",
+    "id": "alta-albion-basin",
+    "name": "Alta — Albion Basin",
     "resortId": "alta",
     "lat": 40.5884,
     "lon": -111.6386,
+    "imageUrl": "https://app.prismcam.com/public/helpers/realtime_preview.php?c=65&s=720",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "alta-mount-baldy",
+    "name": "Alta — Mount Baldy",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://app.prismcam.com/public/helpers/realtime_preview.php?c=88&s=720",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "alta-mount-superior",
+    "name": "Alta — Mount Superior",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://alta-webcams.sfo3.cdn.digitaloceanspaces.com/Superior.jpg",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "alta-high-rustler",
+    "name": "Alta — High Rustler",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://alta-webcams.sfo3.cdn.digitaloceanspaces.com/Highrustler.jpg",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "alta-sugarloaf-peak",
+    "name": "Alta — Sugarloaf Peak",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://alta-webcams.sfo3.cdn.digitaloceanspaces.com/sugar_peak.jpg",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "alta-east-greeley",
+    "name": "Alta — East Greeley",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://alta-webcams.sfo3.cdn.digitaloceanspaces.com/Greeley.jpg",
+    "pageUrl": "https://www.alta.com/weather#mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "alta-salt-lake-valley",
+    "name": "Alta — Salt Lake Valley",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://alta-webcams.sfo3.cdn.digitaloceanspaces.com/collins_dtc.jpg",
     "pageUrl": "https://www.alta.com/weather#mountain-cams",
     "source": "resort"
   },
@@ -12,7 +73,7 @@
     "id": "snowbird-peruvian-gulch-webcam",
     "name": "Snowbird — Peruvian Gulch",
     "resortId": "snowbird",
-    "lat": 40.5820,
+    "lat": 40.582,
     "lon": -111.6558,
     "imageUrl": "https://b15.hdrelay.com/camera/544432bd-3910-4888-aa9f-14b6f51a7eb5/snapshot",
     "pageUrl": "https://www.snowbird.com/the-mountain/webcams/view-all-webcams/peruvian-gulch-webcam/",
@@ -23,7 +84,7 @@
     "name": "Snowbird — Little Cloud",
     "resortId": "snowbird",
     "lat": 40.5825,
-    "lon": -111.6540,
+    "lon": -111.654,
     "imageUrl": "https://b15.hdrelay.com/camera/db2a69c5-66e9-4c48-a713-919eaf191fc1/snapshot",
     "pageUrl": "https://www.snowbird.com/the-mountain/webcams/view-all-webcams/little-cloud-webcam/",
     "source": "resort"
@@ -138,20 +199,81 @@
     "source": "resort"
   },
   {
-    "id": "park-city-webcam",
-    "name": "Park City",
+    "id": "park-city-lookoutcabin",
+    "name": "Park City — Lookout Cabin",
     "resortId": "park-city",
     "lat": 40.6514,
-    "lon": -111.5080,
-    "pageUrl": "https://www.parkcitymountain.com/todays-conditions",
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcitylookoutcabin",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-highmeadow",
+    "name": "Park City — High Meadow",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcityhighmeadow",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-topobx",
+    "name": "Park City — Top of BX",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcitytopobx",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-cnskibeach",
+    "name": "Park City — Canyons Village Ski Beach",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcitycnskibeach",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-topcrescent",
+    "name": "Park City — Top of Crescent",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcitytopcrescent",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-crescentridge",
+    "name": "Park City — Crescent Ridge",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcitycrescentridge",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-mtnvillage",
+    "name": "Park City — Mountain Village",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "videoEmbedUrl": "https://player.brownrice.com/embed/parkcitymtnvillage",
+    "pageUrl": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/mountain-cams.aspx",
     "source": "resort"
   },
   {
     "id": "snowbasin-winter",
     "name": "Snowbasin — Winter",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/6192dd615233cdcad76d7dba/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
@@ -160,8 +282,8 @@
     "id": "snowbasin-snowstake",
     "name": "Snowbasin — Snowstake",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/09f922af-169d-4949-9bb7-295c6a859daa/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
@@ -170,8 +292,8 @@
     "id": "snowbasin-needles",
     "name": "Snowbasin — Needles",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/1b6ed87c-f919-4e59-b9cc-7480e3ca31c3/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
@@ -180,8 +302,8 @@
     "id": "snowbasin-strawberry-patio",
     "name": "Snowbasin — Strawberry Patio",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/65652b36eb0e282336694064/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
@@ -190,8 +312,8 @@
     "id": "snowbasin-base-area",
     "name": "Snowbasin — Base Area",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/621944828db58d080b9eac8b/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
@@ -200,8 +322,8 @@
     "id": "snowbasin-middle-bowl-base",
     "name": "Snowbasin — Middle Bowl Base",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/62101a0b8db58d080b9eac83/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
@@ -210,19 +332,40 @@
     "id": "snowbasin-base-of-wildcat",
     "name": "Snowbasin — Base of Wildcat",
     "resortId": "snowbasin",
-    "lat": 41.2160,
-    "lon": -111.8570,
+    "lat": 41.216,
+    "lon": -111.857,
     "imageUrl": "https://b15b.hdrelay.com/camera/61e1c2e0faf0bf0b5629ac59/get_image",
     "pageUrl": "https://www.snowbasin.com/the-mountain/web-cams/",
     "source": "resort"
   },
   {
-    "id": "powder-mountain-webcam",
-    "name": "Powder Mountain",
+    "id": "powder-mountain-lightning-ridge",
+    "name": "Powder Mountain — Lightning Ridge",
     "resortId": "powder-mountain",
     "lat": 41.3797,
     "lon": -111.7877,
-    "pageUrl": "https://www.powdermountain.com",
+    "imageUrl": "https://storage.googleapis.com/prism-cam-00109/360.jpg",
+    "pageUrl": "https://www.powdermountain.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "powder-mountain-paradise",
+    "name": "Powder Mountain — Paradise",
+    "resortId": "powder-mountain",
+    "lat": 41.3797,
+    "lon": -111.7877,
+    "imageUrl": "https://storage.googleapis.com/prism-cam-00112/360.jpg",
+    "pageUrl": "https://www.powdermountain.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "powder-mountain-timberline",
+    "name": "Powder Mountain — Timberline",
+    "resortId": "powder-mountain",
+    "lat": 41.3797,
+    "lon": -111.7877,
+    "imageUrl": "https://storage.googleapis.com/prism-cam-00113/360.jpg",
+    "pageUrl": "https://www.powdermountain.com/webcams",
     "source": "resort"
   },
   {

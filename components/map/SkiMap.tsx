@@ -225,8 +225,16 @@ export default function SkiMap({
         "width:12px;height:12px;border-radius:2px;background:#f97316;border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);";
       el.title = cam.name;
       el.addEventListener("click", (ev) => ev.stopPropagation());
-      const popupHtml = cam.imageUrl
-        ? `<strong>${cam.name}</strong><br/><img src="${cam.imageUrl}?t=${Date.now()}" alt="${cam.name}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
+      // Some imageUrls already carry a query string (e.g. Alta's PrismCam
+      // preview endpoint, ?c=65&s=720) — a bare "?t=" would double up the
+      // "?" and break the request (confirmed live: the endpoint returns a
+      // tiny broken-image placeholder for a malformed double-"?" URL, a
+      // real image for the same URL with "&t=" instead).
+      const cacheBustedImageUrl = cam.imageUrl
+        ? `${cam.imageUrl}${cam.imageUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
+        : undefined;
+      const popupHtml = cacheBustedImageUrl
+        ? `<strong>${cam.name}</strong><br/><img src="${cacheBustedImageUrl}" alt="${cam.name}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
         : `<strong>${cam.name}</strong><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`;
       const popup = new Popup({ offset: 12 }).setHTML(popupHtml);
       new Marker({ element: el }).setLngLat([cam.lon, cam.lat]).setPopup(popup).addTo(map);

@@ -10,6 +10,16 @@ import type { Webcam } from "@/lib/models/types";
 // benefit; page-link-only entries just link out.
 const REFRESH_MS = 60_000;
 
+// Some imageUrls already carry a query string (e.g. Alta's PrismCam
+// preview endpoint, ?c=65&s=720) — naively appending "?t=" produced a
+// second "?", which the endpoint doesn't parse as an extra param and
+// instead treats the whole thing as a single malformed query, returning a
+// tiny broken-image placeholder instead of the real snapshot (confirmed
+// live: 184 bytes vs. 416KB for the same URL with "&t=" instead).
+function withCacheBust(url: string, tick: number): string {
+  return `${url}${url.includes("?") ? "&" : "?"}t=${tick}`;
+}
+
 export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
   const [tick, setTick] = useState(0);
 
@@ -49,7 +59,7 @@ export default function WebcamGrid({ webcams }: { webcams: Webcam[] }) {
               <div key={cam.id} className="card overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element -- external live snapshot, not an optimizable static asset */}
                 <img
-                  src={`${cam.imageUrl}?t=${tick}`}
+                  src={withCacheBust(cam.imageUrl!, tick)}
                   alt={cam.name}
                   className="aspect-video w-full object-cover"
                   loading="lazy"
