@@ -13,7 +13,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import type { Webcam } from "@/lib/models/types";
+import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
 
 interface MapPin {
@@ -109,7 +109,20 @@ interface SkiMapProps {
   allowPinDrop?: boolean;
   showRadarToggle?: boolean;
   showSnowForecastToggle?: boolean;
+  showAvalancheObservationsToggle?: boolean;
 }
+
+// UAC reports aspect as a full compass word ("North", "Southwest") — the
+// filter uses the same words directly rather than abbreviations, so
+// matching is a plain case-insensitive equality check, no parsing needed.
+const ASPECTS = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"];
+const ELEVATION_BANDS: { label: string; minFt: number }[] = [
+  { label: "Any elevation", minFt: 0 },
+  { label: "8,000 ft+", minFt: 8000 },
+  { label: "9,000 ft+", minFt: 9000 },
+  { label: "10,000 ft+", minFt: 10000 },
+  { label: "11,000 ft+", minFt: 11000 },
+];
 
 // RainViewer's public API (free, CORS-open, no key) — MAP-02/03 current
 // radar. Their nowcast/forecast frames aren't used here, only the latest
@@ -127,6 +140,7 @@ export default function SkiMap({
   allowPinDrop = true,
   showRadarToggle = true,
   showSnowForecastToggle = true,
+  showAvalancheObservationsToggle = true,
 }: SkiMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -137,6 +151,15 @@ export default function SkiMap({
   const [snowOverlayOn, setSnowOverlayOn] = useState(false);
   const snowOverlayOnRef = useRef(false);
   const loadSnowGridRef = useRef<(() => void) | null>(null);
+  // BC-03: "Avalanche observations" mode — recent UAC field reports as map
+  // points, with client-side filters (the source API has no documented
+  // filter params of its own — see lib/data-sources/uac-observations.ts).
+  const [obsOn, setObsOn] = useState(false);
+  const [obsLoading, setObsLoading] = useState(false);
+  const [observations, setObservations] = useState<AvalancheObservation[] | null>(null);
+  const [obsTypeFilter, setObsTypeFilter] = useState<"all" | "avalanche" | "observation">("all");
+  const [obsAspectFilter, setObsAspectFilter] = useState<"all" | (typeof ASPECTS)[number]>("all");
+  const [obsMinElevationFt, setObsMinElevationFt] = useState(0);
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
   // Deliberately not map.isStyleLoaded(): it also factors in whether every
   // source's tiles have finished loading, so one slow/failed tile fetch
@@ -145,6 +168,7 @@ export default function SkiMap({
   // switcher indefinitely. The map's one-time "load" event is what
   // actually marks the style ready for setLayoutProperty calls.
   const styleReadyRef = useRef(false);
+  const applyObservationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
   // Tracks the theme toggle (in AppHeader) so the map's OSM tiles can be
   // inverted for dark mode — this component has no other awareness of the
   // theme system, so it watches the <html> class directly.
@@ -381,6 +405,58 @@ export default function SkiMap({
       });
     }
 
+    // BC-03: avalanche observations layer — created lazily (same pattern as
+    // pistes/snow-grid above) the first time there's data to show, since
+    // source/layer creation needs the style to be loaded. A separate
+    // effect below owns fetching + filtering; this just knows how to draw
+    // whatever GeoJSON it's handed.
+    if (showAvalancheObservationsToggle) {
+      const applyObservations = (geojson: GeoJSON.FeatureCollection) => {
+        const source = map.getSource("avalanche-observations") as GeoJSONSource | undefined;
+        if (source) {
+          source.setData(geojson);
+          return;
+        }
+        if (!map.isStyleLoaded()) return;
+        map.addSource("avalanche-observations", { type: "geojson", data: geojson });
+        map.addLayer({
+          id: "avalanche-observations-circles",
+          type: "circle",
+          source: "avalanche-observations",
+          layout: { visibility: "none" },
+          paint: {
+            "circle-radius": 7,
+            "circle-color": ["match", ["get", "type"], "avalanche", "#dc2626", "#f59e0b"] as unknown as DataDrivenPropertyValueSpecification<string>,
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+        map.on("click", "avalanche-observations-circles", (e) => {
+          const feature = e.features?.[0];
+          if (!feature || feature.geometry.type !== "Point") return;
+          const p = feature.properties as Record<string, string>;
+          const html =
+            `<strong>${p.title}</strong><br/>` +
+            `<span style="font-size:11px;color:#666">${p.type === "avalanche" ? "Avalanche" : "Observation"} · ${p.date}${p.region ? ` · ${p.region}` : ""}</span><br/>` +
+            (p.locationName ? `${p.locationName}<br/>` : "") +
+            (p.aspect || p.elevationFt ? `${p.aspect ? `Aspect: ${p.aspect}` : ""}${p.aspect && p.elevationFt ? " · " : ""}${p.elevationFt ? `${p.elevationFt} ft` : ""}<br/>` : "") +
+            (p.details ? `<p style="margin:4px 0;font-size:12px;max-width:220px">${p.details}</p>` : "") +
+            `<a href="${p.detailsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full report ↗</a>`;
+          new Popup({ offset: 8 })
+            .setLngLat(feature.geometry.coordinates as [number, number])
+            .setHTML(html)
+            .addTo(map);
+        });
+        map.on("mouseenter", "avalanche-observations-circles", () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", "avalanche-observations-circles", () => {
+          map.getCanvas().style.cursor = "";
+        });
+      };
+      applyObservationsRef.current = applyObservations;
+    }
+
     return () => {
       resizeObserver.disconnect();
       map.remove();
@@ -418,6 +494,71 @@ export default function SkiMap({
     else map.once("load", apply);
   }, [baseLayer]);
 
+  // Fetch UAC observations once, the first time the mode is switched on.
+  useEffect(() => {
+    if (!obsOn || observations != null) return;
+    let cancelled = false;
+    (async () => {
+      setObsLoading(true);
+      try {
+        const res = await fetch("/api/avalanche-observations");
+        if (!res.ok) return;
+        const body = (await res.json()) as { observations: AvalancheObservation[] };
+        if (!cancelled) setObservations(body.observations);
+      } catch {
+        // Best-effort — the toggle just won't show any points if this fails.
+      } finally {
+        if (!cancelled) setObsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [obsOn, observations]);
+
+  // Apply the type/aspect/elevation filters and (re)draw whenever the data
+  // or any filter changes; separately toggle layer visibility with obsOn.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const filtered = (observations ?? []).filter((o) => {
+      if (obsTypeFilter !== "all" && o.type !== obsTypeFilter) return false;
+      if (obsAspectFilter !== "all" && o.aspect !== obsAspectFilter) return false;
+      if (obsMinElevationFt > 0 && (o.elevationFt == null || o.elevationFt < obsMinElevationFt)) return false;
+      return true;
+    });
+
+    const geojson: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: filtered
+        .filter((o): o is AvalancheObservation & { lat: number; lon: number } => o.lat != null && o.lon != null)
+        .map((o) => ({
+          type: "Feature",
+          properties: {
+            type: o.type,
+            title: o.title,
+            date: o.date,
+            region: o.region,
+            locationName: o.locationName,
+            aspect: o.aspect ?? "",
+            elevationFt: o.elevationFt ?? "",
+            details: o.details,
+            detailsUrl: o.detailsUrl,
+          },
+          geometry: { type: "Point", coordinates: [o.lon, o.lat] },
+        })),
+    };
+
+    const apply = () => applyObservationsRef.current?.(geojson);
+    if (styleReadyRef.current) apply();
+    else map.once("load", apply);
+
+    if (map.getLayer("avalanche-observations-circles")) {
+      map.setLayoutProperty("avalanche-observations-circles", "visibility", obsOn ? "visible" : "none");
+    }
+  }, [observations, obsTypeFilter, obsAspectFilter, obsMinElevationFt, obsOn]);
+
   return (
     <div className="relative h-full w-full">
       {/* The dark-mode invert trick (see globals.css) only reads right on
@@ -438,23 +579,73 @@ export default function SkiMap({
           </button>
         ))}
       </div>
-      <div className="absolute bottom-3 left-3 z-10 flex gap-2">
-        {showRadarToggle && radarReady && (
-          <button
-            onClick={() => setRadarOn((v) => !v)}
-            className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
-          >
-            {radarOn ? "Hide" : "Show"} radar{radarTime ? ` (${radarTime})` : ""} · RainViewer
-          </button>
+      <div className="absolute bottom-3 left-3 z-10 flex flex-col items-start gap-2">
+        {obsOn && (
+          <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-card/90 p-2 text-xs shadow-sm backdrop-blur-sm">
+            <select
+              value={obsTypeFilter}
+              onChange={(e) => setObsTypeFilter(e.target.value as typeof obsTypeFilter)}
+              className="rounded-full border border-border bg-card px-2 py-1 text-xs"
+              aria-label="Filter by report type"
+            >
+              <option value="all">All reports</option>
+              <option value="avalanche">Avalanches</option>
+              <option value="observation">Observations</option>
+            </select>
+            <select
+              value={obsAspectFilter}
+              onChange={(e) => setObsAspectFilter(e.target.value as typeof obsAspectFilter)}
+              className="rounded-full border border-border bg-card px-2 py-1 text-xs"
+              aria-label="Filter by aspect"
+            >
+              <option value="all">Any aspect</option>
+              {ASPECTS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <select
+              value={obsMinElevationFt}
+              onChange={(e) => setObsMinElevationFt(Number(e.target.value))}
+              className="rounded-full border border-border bg-card px-2 py-1 text-xs"
+              aria-label="Filter by minimum elevation"
+            >
+              {ELEVATION_BANDS.map((b) => (
+                <option key={b.minFt} value={b.minFt}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+            {obsLoading && <span className="px-1 text-muted-foreground">Loading…</span>}
+          </div>
         )}
-        {showSnowForecastToggle && (
-          <button
-            onClick={() => setSnowOverlayOn((v) => !v)}
-            className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
-          >
-            {snowOverlayOn ? "Hide" : "Show"} today&apos;s snow forecast (est.)
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {showRadarToggle && radarReady && (
+            <button
+              onClick={() => setRadarOn((v) => !v)}
+              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+            >
+              {radarOn ? "Hide" : "Show"} radar{radarTime ? ` (${radarTime})` : ""} · RainViewer
+            </button>
+          )}
+          {showSnowForecastToggle && (
+            <button
+              onClick={() => setSnowOverlayOn((v) => !v)}
+              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+            >
+              {snowOverlayOn ? "Hide" : "Show"} today&apos;s snow forecast (est.)
+            </button>
+          )}
+          {showAvalancheObservationsToggle && (
+            <button
+              onClick={() => setObsOn((v) => !v)}
+              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+            >
+              {obsOn ? "Hide" : "Show"} avalanche observations · UAC
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

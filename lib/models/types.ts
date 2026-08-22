@@ -131,6 +131,25 @@ export interface AvalancheForecast {
   url: string;
 }
 
+/** BC-03: a single field report from utahavalanchecenter.org's public observations feed — either an avalanche occurrence or a general (no-avalanche) field observation. */
+export interface AvalancheObservation {
+  id: string;
+  type: "avalanche" | "observation";
+  title: string;
+  date: string;
+  region: string;
+  locationName: string;
+  observerName: string | null;
+  aspect: string | null;
+  elevationFt: number | null;
+  slopeAngle: string | null;
+  redFlags: string | null;
+  details: string;
+  lat: number | null;
+  lon: number | null;
+  detailsUrl: string;
+}
+
 export interface SnotelStation {
   stationTriplet: string;
   name: string;
