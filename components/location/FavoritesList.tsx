@@ -70,8 +70,8 @@ export default function FavoritesList() {
               </button>
             </div>
             <div className="mt-1.5 flex items-center gap-1.5">
-              <span className="pill bg-muted text-muted-foreground">12h {fmtIn(s?.last12hIn)}</span>
               <span className="pill bg-primary/10 text-primary">Today {fmtIn(s?.todayIn)}</span>
+              <span className="pill bg-muted text-muted-foreground">12h {fmtIn(s?.last12hIn)}</span>
               <span className="pill bg-muted text-muted-foreground">7d {fmtIn(s?.last7dIn)}</span>
             </div>
           </li>

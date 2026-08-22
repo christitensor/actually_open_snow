@@ -120,8 +120,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             </div>
           </section>
 
-          <ForecastDiscussion afd={afd} />
-
           <SnowSummary pastDays={pastDays} forecastDaily={forecast.daily} />
 
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -296,6 +294,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               )}
             </section>
           )}
+
+          <ForecastDiscussion afd={afd} />
 
           <section className="card p-4">
             <h2 className="mb-2 font-bold tracking-tight">Snow alerts</h2>

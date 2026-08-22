@@ -369,6 +369,46 @@
     "source": "resort"
   },
   {
+    "id": "beaver-mountain-logan-summit",
+    "name": "Beaver Mountain — Logan Summit",
+    "resortId": "beaver-mountain",
+    "lat": 41.9738,
+    "lon": -111.5245,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1072144413",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "beaver-mountain-lodge-dreamlift",
+    "name": "Beaver Mountain — Lodge / Dreamlift",
+    "resortId": "beaver-mountain",
+    "lat": 41.9738,
+    "lon": -111.5245,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1453631994",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "beaver-mountain-marges-cabin",
+    "name": "Beaver Mountain — Marge's Cabin",
+    "resortId": "beaver-mountain",
+    "lat": 41.9738,
+    "lon": -111.5245,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/VYbnKiTTjEruJB9UP6z5vs",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "beaver-mountain-snowstake",
+    "name": "Beaver Mountain — Snowstake (top Beaver Face Lift)",
+    "resortId": "beaver-mountain",
+    "lat": 41.9738,
+    "lon": -111.5245,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1758577868",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
     "id": "udot-little-cottonwood",
     "name": "UDOT: Little Cottonwood Canyon (SR-210)",
     "lat": 40.5731,

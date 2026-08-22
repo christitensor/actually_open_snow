@@ -28,15 +28,15 @@ function fmtIn(v: number | undefined): string {
   return v != null ? `${v.toFixed(1)}"` : "—";
 }
 
-// Quick forecast visual: 12h / today / 7d at a glance, so a storm that
+// Quick forecast visual: today / 12h / 7d at a glance, so a storm that
 // already dropped snow overnight (12h) or over the week (7d) isn't hidden
 // behind a single "today's forecast" number the way the old one-pill
 // layout was.
 function SnowStats({ r }: { r: ResortRow }) {
   return (
     <div className="mt-1.5 flex items-center gap-1.5">
-      <span className="pill bg-muted text-muted-foreground">12h {fmtIn(r.last12hIn)}</span>
       <span className="pill bg-primary/10 text-primary">Today {fmtIn(r.snowfallTodayIn)}</span>
+      <span className="pill bg-muted text-muted-foreground">12h {fmtIn(r.last12hIn)}</span>
       <span className="pill bg-muted text-muted-foreground">7d {fmtIn(r.last7dIn)}</span>
     </div>
   );
