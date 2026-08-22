@@ -34,7 +34,7 @@ npx eslint .                      # lint
 | `CRON_SECRET` | If set, `/api/alerts/check` requires `Authorization: Bearer <secret>`. Unset by default for local dev; set it before deploying somewhere public, since nothing else protects that endpoint from being triggered repeatedly. |
 | `APP_URL` | Used to build the unsubscribe link in alert emails. Defaults to `http://localhost:3000`. |
 
-Nothing schedules `/api/alerts/check` automatically — wire it to Vercel Cron, a GitHub Actions cron workflow, or an external pinger once deployed.
+`/api/alerts/check` runs daily via Vercel Cron (`vercel.json`, 12:00 UTC) once deployed there. Set `CRON_SECRET` to lock the endpoint down — Vercel automatically sends it as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change.
 
 ## Project layout
 

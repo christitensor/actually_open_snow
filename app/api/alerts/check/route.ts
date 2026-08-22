@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAndNotifyAll } from "@/lib/alerts/check-and-notify";
 
-// PERS-03: the "cron" entrypoint. Nothing in this sandbox/deployment
-// schedules calls to this route automatically — wire it up externally
-// (Vercel Cron hitting this path on a schedule, a GitHub Actions cron
-// workflow, or an external pinger like cron-job.org) once deployed. Safe
-// to call repeatedly: each subscription is only notified once per
+// PERS-03: the cron entrypoint, scheduled daily via vercel.json (once/day
+// — the minimum interval Vercel Cron allows on the Hobby plan, and plenty
+// for a once-per-calendar-day alert anyway) at 12:00 UTC — 5am Mountain
+// Standard Time in ski season, before first tracks; drifts to 6am during
+// Daylight Time, not worth a second cron entry to correct. Safe to call
+// repeatedly regardless: each subscription is only notified once per
 // calendar day (see lib/alerts/check-and-notify.ts).
 //
 // If CRON_SECRET is set, requires `Authorization: Bearer <secret>` so
