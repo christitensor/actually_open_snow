@@ -28,6 +28,7 @@ import { estimateTrailConditions, type TrailConditionsEstimate } from "@/lib/der
 import { wetBulbF } from "@/lib/derive/wet-bulb";
 import { buildConditionsSummary } from "@/lib/derive/conditions-summary";
 import type {
+  AfdProduct,
   AirQuality,
   AvalancheForecast,
   AvalancheZone,
@@ -58,6 +59,8 @@ export interface LocationDashboardData {
   avalancheZone: AvalancheZone | null;
   avalancheForecast: AvalancheForecast | null;
   conditionsSummary: ConditionsSummary;
+  /** SNOW-03/EXP-01: the raw NWS forecast discussion text itself, not just conditionsSummary's one-line mention of it — see components/location/ForecastDiscussion.tsx */
+  afd: AfdProduct | null;
   nearestSnotel: SnotelReading | null;
   nearestNwsStations: NwsStation[];
   /** DATA-01-adj: curated high-elevation stations (data/key-stations.ts) for this location's avalanche zone, if it has any — the generic nearest-station picker above tends to surface valley airports instead. */
@@ -175,6 +178,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     avalancheZone: avalancheZoneResult,
     avalancheForecast,
     conditionsSummary,
+    afd,
     nearestSnotel: snotelResult,
     nearestNwsStations: nwsStations,
     keyStations: keyStationReadings,

@@ -2,6 +2,7 @@ import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
 import ForecastTable from "@/components/location/ForecastTable";
+import ForecastDiscussion from "@/components/location/ForecastDiscussion";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
@@ -55,6 +56,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     avalancheZone,
     avalancheForecast,
     conditionsSummary,
+    afd,
     nearestSnotel,
     nearestNwsStations,
     keyStations,
@@ -117,6 +119,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               )}
             </div>
           </section>
+
+          <ForecastDiscussion afd={afd} />
 
           <SnowSummary pastDays={pastDays} forecastDaily={forecast.daily} />
 
