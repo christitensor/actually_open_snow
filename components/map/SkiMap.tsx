@@ -123,6 +123,22 @@ const ELEVATION_BANDS: { label: string; minFt: number }[] = [
   { label: "10,000 ft+", minFt: 10000 },
   { label: "11,000 ft+", minFt: 11000 },
 ];
+const TIME_WINDOWS: { label: string; maxDays: number }[] = [
+  { label: "Any time", maxDays: 0 },
+  { label: "Last 7 days", maxDays: 7 },
+  { label: "Last 14 days", maxDays: 14 },
+  { label: "Last 30 days", maxDays: 30 },
+];
+
+// UAC's date strings look like "Sun, 05/31/2026" — the leading weekday
+// isn't needed for parsing and JS's Date constructor handles the rest
+// (US MM/DD/YYYY) directly. Returns null for anything that doesn't parse
+// cleanly rather than guessing, since a filter silently hiding reports it
+// can't date would be worse than one that just doesn't filter them.
+function parseUacDate(raw: string): Date | null {
+  const d = new Date(raw.replace(/^[A-Za-z]{3},\s*/, ""));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 // RainViewer's public API (free, CORS-open, no key) — MAP-02/03 current
 // radar. Their nowcast/forecast frames aren't used here, only the latest
@@ -160,6 +176,12 @@ export default function SkiMap({
   const [obsTypeFilter, setObsTypeFilter] = useState<"all" | "avalanche" | "observation">("all");
   const [obsAspectFilter, setObsAspectFilter] = useState<"all" | (typeof ASPECTS)[number]>("all");
   const [obsMinElevationFt, setObsMinElevationFt] = useState(0);
+  const [obsMaxAgeDays, setObsMaxAgeDays] = useState(0);
+  // Date.now() is impure and can't be called directly during render/memo —
+  // captured once via a lazy initializer instead, which only runs on first
+  // mount. A coarse "last N days" filter doesn't need to stay live-accurate
+  // to the millisecond for however long this map instance stays mounted.
+  const [obsFilterNowMs] = useState(() => Date.now());
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
   // Deliberately not map.isStyleLoaded(): it also factors in whether every
   // source's tiles have finished loading, so one slow/failed tile fetch
@@ -521,16 +543,19 @@ export default function SkiMap({
 
   // Shared between the render-effect below and the empty-state message in
   // the JSX, so "nothing plotted" and "nothing to plot" never disagree.
-  const filteredObservations = useMemo(
-    () =>
-      (observations ?? []).filter((o) => {
-        if (obsTypeFilter !== "all" && o.type !== obsTypeFilter) return false;
-        if (obsAspectFilter !== "all" && o.aspect !== obsAspectFilter) return false;
-        if (obsMinElevationFt > 0 && (o.elevationFt == null || o.elevationFt < obsMinElevationFt)) return false;
-        return true;
-      }),
-    [observations, obsTypeFilter, obsAspectFilter, obsMinElevationFt]
-  );
+  const filteredObservations = useMemo(() => {
+    const cutoff = obsMaxAgeDays > 0 ? obsFilterNowMs - obsMaxAgeDays * 24 * 60 * 60 * 1000 : null;
+    return (observations ?? []).filter((o) => {
+      if (obsTypeFilter !== "all" && o.type !== obsTypeFilter) return false;
+      if (obsAspectFilter !== "all" && o.aspect !== obsAspectFilter) return false;
+      if (obsMinElevationFt > 0 && (o.elevationFt == null || o.elevationFt < obsMinElevationFt)) return false;
+      if (cutoff != null) {
+        const parsed = parseUacDate(o.date);
+        if (parsed == null || parsed.getTime() < cutoff) return false;
+      }
+      return true;
+    });
+  }, [observations, obsTypeFilter, obsAspectFilter, obsMinElevationFt, obsMaxAgeDays, obsFilterNowMs]);
 
   // Apply the type/aspect/elevation filters and (re)draw whenever the data
   // or any filter changes; separately toggle layer visibility with obsOn.
@@ -625,6 +650,18 @@ export default function SkiMap({
               {ELEVATION_BANDS.map((b) => (
                 <option key={b.minFt} value={b.minFt}>
                   {b.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={obsMaxAgeDays}
+              onChange={(e) => setObsMaxAgeDays(Number(e.target.value))}
+              className="rounded-full border border-border bg-card px-2 py-1 text-xs"
+              aria-label="Filter by how recent"
+            >
+              {TIME_WINDOWS.map((w) => (
+                <option key={w.maxDays} value={w.maxDays}>
+                  {w.label}
                 </option>
               ))}
             </select>
