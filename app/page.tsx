@@ -4,18 +4,23 @@ import MyLocationButton from "@/components/location/MyLocationButton";
 import ResortList from "@/components/location/ResortList";
 import { primaryResortIds, resorts } from "@/data/resorts";
 import { webcams } from "@/data/webcams";
-import { getGridDailySnowfallIn } from "@/lib/data-sources/open-meteo";
+import { getGridDailySnowfallIn, getGridPastDailySnowfallIn, getGridRecentSnowfallIn } from "@/lib/data-sources/open-meteo";
 
 // Phase 1 regional scope (TRACE_MATRIX.md): Northern Utah & Southeast Idaho.
 // Centered roughly on the Wasatch Front.
 const REGION_CENTER: [number, number] = [-111.75, 41.2];
 
 export default async function Home() {
-  // MAP-10 Powder Finder: today's forecast snowfall for every seeded
-  // resort, batched into one Open-Meteo call.
-  const snowfall = await getGridDailySnowfallIn(resorts.map((r) => ({ lat: r.lat, lon: r.lon }))).catch(
-    () => [] as { lat: number; lon: number; valueIn: number }[]
-  );
+  const points = resorts.map((r) => ({ lat: r.lat, lon: r.lon }));
+  const empty: { lat: number; lon: number; valueIn: number }[] = [];
+
+  // MAP-10 Powder Finder (today) + the "quick forecast visual" 12h/7d
+  // totals, each batched into one Open-Meteo call across every seeded resort.
+  const [snowfall, last12h, last7d] = await Promise.all([
+    getGridDailySnowfallIn(points).catch(() => empty),
+    getGridRecentSnowfallIn(points, 12).catch(() => empty),
+    getGridPastDailySnowfallIn(points, 7).catch(() => empty),
+  ]);
   const resortsWithSnow = resorts.map((r, i) => ({
     id: r.id,
     name: r.name,
@@ -23,6 +28,8 @@ export default async function Home() {
     lat: r.lat,
     lon: r.lon,
     snowfallTodayIn: snowfall[i]?.valueIn,
+    last12hIn: last12h[i]?.valueIn,
+    last7dIn: last7d[i]?.valueIn,
   }));
 
   return (

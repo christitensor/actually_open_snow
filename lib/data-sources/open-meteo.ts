@@ -300,6 +300,18 @@ export async function getHistoricalWeather(
   }));
 }
 
+// Open-Meteo's multi-location batching (comma-separated latitude/longitude)
+// returns an array of per-point response objects — but only when there's
+// more than one point. For exactly one point it returns that same object
+// *unwrapped*, not a 1-element array (confirmed live: `latitude=41.2`
+// alone comes back as `{ latitude: ..., daily: {...} }`, not `[{...}]`).
+// Every grid function below hit this the moment a caller passed a single
+// point (api/quick-snow, for a user with one saved backcountry pin) —
+// normalize here once rather than in each caller.
+function asArray<T>(raw: T | T[]): T[] {
+  return Array.isArray(raw) ? raw : [raw];
+}
+
 /**
  * MAP-04/05: forecast snowfall/precip "map" via a sampled grid of points
  * rather than true raster tiles — Open-Meteo has no gridded-map product,
@@ -317,8 +329,74 @@ export async function getGridDailySnowfallIn(
     `${FORECAST_BASE}?latitude=${lats}&longitude=${lons}` +
     `&daily=snowfall_sum&precipitation_unit=inch&forecast_days=1&timezone=auto`;
 
-  const raw = await fetchJson<{ latitude: number; longitude: number; daily: { snowfall_sum: number[] } }[]>(url);
+  const raw = asArray(
+    await fetchJson<
+      | { latitude: number; longitude: number; daily: { snowfall_sum: number[] } }
+      | { latitude: number; longitude: number; daily: { snowfall_sum: number[] } }[]
+    >(url)
+  );
   return raw.map((r, i) => ({ lat: points[i].lat, lon: points[i].lon, valueIn: r.daily.snowfall_sum[0] ?? 0 }));
+}
+
+/**
+ * Batched multi-location counterpart to getRecent24hSnowfallIn, generalized
+ * to any lookback window — same `past_days`/hourly-sum reanalysis
+ * substitute, same NOHRSC caveat, just across every resort in one request
+ * instead of one location. Confirmed live: Open-Meteo's multi-location
+ * batching returns one full { hourly: {...} } object per point, same
+ * shape as the single-location endpoint, not a flattened/merged array.
+ */
+export async function getGridRecentSnowfallIn(
+  points: { lat: number; lon: number }[],
+  hoursBack: number
+): Promise<{ lat: number; lon: number; valueIn: number }[]> {
+  if (points.length === 0) return [];
+  const lats = points.map((p) => p.lat).join(",");
+  const lons = points.map((p) => p.lon).join(",");
+  const url =
+    `${FORECAST_BASE}?latitude=${lats}&longitude=${lons}` +
+    `&hourly=snowfall&precipitation_unit=inch&past_days=1&forecast_days=1&timezone=auto`;
+
+  const raw = asArray(
+    await fetchJson<
+      | { latitude: number; longitude: number; hourly: { time: string[]; snowfall: number[] } }
+      | { latitude: number; longitude: number; hourly: { time: string[]; snowfall: number[] } }[]
+    >(url)
+  );
+  const now = Date.now();
+  const cutoff = now - hoursBack * 60 * 60 * 1000;
+  return raw.map((r, i) => {
+    const valueIn = r.hourly.time.reduce((sum, time, j) => {
+      const t = new Date(time).getTime();
+      return t >= cutoff && t <= now ? sum + r.hourly.snowfall[j] : sum;
+    }, 0);
+    return { lat: points[i].lat, lon: points[i].lon, valueIn };
+  });
+}
+
+/** Batched multi-location trailing-N-day snowfall total (including today so far) — same reanalysis substitute as getGridRecentSnowfallIn, coarser granularity. */
+export async function getGridPastDailySnowfallIn(
+  points: { lat: number; lon: number }[],
+  days: number
+): Promise<{ lat: number; lon: number; valueIn: number }[]> {
+  if (points.length === 0) return [];
+  const lats = points.map((p) => p.lat).join(",");
+  const lons = points.map((p) => p.lon).join(",");
+  const url =
+    `${FORECAST_BASE}?latitude=${lats}&longitude=${lons}` +
+    `&daily=snowfall_sum&precipitation_unit=inch&past_days=${days}&forecast_days=1&timezone=auto`;
+
+  const raw = asArray(
+    await fetchJson<
+      | { latitude: number; longitude: number; daily: { snowfall_sum: number[] } }
+      | { latitude: number; longitude: number; daily: { snowfall_sum: number[] } }[]
+    >(url)
+  );
+  return raw.map((r, i) => {
+    // past_days=N + forecast_days=1 returns N+1 daily entries (N past + today) — take the trailing `days` of them (today plus the N-1 days before it).
+    const valueIn = r.daily.snowfall_sum.slice(-days).reduce((sum, v) => sum + (v ?? 0), 0);
+    return { lat: points[i].lat, lon: points[i].lon, valueIn };
+  });
 }
 
 const COMPARISON_MODELS = ["gfs_seamless", "ecmwf_ifs04", "icon_seamless"] as const;
