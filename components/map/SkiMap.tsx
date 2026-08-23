@@ -11,7 +11,7 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
@@ -130,6 +130,25 @@ interface SkiMapProps {
   showRadarToggle?: boolean;
   showSnowForecastToggle?: boolean;
   showAvalancheObservationsToggle?: boolean;
+  /** List↔map sync (home page split view): which resort pin to draw highlighted. */
+  hoveredResortId?: string | null;
+  selectedResortId?: string | null;
+  onResortHover?: (id: string | null) => void;
+  /** When provided, clicking a resort pin calls this instead of navigating —
+   * the Airbnb-style "select + scroll the list to it" interaction. The
+   * resort card itself (a real Link) still navigates either way. */
+  onResortSelect?: (id: string) => void;
+  /** Fired whenever the snow-forecast/avalanche-observations overlays turn on or off — SkiMap
+   * still owns the boolean itself (toggleable via the SkiMapHandle ref or its own buttons); this
+   * just lets an external control (e.g. a filter pill) mirror the current on/off state. Pass a
+   * stable (useCallback'd) function, since it's read inside a mount-time effect closure. */
+  onSnowOverlayChange?: (on: boolean) => void;
+  onAvalancheObservationsChange?: (on: boolean) => void;
+}
+
+export interface SkiMapHandle {
+  toggleSnowOverlay: () => void;
+  toggleAvalancheObservations: () => void;
 }
 
 // UAC reports aspect as a full compass word ("North", "Southwest") — the
@@ -166,18 +185,27 @@ function parseUacDate(raw: string): Date | null {
 // out of scope for now.
 const RAINVIEWER_MAPS_URL = "https://api.rainviewer.com/public/weather-maps.json";
 
-export default function SkiMap({
-  resorts,
-  webcams = [],
-  currentLocation,
-  center,
-  zoom = 9,
-  showPistes = true,
-  allowPinDrop = true,
-  showRadarToggle = true,
-  showSnowForecastToggle = true,
-  showAvalancheObservationsToggle = true,
-}: SkiMapProps) {
+const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
+  {
+    resorts,
+    webcams = [],
+    currentLocation,
+    center,
+    zoom = 9,
+    showPistes = true,
+    allowPinDrop = true,
+    showRadarToggle = true,
+    showSnowForecastToggle = true,
+    showAvalancheObservationsToggle = true,
+    hoveredResortId = null,
+    selectedResortId = null,
+    onResortHover,
+    onResortSelect,
+    onSnowOverlayChange,
+    onAvalancheObservationsChange,
+  },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const router = useRouter();
@@ -233,6 +261,19 @@ export default function SkiMap({
   // actually marks the style ready for setLayoutProperty calls.
   const styleReadyRef = useRef(false);
   const applyObservationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
+  // Resort markers are created once at mount (see the empty deps array
+  // below); keeping the element refs around lets a separate effect update
+  // hover/selected styling reactively without recreating every marker.
+  const resortMarkerElsRef = useRef<Map<string, { wrapper: HTMLDivElement; inner: HTMLDivElement }>>(new Map());
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      toggleSnowOverlay: () => setSnowOverlayOn((v) => !v),
+      toggleAvalancheObservations: () => setObsOn((v) => !v),
+    }),
+    []
+  );
   // Tracks the theme toggle (in AppHeader) so the map's street layer can
   // swap to a real dark basemap — this component has no other awareness
   // of the theme system, so it watches the <html> class directly.
@@ -249,6 +290,7 @@ export default function SkiMap({
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    const resortMarkerEls = resortMarkerElsRef.current;
 
     const map = new MapLibreMap({
       container: containerRef.current,
@@ -285,7 +327,14 @@ export default function SkiMap({
 
     // Resort pins — colored by today's forecast snowfall when known (MAP-10 Powder Finder).
     for (const resort of resorts) {
+      // MapLibre's Marker sets `transform` on the element it's given, to
+      // position it on the map — scaling that same element for a hover/
+      // selected highlight would fight that positioning transform every
+      // time the map moves. An inner wrapper div carries the visual
+      // styling instead; the outer `el` stays untouched by anything but
+      // MapLibre itself.
       const el = document.createElement("div");
+      const inner = document.createElement("div");
       const color = powderColor(resort.snowfallTodayIn);
       // z-index above webcam pins: a few resorts (Alta, Brighton, Park City,
       // Powder Mountain) have a webcam sitting at effectively the same
@@ -293,12 +342,18 @@ export default function SkiMap({
       // painted on top by default — silently ate the click (its own handler
       // only stops propagation, no navigation), live-verified as the actual
       // cause of "clicking the map does nothing" for those resorts.
-      el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);z-index:2;`;
-      el.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
-      el.addEventListener("click", (ev) => {
+      inner.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s,box-shadow .15s;`;
+      inner.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
+      el.style.zIndex = "2";
+      el.appendChild(inner);
+      inner.addEventListener("click", (ev) => {
         ev.stopPropagation(); // don't also trigger the map's pin-drop handler
-        router.push(`/location/${resort.id}`);
+        if (onResortSelect) onResortSelect(resort.id);
+        else router.push(`/location/${resort.id}`);
       });
+      inner.addEventListener("mouseenter", () => onResortHover?.(resort.id));
+      inner.addEventListener("mouseleave", () => onResortHover?.(null));
+      resortMarkerElsRef.current.set(resort.id, { wrapper: el, inner });
       new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
     }
 
@@ -591,9 +646,22 @@ export default function SkiMap({
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
+      resortMarkerEls.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map is initialized once; props are read at mount time
   }, []);
+
+  // Highlight the hovered/selected resort pin — separate from the mount
+  // effect above so it can react to prop changes without recreating every
+  // marker (those only exist once, created at mount).
+  useEffect(() => {
+    for (const [id, { wrapper, inner }] of resortMarkerElsRef.current) {
+      const active = id === hoveredResortId || id === selectedResortId;
+      inner.style.transform = active ? "scale(1.5)" : "scale(1)";
+      inner.style.boxShadow = active ? "0 0 0 3px var(--color-primary, #2563eb), 0 1px 3px rgba(0,0,0,.4)" : "0 1px 3px rgba(0,0,0,.4)";
+      wrapper.style.zIndex = active ? "3" : "2";
+    }
+  }, [hoveredResortId, selectedResortId]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -603,11 +671,16 @@ export default function SkiMap({
 
   useEffect(() => {
     snowOverlayOnRef.current = snowOverlayOn;
+    onSnowOverlayChange?.(snowOverlayOn);
     const map = mapRef.current;
     if (!map || !map.getLayer("snow-grid-circles")) return;
     map.setLayoutProperty("snow-grid-circles", "visibility", snowOverlayOn ? "visible" : "none");
     if (snowOverlayOn) loadSnowGridRef.current?.();
-  }, [snowOverlayOn]);
+  }, [snowOverlayOn, onSnowOverlayChange]);
+
+  useEffect(() => {
+    onAvalancheObservationsChange?.(obsOn);
+  }, [obsOn, onAvalancheObservationsChange]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -916,4 +989,6 @@ export default function SkiMap({
   );
 
   return isFullscreen && typeof document !== "undefined" ? createPortal(mapContent, document.body) : mapContent;
-}
+});
+
+export default SkiMap;

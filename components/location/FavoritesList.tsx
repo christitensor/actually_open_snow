@@ -20,7 +20,7 @@ function pointKey(lat: number, lon: number): string {
 
 // PERS-01/MAP-17: saved backcountry pins (resort favorites now live in
 // ResortList's top section instead — see app/page.tsx).
-export default function FavoritesList() {
+export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void }) {
   const { favorites, toggleFavorite } = useFavorites();
   const spots = favorites.filter((f) => f.source === "pin");
   const [stats, setStats] = useState<Record<string, QuickSnow>>({});
@@ -48,9 +48,20 @@ export default function FavoritesList() {
 
   if (spots.length === 0) {
     return (
-      <p className="card px-4 py-3 text-sm text-muted-foreground">
-        No spots saved yet — drop a pin on the map, then save and name it from that page.
-      </p>
+      <div className="card flex flex-col items-center gap-3 px-6 py-8 text-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-2xl" aria-hidden="true">
+          📍
+        </span>
+        <div>
+          <p className="text-sm font-semibold">No backcountry spots saved yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">Drop a pin on the map, then save and name it from that page.</p>
+        </div>
+        {onGoToMap && (
+          <button onClick={onGoToMap} className="btn-primary mt-1">
+            Drop a pin to save your first spot
+          </button>
+        )}
+      </div>
     );
   }
 
