@@ -153,6 +153,28 @@ export async function getNearbyStations(lat: number, lon: number): Promise<NwsSt
   }));
 }
 
+interface StationMetaResponse {
+  properties: {
+    name: string;
+    elevation: { unitCode: string; value: number | null }; // meters (wmoUnit:m), confirmed live
+  };
+  geometry: { coordinates: [number, number] }; // [lon, lat]
+}
+
+/** Coordinates + elevation for a specific known station id — data/key-stations.ts's
+ * curated list has neither, so the map layer looks them up live rather than
+ * hand-maintaining lat/lon for ~20 stations (confirmed live: /stations/{id}
+ * returns real geometry). */
+export async function getStationMeta(stationId: string): Promise<{ lat: number; lon: number; elevationFt: number | null }> {
+  const raw = await fetchJson<StationMetaResponse>(`${BASE}/stations/${stationId}`);
+  const meters = raw.properties.elevation.value;
+  return {
+    lat: raw.geometry.coordinates[1],
+    lon: raw.geometry.coordinates[0],
+    elevationFt: meters != null ? Math.round(meters * 3.28084) : null,
+  };
+}
+
 interface StationObservationResponse {
   properties: {
     timestamp: string;

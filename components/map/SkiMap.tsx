@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
+import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
 
 interface MapPin {
@@ -37,13 +38,22 @@ function powderColor(inches: number | undefined): string {
 
 // No MapTiler/vector-tile API key configured anywhere in this build, so
 // the base map is plain raster tiles — free, no key, always works. Three
-// swappable base layers, all free/open, no key: OSM street, OpenTopoMap
+// swappable base layers, all free/open, no key: street, OpenTopoMap
 // (topo, built from OSM + SRTM elevation), and Esri World Imagery
 // (satellite, Esri's public tile service). All three are added as
 // sources/layers up front with only one visible at a time (same pattern
 // as the radar/snow-forecast toggles below) rather than swapping the
 // whole style — that would blow away the pistes/radar/snow-grid layers
 // added at runtime.
+//
+// "Street" is CARTO's free Voyager/Dark Matter basemaps, not raw OSM
+// tiles: both are CORS-open with no key required (confirmed live), and
+// requesting the "@2x" filename at the same tileSize:256 pulls a
+// double-resolution image into the same on-screen tile slot — sharper on
+// any HiDPI display, the same trick as an <img srcset> 2x variant. Dark
+// mode swaps to CARTO's actual dark cartography (osm-dark) instead of the
+// previous CSS invert-filter hack, which also inverted markers/popups and
+// produced a flatter, muddier result than a real dark basemap.
 type BaseLayerId = "osm" | "topo" | "satellite";
 const BASE_LAYER_IDS: BaseLayerId[] = ["osm", "topo", "satellite"];
 const BASE_LAYER_LABELS: Record<BaseLayerId, string> = { osm: "Street", topo: "Topo", satellite: "Satellite" };
@@ -53,9 +63,17 @@ const BASE_STYLE: StyleSpecification = {
   sources: {
     osm: {
       type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tiles: ["https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"],
       tileSize: 256,
-      attribution: "&copy; OpenStreetMap contributors",
+      maxzoom: 20,
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+    },
+    "osm-dark": {
+      type: "raster",
+      tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"],
+      tileSize: 256,
+      maxzoom: 20,
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
     },
     topo: {
       type: "raster",
@@ -79,6 +97,7 @@ const BASE_STYLE: StyleSpecification = {
   },
   layers: [
     { id: "osm", type: "raster", source: "osm" },
+    { id: "osm-dark", type: "raster", source: "osm-dark", layout: { visibility: "none" } },
     { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
     { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
   ],
@@ -214,10 +233,19 @@ export default function SkiMap({
   // actually marks the style ready for setLayoutProperty calls.
   const styleReadyRef = useRef(false);
   const applyObservationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
-  // Tracks the theme toggle (in AppHeader) so the map's OSM tiles can be
-  // inverted for dark mode — this component has no other awareness of the
-  // theme system, so it watches the <html> class directly.
+  // Tracks the theme toggle (in AppHeader) so the map's street layer can
+  // swap to a real dark basemap — this component has no other awareness
+  // of the theme system, so it watches the <html> class directly.
   const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkSnapshot, getIsDarkServerSnapshot);
+  // DATA-01: "weather stations" mode — curated NWS mountain stations +
+  // every Phase-1 SNOTEL station, merged server-side (/api/weather-stations)
+  // since the two live in different APIs with different id/coordinate
+  // shapes. Fetched once per toggle-on, same lazy-load pattern as
+  // avalanche observations below.
+  const [stationsOn, setStationsOn] = useState(false);
+  const [stationsLoading, setStationsLoading] = useState(false);
+  const [stationsData, setStationsData] = useState<{ keyStations: KeyStationPoint[]; snotel: SnotelStationPoint[] } | null>(null);
+  const applyStationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -336,7 +364,7 @@ export default function SkiMap({
           const source = map.getSource("pistes") as GeoJSONSource | undefined;
           if (source) {
             source.setData(geojson);
-          } else if (map.isStyleLoaded()) {
+          } else if (styleReadyRef.current) {
             map.addSource("pistes", { type: "geojson", data: geojson });
             map.addLayer({
               id: "pistes-line",
@@ -391,7 +419,7 @@ export default function SkiMap({
           const source = map.getSource("snow-grid") as GeoJSONSource | undefined;
           if (source) {
             source.setData(geojson);
-          } else if (map.isStyleLoaded()) {
+          } else if (styleReadyRef.current) {
             map.addSource("snow-grid", { type: "geojson", data: geojson });
             map.addLayer({
               id: "snow-grid-circles",
@@ -465,7 +493,7 @@ export default function SkiMap({
           source.setData(geojson);
           return;
         }
-        if (!map.isStyleLoaded()) return;
+        if (!styleReadyRef.current) return;
         map.addSource("avalanche-observations", { type: "geojson", data: geojson });
         map.addLayer({
           id: "avalanche-observations-circles",
@@ -505,6 +533,60 @@ export default function SkiMap({
       applyObservationsRef.current = applyObservations;
     }
 
+    // DATA-01: weather stations layer — same lazy source/layer creation
+    // pattern as avalanche observations above. "kind" (key vs snotel)
+    // drives both color and which fields the click popup shows, since the
+    // two source APIs return different fields (temp/wind vs snow depth/SWE).
+    {
+      const applyStations = (geojson: GeoJSON.FeatureCollection) => {
+        const source = map.getSource("weather-stations") as GeoJSONSource | undefined;
+        if (source) {
+          source.setData(geojson);
+          return;
+        }
+        if (!styleReadyRef.current) return;
+        map.addSource("weather-stations", { type: "geojson", data: geojson });
+        map.addLayer({
+          id: "weather-stations-circles",
+          type: "circle",
+          source: "weather-stations",
+          layout: { visibility: "none" },
+          paint: {
+            "circle-radius": 6,
+            "circle-color": ["match", ["get", "kind"], "key", "#0891b2", "#7c3aed"] as unknown as DataDrivenPropertyValueSpecification<string>,
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+        map.on("click", "weather-stations-circles", (e) => {
+          const feature = e.features?.[0];
+          if (!feature || feature.geometry.type !== "Point") return;
+          const p = feature.properties as Record<string, string>;
+          const elevation = p.elevationFt ? `${p.elevationFt} ft` : "";
+          const html =
+            p.kind === "key"
+              ? `<strong>${p.name}</strong><br/>` +
+                `<span style="font-size:11px;color:#666">${elevation}</span><br/>` +
+                `${p.tempF ? `${Math.round(Number(p.tempF))}°F` : "No temp reading"}` +
+                `${p.windSpeedMph ? ` · ${Math.round(Number(p.windSpeedMph))} mph` : ""}<br/>` +
+                `<span style="font-size:11px;color:#666">NWS · ${p.observedAt ? new Date(p.observedAt).toLocaleString() : "no timestamp"}</span>`
+              : `<strong>${p.name}</strong><br/>` +
+                `<span style="font-size:11px;color:#666">${elevation}</span><br/>` +
+                `${p.snowDepthIn ? `${p.snowDepthIn}" snow depth` : "No depth reading"}` +
+                `${p.sweIn ? ` · ${p.sweIn}" SWE` : ""}<br/>` +
+                `<span style="font-size:11px;color:#666">SNOTEL · ${p.date}</span>`;
+          new Popup({ offset: 8 }).setLngLat(feature.geometry.coordinates as [number, number]).setHTML(html).addTo(map);
+        });
+        map.on("mouseenter", "weather-stations-circles", () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", "weather-stations-circles", () => {
+          map.getCanvas().style.cursor = "";
+        });
+      };
+      applyStationsRef.current = applyStations;
+    }
+
     return () => {
       resizeObserver.disconnect();
       map.remove();
@@ -530,9 +612,13 @@ export default function SkiMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    // "osm" has a real dark counterpart (osm-dark); topo/satellite don't
+    // (inverting relief shading or a satellite photo produces a
+    // false-color mess), so only the street layer swaps by theme.
+    const visibleId = baseLayer === "osm" && isDark ? "osm-dark" : baseLayer;
     const apply = () => {
-      for (const id of BASE_LAYER_IDS) {
-        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", id === baseLayer ? "visible" : "none");
+      for (const id of ["osm", "osm-dark", "topo", "satellite"]) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", id === visibleId ? "visible" : "none");
       }
     };
     // On mount this can fire before the initial style has finished loading
@@ -540,7 +626,7 @@ export default function SkiMap({
     // mount, the style is already loaded and this runs immediately.
     if (styleReadyRef.current) apply();
     else map.once("load", apply);
-  }, [baseLayer]);
+  }, [baseLayer, isDark]);
 
   // Fetch UAC observations once, the first time the mode is switched on.
   useEffect(() => {
@@ -618,6 +704,72 @@ export default function SkiMap({
     }
   }, [filteredObservations, obsOn]);
 
+  // Fetch weather stations once, the first time the mode is switched on.
+  useEffect(() => {
+    if (!stationsOn || stationsData != null) return;
+    let cancelled = false;
+    (async () => {
+      setStationsLoading(true);
+      try {
+        const res = await fetch("/api/weather-stations");
+        if (!res.ok) return;
+        const body = (await res.json()) as { keyStations: KeyStationPoint[]; snotel: SnotelStationPoint[] };
+        if (!cancelled) setStationsData(body);
+      } catch {
+        // Best-effort — the toggle just won't show any points if this fails.
+      } finally {
+        if (!cancelled) setStationsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stationsOn, stationsData]);
+
+  // Draw whenever the data changes; separately toggle layer visibility with stationsOn.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const geojson: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [
+        ...(stationsData?.keyStations ?? []).map((s) => ({
+          type: "Feature" as const,
+          properties: {
+            kind: "key",
+            name: s.name,
+            elevationFt: s.elevationFt ?? "",
+            tempF: s.tempF ?? "",
+            windSpeedMph: s.windSpeedMph ?? "",
+            observedAt: s.observedAt ?? "",
+          },
+          geometry: { type: "Point" as const, coordinates: [s.lon, s.lat] },
+        })),
+        ...(stationsData?.snotel ?? []).map((s) => ({
+          type: "Feature" as const,
+          properties: {
+            kind: "snotel",
+            name: s.name,
+            elevationFt: s.elevationFt,
+            snowDepthIn: s.snowDepthIn ?? "",
+            sweIn: s.sweIn ?? "",
+            date: s.date,
+          },
+          geometry: { type: "Point" as const, coordinates: [s.lon, s.lat] },
+        })),
+      ],
+    };
+
+    const apply = () => applyStationsRef.current?.(geojson);
+    if (styleReadyRef.current) apply();
+    else map.once("load", apply);
+
+    if (map.getLayer("weather-stations-circles")) {
+      map.setLayoutProperty("weather-stations-circles", "visibility", stationsOn ? "visible" : "none");
+    }
+  }, [stationsData, stationsOn]);
+
   // Full-screen renders through a portal to document.body rather than in
   // place: this component is nested inside a `sticky`-positioned card on
   // every page that uses it (the home page's map panel, the location
@@ -631,11 +783,7 @@ export default function SkiMap({
   // itself is undisturbed.
   const mapContent = (
     <div className={isFullscreen ? "fixed inset-0 z-50 h-dvh w-dvw bg-background" : "relative h-full w-full"}>
-      {/* The dark-mode invert trick (see globals.css) only reads right on
-          the plain OSM street tiles — inverting topo's relief colors or a
-          satellite photo produces a false-color mess, so it's skipped for
-          those two. */}
-      <div ref={containerRef} className={`h-full w-full ${isDark && baseLayer === "osm" ? "map-dark-tiles" : ""}`} />
+      <div ref={containerRef} className="h-full w-full" />
       <button
         onClick={() => setIsFullscreen((v) => !v)}
         aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
@@ -756,6 +904,12 @@ export default function SkiMap({
               {obsOn ? "Hide" : "Show"} avalanche observations · UAC
             </button>
           )}
+          <button
+            onClick={() => setStationsOn((v) => !v)}
+            className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+          >
+            {stationsOn ? "Hide" : "Show"} weather stations{stationsLoading ? " · loading…" : ""}
+          </button>
         </div>
       </div>
     </div>

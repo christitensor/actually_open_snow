@@ -3,6 +3,7 @@ import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
 import ForecastTable from "@/components/location/ForecastTable";
 import ForecastDiscussion from "@/components/location/ForecastDiscussion";
+import DangerRose from "@/components/location/DangerRose";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
@@ -208,6 +209,11 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             <h2 className="mb-2 font-bold tracking-tight">Avalanche forecast</h2>
             {avalancheForecast ? (
               <div className="space-y-3 text-sm">
+                <DangerRose
+                  aboveTreeline={avalancheForecast.dangerAboveTreeline}
+                  nearTreeline={avalancheForecast.dangerNearTreeline}
+                  belowTreeline={avalancheForecast.dangerBelowTreeline}
+                />
                 <div className="flex gap-4">
                   <DangerBadge label="Above treeline" level={avalancheForecast.dangerAboveTreeline} />
                   <DangerBadge label="Near treeline" level={avalancheForecast.dangerNearTreeline} />

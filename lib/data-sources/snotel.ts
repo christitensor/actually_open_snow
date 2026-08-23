@@ -95,3 +95,48 @@ export async function getLatestReading(station: SnotelStation): Promise<SnotelRe
     sweIn: latestWteq?.value ?? null,
   };
 }
+
+/**
+ * DATA-01 map layer: every Phase-1 (UT/ID) SNOTEL station with its latest
+ * reading, for plotting region-wide rather than nearest-N to one point.
+ * The AWDB /data endpoint accepts a comma-separated stationTriplets list
+ * in one call (confirmed live: all ~223 Phase-1 stations in a single
+ * ~10s request, well under the URL-length limits that would force
+ * chunking) — one request instead of 223 is the only way this is
+ * feasible for a map layer. Cached long (1hr) since that request is slow;
+ * SNOTEL readings only update daily anyway.
+ */
+export async function getAllPhase1StationsWithReadings(): Promise<SnotelReading[]> {
+  const allStations = await fetchPhase1Stations();
+  const stations: SnotelStation[] = allStations.map((s) => ({
+    stationTriplet: s.stationTriplet,
+    name: s.name,
+    lat: s.latitude,
+    lon: s.longitude,
+    elevationFt: s.elevation,
+    distanceMi: 0,
+  }));
+
+  const triplets = stations.map((s) => s.stationTriplet).join(",");
+  const url = `${BASE}/data?stationTriplets=${triplets}&elements=SNWD,WTEQ&duration=DAILY&beginDate=-3&endDate=0`;
+  const res = await fetch(url, { next: { revalidate: 3600 } });
+  if (!res.ok) {
+    throw new Error(`SNOTEL batched data request failed (${res.status})`);
+  }
+  const raw = (await res.json()) as AwdbDataResponse[];
+  const byTriplet = new Map(raw.map((r) => [r.stationTriplet, r]));
+
+  return stations.map((station) => {
+    const stationData = byTriplet.get(station.stationTriplet);
+    const snwd = stationData?.data.find((d) => d.stationElement.elementCode === "SNWD");
+    const wteq = stationData?.data.find((d) => d.stationElement.elementCode === "WTEQ");
+    const latestSnwd = snwd?.values.at(-1);
+    const latestWteq = wteq?.values.at(-1);
+    return {
+      station,
+      date: latestSnwd?.date ?? latestWteq?.date ?? new Date().toISOString(),
+      snowDepthIn: latestSnwd?.value ?? null,
+      sweIn: latestWteq?.value ?? null,
+    };
+  });
+}

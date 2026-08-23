@@ -117,14 +117,4 @@ body {
   input[type="range"]::-moz-range-track {
     @apply h-2 rounded-full bg-muted;
   }
-  /* Dark-mode map tiles: OSM raster tiles have no dark variant, so invert
-     the whole map then invert markers/popups back to true color — a
-     standard trick for slippy maps without a dedicated dark tile set. */
-  .map-dark-tiles .maplibregl-canvas-container canvas {
-    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
-  }
-  .map-dark-tiles .maplibregl-marker,
-  .map-dark-tiles .maplibregl-popup {
-    filter: invert(1) hue-rotate(180deg);
-  }
 }
