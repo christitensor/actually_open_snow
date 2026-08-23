@@ -12,6 +12,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
@@ -183,6 +184,28 @@ export default function SkiMap({
   // to the millisecond for however long this map instance stays mounted.
   const [obsFilterNowMs] = useState(() => Date.now());
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
+  // Full-screen mode: a CSS fixed-position overlay rather than the native
+  // Fullscreen API, since Element.requestFullscreen() is unreliable in an
+  // iOS home-screen PWA (this app's primary use case, per the sign-in
+  // work above) — a fixed overlay works identically everywhere. The
+  // existing ResizeObserver on containerRef already calls map.resize()
+  // whenever the container's size changes, so toggling the container's
+  // size via CSS classes is enough to make the map itself redraw correctly.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isFullscreen]);
   // Deliberately not map.isStyleLoaded(): it also factors in whether every
   // source's tiles have finished loading, so one slow/failed tile fetch
   // (e.g. a flaky connection) can leave it false long after the style
@@ -595,13 +618,40 @@ export default function SkiMap({
     }
   }, [filteredObservations, obsOn]);
 
-  return (
-    <div className="relative h-full w-full">
+  // Full-screen renders through a portal to document.body rather than in
+  // place: this component is nested inside a `sticky`-positioned card on
+  // every page that uses it (the home page's map panel, the location
+  // dashboard's sidebar), and `position: sticky` always creates its own
+  // stacking context — trapping a nested z-50 fixed overlay inside it, so
+  // it painted BELOW the page header's own (lower) z-index stacking
+  // context instead of above it (live-verified: the header rendered on
+  // top of the "fullscreen" map). A portal moves the same DOM subtree to
+  // body, escaping that ancestor's stacking context entirely — MapLibre's
+  // container node is relocated, not recreated, so the map instance
+  // itself is undisturbed.
+  const mapContent = (
+    <div className={isFullscreen ? "fixed inset-0 z-50 h-dvh w-dvw bg-background" : "relative h-full w-full"}>
       {/* The dark-mode invert trick (see globals.css) only reads right on
           the plain OSM street tiles — inverting topo's relief colors or a
           satellite photo produces a false-color mess, so it's skipped for
           those two. */}
       <div ref={containerRef} className={`h-full w-full ${isDark && baseLayer === "osm" ? "map-dark-tiles" : ""}`} />
+      <button
+        onClick={() => setIsFullscreen((v) => !v)}
+        aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+        title={isFullscreen ? "Exit full screen" : "Full screen"}
+        className="absolute right-3 bottom-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-sm backdrop-blur-sm transition hover:text-primary"
+      >
+        {isFullscreen ? (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 2v3a1 1 0 0 1-1 1H2M14 6h-3a1 1 0 0 1-1-1V2M10 14v-3a1 1 0 0 1 1-1h3M2 10h3a1 1 0 0 1 1 1v3" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 6V3a1 1 0 0 1 1-1h3M14 6V3a1 1 0 0 0-1-1h-3M2 10v3a1 1 0 0 0 1 1h3M14 10v3a1 1 0 0 1-1 1h-3" />
+          </svg>
+        )}
+      </button>
       <div className="absolute top-3 left-3 z-10 flex gap-1 rounded-full border border-border bg-card/90 p-1 text-xs shadow-sm backdrop-blur-sm">
         {BASE_LAYER_IDS.map((id) => (
           <button
@@ -710,4 +760,6 @@ export default function SkiMap({
       </div>
     </div>
   );
+
+  return isFullscreen && typeof document !== "undefined" ? createPortal(mapContent, document.body) : mapContent;
 }
