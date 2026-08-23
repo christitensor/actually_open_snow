@@ -23,12 +23,14 @@ const DB_PATH = join(tmpdir(), "actually-open-snow", "app.db");
 
 let db: DatabaseSync | null = null;
 
-// Exported so lib/db/users.ts (PERS-04 accounts/sessions/favorites) shares
-// this same connection/file instead of opening a second DatabaseSync
-// pointed at the same path — SQLite tolerates that, but there's no reason
-// to. Same ephemeral-storage caveat above applies to every table here,
-// accounts included: fine for a low-traffic app on one warm instance, not
-// guaranteed to survive multiple concurrent Vercel instances or a redeploy.
+// Exported so lib/db/users.ts (PERS-04 accounts/favorites; sessions are a
+// stateless signed cookie, see lib/auth/session-token.ts, precisely to avoid
+// this file's ephemeral-storage caveat) shares this same connection/file
+// instead of opening a second DatabaseSync pointed at the same path — SQLite
+// tolerates that, but there's no reason to. Same ephemeral-storage caveat
+// above applies to every table here, accounts included: fine for a
+// low-traffic app on one warm instance, not guaranteed to survive multiple
+// concurrent Vercel instances or a redeploy.
 export function getDb(): DatabaseSync {
   if (db) return db;
   mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -57,12 +59,6 @@ export function getDb(): DatabaseSync {
       code TEXT,
       expires_at TEXT NOT NULL,
       used_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
-      token TEXT PRIMARY KEY,
-      user_id INTEGER NOT NULL,
-      created_at TEXT NOT NULL,
-      expires_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS favorites (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

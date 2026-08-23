@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   }
 
   const user = getOrCreateUser(email);
-  const { token: sessionToken, expiresAt } = createSession(user.id);
+  const { token: sessionToken, expiresAt } = createSession(user.id, user.email);
 
   const url = new URL(nextPath, req.url);
   url.searchParams.set("signedIn", "1");

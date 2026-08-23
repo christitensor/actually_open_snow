@@ -5,6 +5,7 @@
 // start a session instead of removing a subscription.
 import { randomUUID } from "node:crypto";
 import { getDb } from "./sqlite";
+import { createSessionToken, verifySessionToken } from "@/lib/auth/session-token";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
 
@@ -89,35 +90,17 @@ export function getOrCreateUser(email: string): User {
 
 // --- Sessions ----------------------------------------------------------
 
-export function createSession(userId: number): { token: string; expiresAt: Date } {
-  const token = randomUUID();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
-  getDb()
-    .prepare(`INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`)
-    .run(token, userId, now.toISOString(), expiresAt.toISOString());
-  return { token, expiresAt };
+// Stateless: the token itself carries {userId, email, expiresAt} plus an
+// HMAC (lib/auth/session-token.ts), so validating it needs no database
+// lookup — see that file's comment for why (ephemeral SQLite on Vercel).
+export function createSession(userId: number, email: string): { token: string; expiresAt: Date } {
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  return { token: createSessionToken(userId, email, expiresAt), expiresAt };
 }
 
 export function getUserBySessionToken(token: string): User | null {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT users.id as id, users.email as email, sessions.expires_at as expires_at
-       FROM sessions JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token = ?`
-    )
-    .get(token) as (UserRow & { expires_at: string }) | undefined;
-  if (!row) return null;
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    db.prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
-    return null;
-  }
-  return { id: row.id, email: row.email };
-}
-
-export function deleteSession(token: string): void {
-  getDb().prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
+  const verified = verifySessionToken(token);
+  return verified ? { id: verified.userId, email: verified.email } : null;
 }
 
 // --- Favorites -----------------------------------------------------------
