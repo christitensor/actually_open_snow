@@ -52,14 +52,6 @@ export function getDb(): DatabaseSync {
       email TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS magic_links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL,
-      token TEXT NOT NULL UNIQUE,
-      code TEXT,
-      expires_at TEXT NOT NULL,
-      used_at TEXT
-    );
     CREATE TABLE IF NOT EXISTS favorites (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,

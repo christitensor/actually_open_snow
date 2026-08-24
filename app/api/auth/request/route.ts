@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMagicLink } from "@/lib/db/users";
+import { createMagicLinkToken, currentMagicLinkCode } from "@/lib/auth/magic-link";
 import { sendEmail } from "@/lib/email";
 import { badRequest, serverError } from "@/lib/util/api";
 
@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
   const nextPath = typeof next === "string" && next.startsWith("/") ? next : "/";
 
   try {
-    const { token, code } = createMagicLink(email);
+    const { token } = createMagicLinkToken(email);
+    const code = currentMagicLinkCode(email);
     const origin = req.nextUrl.origin;
     const verifyUrl = `${origin}/api/auth/verify?token=${token}&next=${encodeURIComponent(nextPath)}`;
 

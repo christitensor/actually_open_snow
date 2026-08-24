@@ -2,14 +2,13 @@
 // of being stuck in one browser's localStorage (lib/favorites.ts). No
 // passwords — a user proves they own an email by clicking a one-time link,
 // same trust model as the PERS-03 alert-unsubscribe links, just used to
-// start a session instead of removing a subscription.
-import { randomUUID } from "node:crypto";
+// start a session instead of removing a subscription. Magic links
+// themselves are stateless (lib/auth/magic-link.ts) — see that file for why.
 import { getDb } from "./sqlite";
 import { createSessionToken, verifySessionToken } from "@/lib/auth/session-token";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
 
-const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes — short-lived, single use
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export interface User {
@@ -20,59 +19,6 @@ export interface User {
 interface UserRow {
   id: number;
   email: string;
-}
-
-// --- Magic links ---------------------------------------------------------
-
-function generateCode(): string {
-  // 6-digit numeric, zero-padded — short enough to type by hand from an
-  // email into a saved-to-home-screen app (see consumeMagicLinkByCode).
-  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
-}
-
-export function createMagicLink(email: string): { token: string; code: string; expiresAt: string } {
-  const token = randomUUID();
-  const code = generateCode();
-  const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS).toISOString();
-  getDb()
-    .prepare(`INSERT INTO magic_links (email, token, code, expires_at, used_at) VALUES (?, ?, ?, ?, NULL)`)
-    .run(email, token, code, expiresAt);
-  return { token, code, expiresAt };
-}
-
-/** Validates + burns a magic-link token, returning the email it was issued to (or null if invalid/expired/already used). */
-export function consumeMagicLink(token: string): string | null {
-  const db = getDb();
-  const row = db.prepare(`SELECT email, expires_at, used_at FROM magic_links WHERE token = ?`).get(token) as
-    | { email: string; expires_at: string; used_at: string | null }
-    | undefined;
-  if (!row || row.used_at) return null;
-  if (new Date(row.expires_at).getTime() < Date.now()) return null;
-
-  db.prepare(`UPDATE magic_links SET used_at = ? WHERE token = ?`).run(new Date().toISOString(), token);
-  return row.email;
-}
-
-// iOS treats a "saved to home screen" web app as a separate storage silo
-// from Safari — a magic link opened from Mail always opens in Safari, so
-// it can never set a cookie the saved app can see. This lets someone who
-// already has the saved app open finish sign-in entirely within it: type
-// the short code from the email instead of tapping the link, so the
-// session cookie gets set in the right context to begin with. Rate-limited
-// naturally by the same 15-minute expiry + single-use burn as the token —
-// a brute-force guesser gets one attempt window per requested code.
-export function consumeMagicLinkByCode(email: string, code: string): boolean {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT id, token, expires_at, used_at FROM magic_links WHERE email = ? AND code = ? ORDER BY id DESC LIMIT 1`
-    )
-    .get(email, code) as { id: number; token: string; expires_at: string; used_at: string | null } | undefined;
-  if (!row || row.used_at) return false;
-  if (new Date(row.expires_at).getTime() < Date.now()) return false;
-
-  db.prepare(`UPDATE magic_links SET used_at = ? WHERE id = ?`).run(new Date().toISOString(), row.id);
-  return true;
 }
 
 // --- Users -----------------------------------------------------------------

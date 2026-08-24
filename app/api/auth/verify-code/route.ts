@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeMagicLinkByCode, createSession, getOrCreateUser } from "@/lib/db/users";
+import { createSession, getOrCreateUser } from "@/lib/db/users";
+import { verifyMagicLinkCode } from "@/lib/auth/magic-link";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
 import { badRequest } from "@/lib/util/api";
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (typeof email !== "string" || !EMAIL_RE.test(email)) return badRequest("A valid email is required");
   if (typeof code !== "string" || !/^\d{6}$/.test(code)) return badRequest("A valid 6-digit code is required");
 
-  const valid = consumeMagicLinkByCode(email, code);
+  const valid = verifyMagicLinkCode(email, code);
   if (!valid) return NextResponse.json({ error: "That code is invalid, expired, or already used." }, { status: 400 });
 
   const user = getOrCreateUser(email);

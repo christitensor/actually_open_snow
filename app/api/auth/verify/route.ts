@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeMagicLink, createSession, getOrCreateUser } from "@/lib/db/users";
+import { createSession, getOrCreateUser } from "@/lib/db/users";
+import { consumeMagicLinkToken } from "@/lib/auth/magic-link";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
 
 // PERS-04: the link target from the sign-in email. Burns the token,
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const next = req.nextUrl.searchParams.get("next");
   const nextPath = next && next.startsWith("/") ? next : "/";
 
-  const email = token ? consumeMagicLink(token) : null;
+  const email = token ? consumeMagicLinkToken(token) : null;
   if (!email) {
     const url = new URL("/", req.url);
     url.searchParams.set("signInError", "1");
