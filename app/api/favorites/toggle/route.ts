@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!isValidLocation(location)) return badRequest("A valid location is required");
 
   try {
-    return NextResponse.json({ favorites: toggleFavoriteForUser(user.id, location) });
+    return NextResponse.json({ favorites: await toggleFavoriteForUser(user.id, location) });
   } catch (err) {
     return serverError(err);
   }

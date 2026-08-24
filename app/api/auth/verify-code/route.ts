@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const valid = verifyMagicLinkCode(email, code);
   if (!valid) return NextResponse.json({ error: "That code is invalid, expired, or already used." }, { status: 400 });
 
-  const user = getOrCreateUser(email);
+  const user = await getOrCreateUser(email);
   const { token: sessionToken, expiresAt } = createSession(user.id, user.email);
 
   const response = NextResponse.json({ email: user.email });

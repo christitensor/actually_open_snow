@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const user = getOrCreateUser(email);
+  const user = await getOrCreateUser(email);
   const { token: sessionToken, expiresAt } = createSession(user.id, user.email);
 
   const url = new URL(nextPath, req.url);

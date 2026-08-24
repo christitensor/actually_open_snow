@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    return NextResponse.json({ favorites: importFavoritesForUser(user.id, favorites) });
+    return NextResponse.json({ favorites: await importFavoritesForUser(user.id, favorites) });
   } catch (err) {
     return serverError(err);
   }
