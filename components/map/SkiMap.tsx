@@ -239,6 +239,11 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // whenever the container's size changes, so toggling the container's
   // size via CSS classes is enough to make the map itself redraw correctly.
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Layer toggles + the avalanche-observations filter row can otherwise
+  // stack up to 4-5 rows deep and eat most of a mobile map's height —
+  // collapsed by default behind one "Layers" pill; the layers themselves
+  // stay on/off independent of whether this panel is open.
+  const [layersOpen, setLayersOpen] = useState(false);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -854,6 +859,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // body, escaping that ancestor's stacking context entirely — MapLibre's
   // container node is relocated, not recreated, so the map instance
   // itself is undisturbed.
+  const activeLayerCount = [radarOn, snowOverlayOn, obsOn, stationsOn].filter(Boolean).length;
+
   const mapContent = (
     <div className={isFullscreen ? "fixed inset-0 z-50 h-dvh w-dvw bg-background" : "relative h-full w-full"}>
       <div ref={containerRef} className="h-full w-full" />
@@ -886,8 +893,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
           </button>
         ))}
       </div>
-      <div className="absolute bottom-3 left-3 z-10 flex flex-col items-start gap-2">
-        {obsOn && (
+      <div className="absolute bottom-3 left-3 z-10 flex max-h-[calc(100%-1.5rem)] flex-col items-start gap-2 overflow-y-auto">
+        {layersOpen && obsOn && (
           <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-card/90 p-2 text-xs shadow-sm backdrop-blur-sm">
             <select
               value={obsTypeFilter}
@@ -939,7 +946,7 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
             {obsLoading && <span className="px-1 text-muted-foreground">Loading…</span>}
           </div>
         )}
-        {obsOn && !obsLoading && observations != null && (
+        {layersOpen && obsOn && !obsLoading && observations != null && (
           <div className="max-w-[260px] rounded-2xl border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
             {observations.length === 0
               ? "No recent avalanche observations from UAC right now."
@@ -952,38 +959,47 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
                   `${filteredObservations.length} UAC observation${filteredObservations.length === 1 ? "" : "s"} loaded statewide — pan or zoom out if none are visible near this spot.`}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          {showRadarToggle && radarReady && (
+        {layersOpen && (
+          <div className="flex flex-wrap gap-2">
+            {showRadarToggle && radarReady && (
+              <button
+                onClick={() => setRadarOn((v) => !v)}
+                className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+              >
+                {radarOn ? "Hide" : "Show"} radar{radarTime ? ` (${radarTime})` : ""} · RainViewer
+              </button>
+            )}
+            {showSnowForecastToggle && (
+              <button
+                onClick={() => setSnowOverlayOn((v) => !v)}
+                className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+              >
+                {snowOverlayOn ? "Hide" : "Show"} today&apos;s snow forecast (est.)
+              </button>
+            )}
+            {showAvalancheObservationsToggle && (
+              <button
+                onClick={() => setObsOn((v) => !v)}
+                className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+              >
+                {obsOn ? "Hide" : "Show"} avalanche observations · UAC
+              </button>
+            )}
             <button
-              onClick={() => setRadarOn((v) => !v)}
+              onClick={() => setStationsOn((v) => !v)}
               className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
             >
-              {radarOn ? "Hide" : "Show"} radar{radarTime ? ` (${radarTime})` : ""} · RainViewer
+              {stationsOn ? "Hide" : "Show"} weather stations{stationsLoading ? " · loading…" : ""}
             </button>
-          )}
-          {showSnowForecastToggle && (
-            <button
-              onClick={() => setSnowOverlayOn((v) => !v)}
-              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
-            >
-              {snowOverlayOn ? "Hide" : "Show"} today&apos;s snow forecast (est.)
-            </button>
-          )}
-          {showAvalancheObservationsToggle && (
-            <button
-              onClick={() => setObsOn((v) => !v)}
-              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
-            >
-              {obsOn ? "Hide" : "Show"} avalanche observations · UAC
-            </button>
-          )}
-          <button
-            onClick={() => setStationsOn((v) => !v)}
-            className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
-          >
-            {stationsOn ? "Hide" : "Show"} weather stations{stationsLoading ? " · loading…" : ""}
-          </button>
-        </div>
+          </div>
+        )}
+        <button
+          onClick={() => setLayersOpen((v) => !v)}
+          aria-expanded={layersOpen}
+          className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+        >
+          Layers{activeLayerCount > 0 ? ` (${activeLayerCount})` : ""} {layersOpen ? "▴" : "▾"}
+        </button>
       </div>
     </div>
   );
