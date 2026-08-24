@@ -4,8 +4,7 @@
 // same trust model as the PERS-03 alert-unsubscribe links, just used to
 // start a session instead of removing a subscription. Magic links
 // themselves are stateless (lib/auth/magic-link.ts) — see that file for why.
-import { getDb } from "./sqlite";
-import { getSql, isPostgresConfigured } from "./postgres";
+import { getSql } from "./postgres";
 import { createSessionToken, verifySessionToken } from "@/lib/auth/session-token";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
@@ -24,36 +23,21 @@ interface UserRow {
 
 // --- Users -----------------------------------------------------------------
 //
-// Prefers Postgres (lib/db/postgres.ts) when DATABASE_URL/POSTGRES_URL is
-// configured — that's what makes an account's favorites actually durable
-// across Vercel's separate serverless instances. Falls back to the
-// original SQLite path when it isn't configured yet, so this keeps working
-// (with the pre-existing ephemeral-storage caveat) rather than breaking
-// outright the moment this shipped. Delete the SQLite branch here once
-// Postgres is confirmed live.
+// Backed by Postgres (lib/db/postgres.ts) — that's what makes an account's
+// favorites actually durable across Vercel's separate serverless instances,
+// unlike the ephemeral per-instance SQLite this used before.
 
 export async function getOrCreateUser(email: string): Promise<User> {
-  if (isPostgresConfigured) {
-    const sql = await getSql();
-    const existing = (await sql`SELECT id, email FROM users WHERE email = ${email}`) as UserRow[];
-    if (existing[0]) return existing[0];
+  const sql = await getSql();
+  const existing = (await sql`SELECT id, email FROM users WHERE email = ${email}`) as UserRow[];
+  if (existing[0]) return existing[0];
 
-    const inserted = (await sql`
-      INSERT INTO users (email, created_at) VALUES (${email}, ${new Date().toISOString()})
-      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-      RETURNING id, email
-    `) as UserRow[];
-    return inserted[0];
-  }
-
-  const db = getDb();
-  const existing = db.prepare(`SELECT id, email FROM users WHERE email = ?`).get(email) as UserRow | undefined;
-  if (existing) return existing;
-
-  const result = db
-    .prepare(`INSERT INTO users (email, created_at) VALUES (?, ?)`)
-    .run(email, new Date().toISOString());
-  return { id: Number(result.lastInsertRowid), email };
+  const inserted = (await sql`
+    INSERT INTO users (email, created_at) VALUES (${email}, ${new Date().toISOString()})
+    ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+    RETURNING id, email
+  `) as UserRow[];
+  return inserted[0];
 }
 
 // --- Sessions ----------------------------------------------------------
@@ -82,78 +66,42 @@ function rowToFavorite(row: FavoriteRow): FavoriteLocation {
 }
 
 export async function listFavoritesForUser(userId: number): Promise<FavoriteLocation[]> {
-  if (isPostgresConfigured) {
-    const sql = await getSql();
-    const rows = (await sql`
-      SELECT location_json FROM favorites WHERE user_id = ${userId} ORDER BY saved_at ASC
-    `) as FavoriteRow[];
-    return rows.map(rowToFavorite);
-  }
-
-  const rows = getDb()
-    .prepare(`SELECT location_json FROM favorites WHERE user_id = ? ORDER BY saved_at ASC`)
-    .all(userId) as unknown as FavoriteRow[];
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT location_json FROM favorites WHERE user_id = ${userId} ORDER BY saved_at ASC
+  `) as FavoriteRow[];
   return rows.map(rowToFavorite);
 }
 
 /** Toggles one location on/off for a user's server-side favorites, returning the updated list. */
 export async function toggleFavoriteForUser(userId: number, location: Location): Promise<FavoriteLocation[]> {
   const key = favoriteKey(location);
+  const sql = await getSql();
+  const existing = (await sql`
+    SELECT id FROM favorites WHERE user_id = ${userId} AND favorite_key = ${key}
+  `) as { id: number }[];
 
-  if (isPostgresConfigured) {
-    const sql = await getSql();
-    const existing = (await sql`
-      SELECT id FROM favorites WHERE user_id = ${userId} AND favorite_key = ${key}
-    `) as { id: number }[];
-
-    if (existing[0]) {
-      await sql`DELETE FROM favorites WHERE id = ${existing[0].id}`;
-    } else {
-      const favorite: FavoriteLocation = { ...location, savedAt: new Date().toISOString() };
-      await sql`
-        INSERT INTO favorites (user_id, favorite_key, location_json, saved_at)
-        VALUES (${userId}, ${key}, ${JSON.stringify(favorite)}, ${favorite.savedAt})
-      `;
-    }
-    return listFavoritesForUser(userId);
-  }
-
-  const db = getDb();
-  const existing = db.prepare(`SELECT id FROM favorites WHERE user_id = ? AND favorite_key = ?`).get(userId, key) as
-    | { id: number }
-    | undefined;
-
-  if (existing) {
-    db.prepare(`DELETE FROM favorites WHERE id = ?`).run(existing.id);
+  if (existing[0]) {
+    await sql`DELETE FROM favorites WHERE id = ${existing[0].id}`;
   } else {
     const favorite: FavoriteLocation = { ...location, savedAt: new Date().toISOString() };
-    db.prepare(
-      `INSERT INTO favorites (user_id, favorite_key, location_json, saved_at) VALUES (?, ?, ?, ?)`
-    ).run(userId, key, JSON.stringify(favorite), favorite.savedAt);
+    await sql`
+      INSERT INTO favorites (user_id, favorite_key, location_json, saved_at)
+      VALUES (${userId}, ${key}, ${JSON.stringify(favorite)}, ${favorite.savedAt})
+    `;
   }
   return listFavoritesForUser(userId);
 }
 
 /** One-time merge of a freshly-signed-in user's local (pre-account) favorites into their server-side set. Idempotent — already-present keys are left alone. */
 export async function importFavoritesForUser(userId: number, favorites: FavoriteLocation[]): Promise<FavoriteLocation[]> {
-  if (isPostgresConfigured) {
-    const sql = await getSql();
-    for (const favorite of favorites) {
-      await sql`
-        INSERT INTO favorites (user_id, favorite_key, location_json, saved_at)
-        VALUES (${userId}, ${favoriteKey(favorite)}, ${JSON.stringify(favorite)}, ${favorite.savedAt})
-        ON CONFLICT (user_id, favorite_key) DO NOTHING
-      `;
-    }
-    return listFavoritesForUser(userId);
-  }
-
-  const db = getDb();
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO favorites (user_id, favorite_key, location_json, saved_at) VALUES (?, ?, ?, ?)`
-  );
+  const sql = await getSql();
   for (const favorite of favorites) {
-    insert.run(userId, favoriteKey(favorite), JSON.stringify(favorite), favorite.savedAt);
+    await sql`
+      INSERT INTO favorites (user_id, favorite_key, location_json, saved_at)
+      VALUES (${userId}, ${favoriteKey(favorite)}, ${JSON.stringify(favorite)}, ${favorite.savedAt})
+      ON CONFLICT (user_id, favorite_key) DO NOTHING
+    `;
   }
   return listFavoritesForUser(userId);
 }
