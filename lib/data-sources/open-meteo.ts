@@ -250,6 +250,45 @@ export async function getRecent24hSnowfallIn(lat: number, lon: number): Promise<
   }, 0);
 }
 
+/**
+ * PERS-06: snowfall since 5pm local yesterday, up to now — "did it dump
+ * overnight", for the early-morning wake-up alert. Same model-reanalysis
+ * caveat as getRecent24hSnowfallIn. Uses utc_offset_seconds to anchor the
+ * local wall-clock times, since the server runs in UTC and parsing them
+ * as-is would shift the window by the location's offset. Also returns
+ * the location's local date so once-per-morning dedup follows local time.
+ */
+export async function getOvernightSnowfallIn(
+  lat: number,
+  lon: number,
+  sinceLocalHour = 17
+): Promise<{ snowfallIn: number; localDate: string }> {
+  const url =
+    `${FORECAST_BASE}?latitude=${lat}&longitude=${lon}` +
+    `&hourly=snowfall&precipitation_unit=inch&timezone=auto&past_days=1&forecast_days=1`;
+  const raw = await fetchJson<{ utc_offset_seconds: number; hourly: { time: string[]; snowfall: number[] } }>(url);
+
+  const offsetMs = raw.utc_offset_seconds * 1000;
+  const now = Date.now();
+  const localNow = new Date(now + offsetMs); // read with getUTC* = local wall clock
+  const localDate = localNow.toISOString().slice(0, 10);
+  const windowStartLocal = Date.UTC(
+    localNow.getUTCFullYear(),
+    localNow.getUTCMonth(),
+    localNow.getUTCDate() - (localNow.getUTCHours() >= sinceLocalHour ? 0 : 1),
+    sinceLocalHour
+  );
+  const windowStart = windowStartLocal - offsetMs;
+
+  // Each hourly value is the total for the hour *ending* at its timestamp.
+  const snowfallIn = raw.hourly.time.reduce((sum, time, i) => {
+    const t = new Date(`${time}Z`).getTime() - offsetMs;
+    return t > windowStart && t <= now ? sum + (raw.hourly.snowfall[i] ?? 0) : sum;
+  }, 0);
+
+  return { snowfallIn: Math.round(snowfallIn * 10) / 10, localDate };
+}
+
 /** SEV-06/07: current + forecast US AQI, PM2.5, PM10. Free, no key, global (US AQI scale used everywhere). */
 export async function getAirQuality(lat: number, lon: number): Promise<AirQuality> {
   const url =

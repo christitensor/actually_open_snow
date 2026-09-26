@@ -1,6 +1,7 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import AlertSubscribeForm from "@/components/location/AlertSubscribeForm";
+import WakeAlarmForm from "@/components/location/WakeAlarmForm";
 import ForecastTable from "@/components/location/ForecastTable";
 import ForecastDiscussion from "@/components/location/ForecastDiscussion";
 import DangerRose from "@/components/location/DangerRose";
@@ -306,6 +307,11 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           <section className="card p-4">
             <h2 className="mb-2 font-bold tracking-tight">Snow alerts</h2>
             <AlertSubscribeForm location={location} />
+          </section>
+
+          <section className="card p-4">
+            <h2 className="mb-2 font-bold tracking-tight">Powder wake-up</h2>
+            <WakeAlarmForm location={location} />
           </section>
         </div>
 

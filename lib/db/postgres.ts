@@ -42,6 +42,22 @@ async function ensureSchema(sql: Sql): Promise<void> {
       UNIQUE(user_id, favorite_key)
     )
   `;
+  // PERS-06: one row per (device push endpoint, location) — see lib/db/push-subscriptions.ts.
+  await sql`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id SERIAL PRIMARY KEY,
+      endpoint TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      location_name TEXT NOT NULL,
+      lat DOUBLE PRECISION NOT NULL,
+      lon DOUBLE PRECISION NOT NULL,
+      threshold_in DOUBLE PRECISION NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      last_notified_date TEXT,
+      UNIQUE(endpoint, location_name)
+    )
+  `;
 }
 
 /** Resolves to a ready-to-query client; table creation only actually runs once per warm instance. */
