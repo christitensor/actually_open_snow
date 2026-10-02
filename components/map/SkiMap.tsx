@@ -11,12 +11,13 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
+import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
 
 interface MapPin {
   id: string;
@@ -292,6 +293,69 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   const [stationsLoading, setStationsLoading] = useState(false);
   const [stationsData, setStationsData] = useState<{ keyStations: KeyStationPoint[]; snotel: SnotelStationPoint[] } | null>(null);
   const applyStationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
+  // The one "search result" marker — replaced on each new search rather
+  // than accumulating, the same way weather.gov's map shows one result.
+  const searchMarkerRef = useRef<Marker | null>(null);
+
+  const getSearchBias = useCallback(() => {
+    const c = mapRef.current?.getCenter();
+    return c ? { lat: c.lat, lon: c.lng } : null;
+  }, []);
+
+  const handleSearchPick = (pick: SearchPick) => {
+    const map = mapRef.current;
+    if (!map) return;
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
+
+    if (pick.kind === "resort") {
+      // Same outcome as clicking that resort's pin: select it in the list
+      // (home page) or open its forecast (everywhere else).
+      map.flyTo({ center: [pick.resort.lon, pick.resort.lat], zoom: Math.max(map.getZoom(), 11) });
+      if (onResortSelect) onResortSelect(pick.resort.id);
+      else router.push(`/location/${pick.resort.id}`);
+      return;
+    }
+
+    // A searched place isn't necessarily where the user wants to ski — a
+    // town or ZIP is usually just a starting point — so this flies there
+    // and offers the forecast rather than navigating away immediately;
+    // tapping elsewhere on the map still drops a pin as usual.
+    const { lat, lon, label, bbox } = pick;
+    if (bbox && bbox[0] !== bbox[2] && bbox[1] !== bbox[3]) {
+      map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 40, maxZoom: 13 });
+    } else {
+      map.flyTo({ center: [lon, lat], zoom: 12 });
+    }
+
+    // DOM content, not setHTML: the label is third-party geocoder text.
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = label;
+    const link = document.createElement("a");
+    link.href = `/location/pin?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`;
+    link.textContent = "Forecast for this spot →";
+    link.style.cssText = "display:block;margin-top:4px;font-size:12px;font-weight:600;color:var(--color-primary, #2563eb)";
+    link.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      router.push(link.getAttribute("href")!);
+    });
+    content.append(title, link);
+
+    const el = document.createElement("div");
+    el.style.cssText =
+      "width:18px;height:18px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer;";
+    el.title = label;
+    el.addEventListener("click", (ev) => ev.stopPropagation());
+    const marker = new Marker({ element: el })
+      .setLngLat([lon, lat])
+      // Anchored below the pin: above it, the popup collides with the search
+      // box and base-layer pills along the top of a small mobile map.
+      .setPopup(new Popup({ anchor: "top", offset: 14, closeOnClick: false }).setDOMContent(content))
+      .addTo(map);
+    marker.togglePopup();
+    searchMarkerRef.current = marker;
+  };
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -880,7 +944,10 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
           </svg>
         )}
       </button>
-      <div className="absolute top-3 left-3 z-10 flex gap-1 rounded-full border border-border bg-card/90 p-1 text-xs shadow-sm backdrop-blur-sm">
+      <div className="absolute top-3 right-12 left-3 z-30 sm:right-auto sm:w-80">
+        <MapSearch resorts={resorts} getBias={getSearchBias} onPick={handleSearchPick} />
+      </div>
+      <div className="absolute top-15 left-3 z-10 flex gap-1 rounded-full border border-border bg-card/90 p-1 text-xs shadow-sm backdrop-blur-sm">
         {BASE_LAYER_IDS.map((id) => (
           <button
             key={id}
