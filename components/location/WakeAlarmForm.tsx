@@ -208,6 +208,30 @@ export default function WakeAlarmForm({ location }: { location: Location }) {
           In 10 sec (lock your phone)
         </button>
       </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer font-semibold text-muted-foreground">Auto-set a real alarm with a Siri Shortcut</summary>
+        <div className="mt-2 space-y-2 text-muted-foreground">
+          <p>
+            Shortcuts can&apos;t react to a notification, but a 4:45am automation can ask this link whether {location.name} got {thresholdIn}&quot;+
+            overnight. It answers <strong>YES</strong> or <strong>NO</strong> — if YES, the Shortcut turns your alarm on.
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              const url = `${window.location.origin}/api/powder-check?lat=${location.lat.toFixed(4)}&lon=${location.lon.toFixed(4)}&min=${thresholdIn}`;
+              try {
+                await navigator.clipboard.writeText(url);
+                setMessage({ tone: "ok", text: "Link copied — paste it into the Shortcut's \"Get Contents of URL\" step." });
+              } catch {
+                setMessage({ tone: "ok", text: url });
+              }
+            }}
+            className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary"
+          >
+            Copy Shortcut link ({thresholdIn}&quot;+)
+          </button>
+        </div>
+      </details>
       {message && (
         <p className={`text-xs ${message.tone === "ok" ? "text-green-700 dark:text-green-400" : "text-red-500"}`}>{message.text}</p>
       )}
