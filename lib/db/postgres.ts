@@ -1,5 +1,5 @@
 // PERS-04 users + favorites need a store that survives across Vercel's
-// separate serverless instances — lib/db/sqlite.ts's own doc comment
+// separate serverless instances — the old lib/db/sqlite.ts's own doc comment
 // already flagged this as the eventual requirement, and it's what turned
 // "signed in, starred a resort" into "the star is gone on reload." Neon's
 // HTTP-based serverless driver (no long-lived TCP connection to pool) is

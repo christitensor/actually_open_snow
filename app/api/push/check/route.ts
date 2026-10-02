@@ -8,7 +8,7 @@ import { isPushConfigured } from "@/lib/push";
 // most overnight snow has already fallen. Vercel Hobby crons can fire any
 // time within the scheduled hour, hence the early side of the window.
 // Safe to call repeatedly: each subscription is notified at most once per
-// local day. Same optional CRON_SECRET guard as /api/alerts/check.
+// local day. Optional CRON_SECRET guard (Vercel Cron sends it automatically).
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {

@@ -1,5 +1,5 @@
 // PERS-04 sessions used to be a row in the same SQLite file as everything
-// else in lib/db/sqlite.ts — which, per that file's own doc comment, does
+// else in the (since removed) lib/db/sqlite.ts — which, per that file's own doc comment, did
 // not survive or share state across Vercel serverless instances. In
 // practice that meant a session created by the instance that handled
 // /api/auth/verify was often invisible to the next request, which could

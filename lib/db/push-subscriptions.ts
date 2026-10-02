@@ -1,8 +1,8 @@
 // PERS-06: Web Push "wake me up" subscriptions. Keyed by the browser's push
 // endpoint (one per installed app/device) plus location, so the same phone
 // can watch more than one resort. No account needed — the push endpoint
-// itself is the device's identity, same no-login model as PERS-03 email
-// alerts. Lives in Postgres rather than lib/db/sqlite.ts so subscriptions
+// itself is the device's identity, no login. Lives in Postgres rather
+// than a local SQLite file so subscriptions
 // survive Vercel cold starts, which a once-a-night alarm depends on.
 import { getSql } from "./postgres";
 

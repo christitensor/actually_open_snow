@@ -98,18 +98,25 @@ export default function WakeAlarmForm({ location }: { location: Location }) {
     return reg.pushManager.getSubscription();
   };
 
+  // Asks for notification permission (if not already granted) and returns
+  // this device's push subscription, creating one if needed. Must run
+  // directly from a tap — iOS only shows the permission prompt then.
+  const ensureSubscription = async () => {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      throw new Error("Notifications are blocked — allow them for this app in Settings → Notifications, then try again.");
+    }
+    const reg = await getRegistration();
+    await navigator.serviceWorker.ready;
+    return (
+      (await reg.pushManager.getSubscription()) ??
+      (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey!) }))
+    );
+  };
+
   const enable = () =>
     run(async () => {
-      // Must be called directly from the tap for iOS to show the prompt.
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        throw new Error("Notifications are blocked — allow them for this app in Settings, then try again.");
-      }
-      const reg = await getRegistration();
-      await navigator.serviceWorker.ready;
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey!) }));
+      const sub = await ensureSubscription();
       await postJson("/api/push/subscribe", "POST", {
         subscription: sub.toJSON(),
         locationName: location.name,
@@ -129,12 +136,19 @@ export default function WakeAlarmForm({ location }: { location: Location }) {
       setMessage({ tone: "ok", text: "Wake-up alert turned off for this location." });
     });
 
-  const sendTest = () =>
+  // Works before any alert is turned on — the point is to check this
+  // phone can receive (and hear) one before trusting it at 5am.
+  const sendTest = (delaySeconds: number) =>
     run(async () => {
-      const sub = await currentSubscription();
-      if (!sub) throw new Error("Turn the alert on first.");
-      await postJson("/api/push/test", "POST", { subscription: sub.toJSON() });
-      setMessage({ tone: "ok", text: "Test sent — it should arrive within a few seconds." });
+      const sub = await ensureSubscription();
+      await postJson("/api/push/test", "POST", { subscription: sub.toJSON(), locationName: location.name, delaySeconds });
+      setMessage({
+        tone: "ok",
+        text:
+          delaySeconds > 0
+            ? `Lock your phone now — the test arrives in about ${delaySeconds} seconds. That's exactly how a 5am alert will look and sound.`
+            : "Test sent — it should pop up within a few seconds.",
+      });
     });
 
   if (support === "checking") return <p className="text-sm text-muted-foreground">Checking notification support…</p>;
@@ -179,14 +193,20 @@ export default function WakeAlarmForm({ location }: { location: Location }) {
         </button>
         {activeThreshold != null && (
           <>
-            <button type="button" onClick={sendTest} disabled={busy} className="text-sm underline">
-              Send test
-            </button>
             <button type="button" onClick={disable} disabled={busy} className="text-sm text-muted-foreground underline">
               Turn off
             </button>
           </>
         )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+        <span className="text-xs font-semibold text-muted-foreground">Test notifications:</span>
+        <button type="button" onClick={() => sendTest(0)} disabled={busy} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold transition hover:border-primary hover:text-primary">
+          Send now
+        </button>
+        <button type="button" onClick={() => sendTest(10)} disabled={busy} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold transition hover:border-primary hover:text-primary">
+          In 10 sec (lock your phone)
+        </button>
       </div>
       {message && (
         <p className={`text-xs ${message.tone === "ok" ? "text-green-700 dark:text-green-400" : "text-red-500"}`}>{message.text}</p>

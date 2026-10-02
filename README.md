@@ -30,11 +30,11 @@ npx eslint .                      # lint
 
 | Variable | Purpose |
 |---|---|
-| `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Shared by snow alerts and account sign-in — both go through `lib/email.ts`. Without these, `/api/alerts/check` computes and dedupes alerts correctly but only logs what it would send, and sign-in links are logged to the server console instead of emailed. Set both to actually deliver email via [Resend](https://resend.com). |
-| `CRON_SECRET` | If set, `/api/alerts/check` requires `Authorization: Bearer <secret>`. Unset by default for local dev; set it before deploying somewhere public, since nothing else protects that endpoint from being triggered repeatedly. |
-| `APP_URL` | Used to build the unsubscribe link in alert emails. Defaults to `http://localhost:3000`. |
+| `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Account sign-in emails, via `lib/email.ts`. Without these, sign-in links are logged to the server console instead of emailed. Set both to actually deliver email via [Resend](https://resend.com). |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Powder wake-up push notifications (PERS-06). Generate once with `npx web-push generate-vapid-keys`; without them the wake-up card says it isn't set up. |
+| `CRON_SECRET` | If set, `/api/push/check` requires `Authorization: Bearer <secret>`. Unset by default for local dev; set it before deploying somewhere public, since nothing else protects that endpoint from being triggered repeatedly. |
 
-`/api/alerts/check` runs daily via Vercel Cron (`vercel.json`, 12:00 UTC) once deployed there. Set `CRON_SECRET` to lock the endpoint down — Vercel automatically sends it as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change.
+`/api/push/check` runs daily via Vercel Cron (`vercel.json`, 11:00 UTC) once deployed there. Set `CRON_SECRET` to lock the endpoint down — Vercel automatically sends it as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change.
 
 ## Project layout
 
