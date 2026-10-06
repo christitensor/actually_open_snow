@@ -1,11 +1,11 @@
 // PERS-06: the early-morning "wake me up" check. For each push
 // subscription, sums snowfall since 5pm local yesterday and, if it meets
 // the threshold, sends a high-urgency push — at most once per subscription
-// per local calendar day. Separate from PERS-03's email check because
-// that one looks at *today's forecast*; this one looks at what actually
-// fell overnight, which is what should get someone out of bed.
+// per local calendar day. Uses MEASURED overnight snow only (resort
+// report, else SNOTEL — lib/derive/measured-overnight.ts), never a
+// forecast: what actually fell is what should get someone out of bed.
 
-import { getOvernightSnowfallIn } from "@/lib/data-sources/open-meteo";
+import { getMeasuredOvernight, type MeasuredOvernight } from "@/lib/derive/measured-overnight";
 import { listAllPushSubscriptions, markPushNotified } from "@/lib/db/push-subscriptions";
 import { sendPush, type SendPushResult } from "@/lib/push";
 
@@ -13,6 +13,7 @@ export interface PushCheckResult {
   subscriptionId: number;
   locationName: string;
   overnightSnowfallIn: number | null;
+  source?: MeasuredOvernight["source"];
   thresholdIn: number;
   crossed: boolean;
   alreadyNotifiedToday: boolean;
@@ -25,22 +26,23 @@ export async function checkAndPushAll(): Promise<PushCheckResult[]> {
   const results: PushCheckResult[] = [];
 
   // Many devices usually watch the same few resorts — fetch each point once.
-  const snowByPoint = new Map<string, ReturnType<typeof getOvernightSnowfallIn>>();
+  const snowByPoint = new Map<string, Promise<MeasuredOvernight>>();
 
   for (const sub of subscriptions) {
     try {
       const pointKey = `${sub.lat.toFixed(4)},${sub.lon.toFixed(4)}`;
-      if (!snowByPoint.has(pointKey)) snowByPoint.set(pointKey, getOvernightSnowfallIn(sub.lat, sub.lon));
-      const { snowfallIn, localDate } = await snowByPoint.get(pointKey)!;
+      if (!snowByPoint.has(pointKey)) snowByPoint.set(pointKey, getMeasuredOvernight(sub.lat, sub.lon));
+      const { snowfallIn, localDate, source } = await snowByPoint.get(pointKey)!;
 
-      const crossed = snowfallIn >= sub.thresholdIn;
+      // No measured data → no wake-up (never a forecast fallback).
+      const crossed = snowfallIn != null && snowfallIn >= sub.thresholdIn;
       const alreadyNotifiedToday = sub.lastNotifiedDate === localDate;
 
       let pushResult: SendPushResult | undefined;
       if (crossed && !alreadyNotifiedToday) {
         pushResult = await sendPush(sub, {
-          title: `❄️ ${snowfallIn.toFixed(1)}" overnight at ${sub.locationName}`,
-          body: `Your ${sub.thresholdIn}" wake-up threshold was hit. Time to get up!`,
+          title: `❄️ ${snowfallIn!.toFixed(1)}" overnight at ${sub.locationName}`,
+          body: `Measured by ${source === "resort-report" ? "the resort's snow report" : "nearby SNOTEL stations"} — your ${sub.thresholdIn}" threshold was hit. Time to get up!`,
           url: "/",
           tag: `wake-${sub.id}`,
         });
@@ -51,6 +53,7 @@ export async function checkAndPushAll(): Promise<PushCheckResult[]> {
         subscriptionId: sub.id,
         locationName: sub.locationName,
         overnightSnowfallIn: snowfallIn,
+        source,
         thresholdIn: sub.thresholdIn,
         crossed,
         alreadyNotifiedToday,

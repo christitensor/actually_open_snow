@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getResortById } from "@/data/resorts";
-import { getOvernightSnowfallIn } from "@/lib/data-sources/open-meteo";
+import { getMeasuredOvernight } from "@/lib/derive/measured-overnight";
 import { parseLatLon } from "@/lib/util/api";
 
 // PERS-06 companion for iOS Shortcuts: iOS has no "when a notification
 // arrives" automation trigger, so a Shortcut can't react to the wake-up
-// push itself. Instead a daily "Time of Day" automation (~4:45am) calls
+// push itself. Instead a daily "Time of Day" automation (~6am) calls
 // this and turns on an alarm when the answer is YES — no push needed.
 //
 //   GET /api/powder-check?resort=snowbasin&min=6   (or ?lat=&lon=&min=)
 //
 // Plain-text "YES" / "NO" by default, because "If Contents of URL is YES"
 // is the simplest possible Shortcut condition; ?format=json for details.
-// Same overnight window as the push check: snowfall since 5pm local.
+// MEASURED snow only (resort patrol report, else SNOTEL depth sensors —
+// see lib/derive/measured-overnight.ts), never a forecast. If nothing
+// measured is available the answer is NO, so a data outage can't ring
+// an alarm on a dry morning.
 // Add &test=1 to force YES while setting the Shortcut up.
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
@@ -24,6 +27,13 @@ export async function GET(req: NextRequest) {
   const point = resort ? { lat: resort.lat, lon: resort.lon } : !resortId && hasLatLon ? parseLatLon(params) : null;
   const min = Number(params.get("min") ?? 6);
   const asJson = params.get("format") === "json";
+  // ?at=<ISO time> replays a past morning (SNOTEL only — a resort's report
+  // page only ever shows its current numbers), for checking accuracy
+  // against storms you remember.
+  const at = params.get("at") ? new Date(params.get("at")!) : undefined;
+  if (at && Number.isNaN(at.getTime())) {
+    return asJson ? NextResponse.json({ error: "Invalid ?at= time" }, { status: 400 }) : new NextResponse("ERROR: Invalid ?at= time", { status: 400 });
+  }
 
   if (!point || !Number.isFinite(min) || min <= 0) {
     const error = resortId && !resort ? `Unknown resort "${resortId}"` : "Pass ?resort=<id> or ?lat=&lon=, plus ?min=<inches>";
@@ -39,11 +49,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { snowfallIn, localDate } = await getOvernightSnowfallIn(point.lat, point.lon);
-    const powder = snowfallIn >= min;
+    const measured = await getMeasuredOvernight(point.lat, point.lon, resort?.id, at);
+    const powder = measured.snowfallIn != null && measured.snowfallIn >= min;
     const headers = { "Cache-Control": "no-store" };
     if (asJson) {
-      return NextResponse.json({ powder, overnightSnowfallIn: Math.round(snowfallIn * 10) / 10, thresholdIn: min, localDate, resort: resort?.id ?? null }, { headers });
+      return NextResponse.json({ powder, overnightSnowfallIn: measured.snowfallIn, thresholdIn: min, resort: resort?.id ?? null, ...measured }, { headers });
     }
     return new NextResponse(powder ? "YES" : "NO", { headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" } });
   } catch (err) {

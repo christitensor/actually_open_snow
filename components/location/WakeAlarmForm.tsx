@@ -166,7 +166,8 @@ export default function WakeAlarmForm({ location }: { location: Location }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        A push notification around 4-5am when {location.name} gets enough snow overnight (since 5pm). iOS can&apos;t set a real
+        A push notification around 4-5am when {location.name} gets enough <strong>measured</strong> snow overnight (since 5pm) — from
+        the resort&apos;s own snow report when it&apos;s out, otherwise nearby SNOTEL snow-depth sensors. Never a forecast. iOS can&apos;t set a real
         alarm from a web app — keep notification sounds on and this app allowed through Sleep Focus so it can wake you.
       </p>
       <div className="flex flex-wrap items-end gap-3">
@@ -212,8 +213,8 @@ export default function WakeAlarmForm({ location }: { location: Location }) {
         <summary className="cursor-pointer font-semibold text-muted-foreground">Auto-set a real alarm with a Siri Shortcut</summary>
         <div className="mt-2 space-y-2 text-muted-foreground">
           <p>
-            Shortcuts can&apos;t react to a notification, but a 4:45am automation can ask this link whether {location.name} got {thresholdIn}&quot;+
-            overnight. It answers <strong>YES</strong> or <strong>NO</strong> — if YES, the Shortcut turns your alarm on.
+            Shortcuts can&apos;t react to a notification, but a 6am automation can ask this link whether {location.name} got {thresholdIn}&quot;+
+            of measured snow overnight. It answers <strong>YES</strong> or <strong>NO</strong> — if YES, the Shortcut turns your alarm on.
           </p>
           <button
             type="button"
