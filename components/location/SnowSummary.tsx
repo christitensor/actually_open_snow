@@ -10,6 +10,13 @@ import type { DailyForecastDay, HistoricalDay } from "@/lib/models/types";
 
 const TIMELINE_FUTURE_DAYS = 14;
 const BAR_MAX_HEIGHT_PX = 56;
+const BAR_LABEL_HEIGHT_PX = 14;
+
+// Compact inches label for the top of each bar: one decimal under 10",
+// whole inches above so labels fit the 24px-wide column.
+function formatBarInches(inches: number): string {
+  return inches >= 10 ? `${Math.round(inches)}"` : `${inches.toFixed(1)}"`;
+}
 
 interface TimelineDay {
   date: string;
@@ -106,7 +113,19 @@ export default function SnowSummary({
                   : "bg-muted-foreground/40";
             return (
               <div key={d.date} className="flex w-6 flex-col items-center gap-1" title={`${d.date}: ${d.snowIn.toFixed(1)}" snow`}>
-                <div className="flex h-14 w-full items-end justify-center">
+                <div
+                  className="flex w-full flex-col items-center justify-end"
+                  style={{ height: `${BAR_MAX_HEIGHT_PX + BAR_LABEL_HEIGHT_PX}px` }}
+                >
+                  {d.snowIn >= 0.05 && (
+                    <div
+                      className={`mb-0.5 whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums ${
+                        d.isToday ? "text-accent" : d.isFuture ? "text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      {formatBarInches(d.snowIn)}
+                    </div>
+                  )}
                   <div className={`w-3.5 rounded-t ${barColor}`} style={{ height: `${Math.max(barHeight, d.snowIn > 0 ? 3 : 0)}px` }} />
                 </div>
                 <div className="h-px w-full bg-border" />
@@ -122,7 +141,7 @@ export default function SnowSummary({
         </div>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        Bar height is new snow that day (muted = past/actual, blue = forecast, orange = today). Exact numbers are in the tables below.
+        Bar height and label are new snow that day (muted = past/actual, blue = forecast, orange = today).
       </p>
     </section>
   );
