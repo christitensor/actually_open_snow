@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGridDailySnowfallIn, getGridPastDailySnowfallIn, getGridRecentSnowfallIn } from "@/lib/data-sources/open-meteo";
+import { getMeasuredSnowNearPoints, type MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 import { badRequest, serverError } from "@/lib/util/api";
+import { withTimeout } from "@/lib/util/with-timeout";
 
 const LAST_N_HOURS = 12;
 const LAST_N_DAYS = 7;
@@ -24,10 +26,13 @@ export async function GET(req: NextRequest) {
   if (points.length === 0 || points.length > 50) return badRequest("points must have between 1 and 50 entries");
 
   try {
-    const [today, last12h, last7d] = await Promise.all([
+    const noMeasured: (MeasuredSnowNearby | null)[] = points.map(() => null);
+    const [today, last12h, last7d, measured] = await Promise.all([
       getGridDailySnowfallIn(points),
       getGridRecentSnowfallIn(points, LAST_N_HOURS),
       getGridPastDailySnowfallIn(points, LAST_N_DAYS),
+      // Measured snow at the nearest SNOTEL — best-effort, never blocks the model numbers.
+      withTimeout(getMeasuredSnowNearPoints(points), 4000).catch(() => noMeasured),
     ]);
 
     const results = points.map((p, i) => ({
@@ -36,6 +41,7 @@ export async function GET(req: NextRequest) {
       todayIn: today[i]?.valueIn ?? 0,
       last12hIn: last12h[i]?.valueIn ?? 0,
       last7dIn: last7d[i]?.valueIn ?? 0,
+      measured: measured?.[i] ?? null,
     }));
 
     return NextResponse.json({ results });

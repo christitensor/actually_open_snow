@@ -28,7 +28,34 @@ interface AwdbStation {
 /** Phase 1 scope: only need UT/ID SNOTEL networks (see TRACE_MATRIX.md regional scope). */
 const PHASE_1_TRIPLETS = "*:UT:SNTL,*:ID:SNTL";
 
-async function fetchPhase1Stations(): Promise<AwdbStation[]> {
+// The station list barely changes, but it's a ~2.1MB response (see below)
+// that every caller used to re-download. Keep a trimmed copy per warm
+// server instance instead.
+const STATIONS_TTL_MS = 6 * 60 * 60 * 1000;
+let stationsCache: { at: number; stations: Promise<AwdbStation[]> } | null = null;
+
+function fetchPhase1Stations(): Promise<AwdbStation[]> {
+  if (stationsCache && Date.now() - stationsCache.at < STATIONS_TTL_MS) return stationsCache.stations;
+  const stations = fetchPhase1StationsUncached()
+    .then((all) =>
+      all.map(({ stationTriplet, name, latitude, longitude, elevation, dataTimeZone }) => ({
+        stationTriplet,
+        name,
+        latitude,
+        longitude,
+        elevation,
+        dataTimeZone,
+      }))
+    )
+    .catch((err) => {
+      stationsCache = null; // don't cache a failure
+      throw err;
+    });
+  stationsCache = { at: Date.now(), stations };
+  return stations;
+}
+
+async function fetchPhase1StationsUncached(): Promise<AwdbStation[]> {
   const url = `${BASE}/stations?stationTriplets=${PHASE_1_TRIPLETS}&activeOnly=true`;
   // Not using Next's `next: { revalidate }` data cache here: the AWDB
   // response for ~225 UT/ID stations is ~2.1MB (each station's
@@ -207,4 +234,74 @@ export async function getOvernightDepthGains(
     });
   }
   return gains;
+}
+
+export interface MeasuredSnowNearby {
+  stationName: string;
+  distanceMi: number;
+  elevationFt: number;
+  /** Latest measured snow depth (inches, ultrasonic sensor, 1" resolution). */
+  depthIn: number;
+  /** Measured depth rise over the last 24h; never negative (melt/settling reads as 0). */
+  gain24hIn: number;
+  /** ISO time of the latest hourly reading — SNOTEL typically lags real time by ~1-2h. */
+  readingAt: string;
+}
+
+/**
+ * Measured snow on the ground at the nearest SNOTEL station to each point
+ * (within maxMiles), for showing next to the model's snowfall numbers. The
+ * model can count near-freezing precipitation as snow that never
+ * accumulates (rain, or wet snow melting on warm ground); a depth sensor
+ * shows what actually stuck. One batched hourly request for all stations.
+ * null for a point with no station close enough — "no nearby sensor", not
+ * "no snow".
+ */
+export async function getMeasuredSnowNearPoints(
+  points: { lat: number; lon: number }[],
+  { maxMiles = 5, now = new Date() } = {}
+): Promise<(MeasuredSnowNearby | null)[]> {
+  if (points.length === 0) return [];
+  const all = await fetchPhase1Stations();
+
+  const nearest = points.map(({ lat, lon }) => {
+    let best: { st: AwdbStation; distanceMi: number } | null = null;
+    for (const st of all) {
+      const distanceMi = haversineMiles(lat, lon, st.latitude, st.longitude);
+      if (distanceMi <= maxMiles && (!best || distanceMi < best.distanceMi)) best = { st, distanceMi };
+    }
+    return best;
+  });
+  const triplets = [...new Set(nearest.flatMap((n) => (n ? [n.st.stationTriplet] : [])))];
+  if (triplets.length === 0) return points.map(() => null);
+
+  // Explicit calendar dates (relative "-1" only returned today's values when tested).
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const begin = fmt(new Date(now.getTime() - 2 * 24 * 3600 * 1000));
+  const end = fmt(new Date(now.getTime() + 24 * 3600 * 1000));
+  const url = `${BASE}/data?stationTriplets=${triplets.join(",")}&elements=SNWD&duration=HOURLY&beginDate=${begin}&endDate=${end}`;
+  const res = await fetch(url, { next: { revalidate: 900 } });
+  if (!res.ok) throw new Error(`SNOTEL hourly request failed (${res.status})`);
+  const raw = (await res.json()) as AwdbDataResponse[];
+  const byTriplet = new Map(raw.map((r) => [r.stationTriplet, r]));
+
+  return nearest.map((n) => {
+    if (!n) return null;
+    const offsetH = n.st.dataTimeZone ?? -8;
+    const values = (byTriplet.get(n.st.stationTriplet)?.data.find((d) => d.stationElement.elementCode === "SNWD")?.values ?? [])
+      .filter((v): v is { date: string; value: number } => v.value != null)
+      .map((v) => ({ t: new Date(`${v.date.replace(" ", "T")}:00Z`).getTime() - offsetH * 3600 * 1000, depth: v.value }))
+      .filter((v) => v.t <= now.getTime());
+    const latest = values.at(-1);
+    if (!latest) return null;
+    const dayAgo = values.filter((v) => v.t <= latest.t - 24 * 3600 * 1000).at(-1);
+    return {
+      stationName: n.st.name,
+      distanceMi: n.distanceMi,
+      elevationFt: n.st.elevation,
+      depthIn: latest.depth,
+      gain24hIn: dayAgo ? Math.max(0, latest.depth - dayAgo.depth) : 0,
+      readingAt: new Date(latest.t).toISOString(),
+    };
+  });
 }
