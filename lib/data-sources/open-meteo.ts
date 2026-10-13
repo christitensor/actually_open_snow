@@ -204,6 +204,31 @@ export async function getElevationAdjustedDaily(
 }
 
 /**
+ * Open-Meteo's `timezone=auto` hourly times are local wall-clock strings
+ * with no offset ("2026-10-13T09:00"). The server runs in UTC, so
+ * `new Date(time)` reads them as UTC — off by the location's offset (6–7h
+ * in Utah), which shifted "last N hours" windows into the future and
+ * mixed forecast hours into "recent" totals. Anchor with
+ * utc_offset_seconds instead (same as getOvernightSnowfallIn).
+ */
+function localTimeToEpochMs(time: string, utcOffsetSeconds: number): number {
+  return new Date(`${time}Z`).getTime() - utcOffsetSeconds * 1000;
+}
+
+/**
+ * Sum of hourly snowfall over (now - hoursBack, now] — past hours only.
+ * Each hourly value is the total for the hour *ending* at its timestamp.
+ */
+function sumPastHours(hourly: { time: string[]; snowfall: number[] }, utcOffsetSeconds: number, hoursBack: number): number {
+  const now = Date.now();
+  const cutoff = now - hoursBack * 60 * 60 * 1000;
+  return hourly.time.reduce((sum, time, i) => {
+    const t = localTimeToEpochMs(time, utcOffsetSeconds);
+    return t > cutoff && t <= now ? sum + (hourly.snowfall[i] ?? 0) : sum;
+  }, 0);
+}
+
+/**
  * SNOW-02 input: recent hourly temp + snowfall, for the trail-conditions
  * heuristic (time since last snow, freeze-thaw cycles). Same reanalysis
  * caveat as getRecent24hSnowfallIn — this is a model estimate of the
@@ -219,13 +244,14 @@ export async function getRecentHourlyWindow(
     `&hourly=temperature_2m,snowfall&temperature_unit=fahrenheit&precipitation_unit=inch` +
     `&timezone=auto&past_days=${pastDays}&forecast_days=1`;
   const raw = await fetchJson<{
+    utc_offset_seconds: number;
     hourly: { time: string[]; temperature_2m: number[]; snowfall: number[] };
   }>(url);
 
   const now = Date.now();
   return raw.hourly.time
     .map((time, i) => ({ time, temperatureF: raw.hourly.temperature_2m[i], snowfallIn: raw.hourly.snowfall[i] }))
-    .filter((h) => new Date(h.time).getTime() <= now);
+    .filter((h) => localTimeToEpochMs(h.time, raw.utc_offset_seconds) <= now);
 }
 
 /**
@@ -240,14 +266,8 @@ export async function getRecent24hSnowfallIn(lat: number, lon: number): Promise<
   const url =
     `${FORECAST_BASE}?latitude=${lat}&longitude=${lon}` +
     `&hourly=snowfall&precipitation_unit=inch&timezone=auto&past_days=1&forecast_days=1`;
-  const raw = await fetchJson<{ hourly: { time: string[]; snowfall: number[] } }>(url);
-
-  const now = Date.now();
-  const cutoff = now - 24 * 60 * 60 * 1000;
-  return raw.hourly.time.reduce((sum, time, i) => {
-    const t = new Date(time).getTime();
-    return t >= cutoff && t <= now ? sum + raw.hourly.snowfall[i] : sum;
-  }, 0);
+  const raw = await fetchJson<{ utc_offset_seconds: number; hourly: { time: string[]; snowfall: number[] } }>(url);
+  return sumPastHours(raw.hourly, raw.utc_offset_seconds, 24);
 }
 
 /**
@@ -385,6 +405,13 @@ export async function getGridDailySnowfallIn(
  * batching returns one full { hourly: {...} } object per point, same
  * shape as the single-location endpoint, not a flattened/merged array.
  */
+interface GridHourlySnowfall {
+  latitude: number;
+  longitude: number;
+  utc_offset_seconds: number;
+  hourly: { time: string[]; snowfall: number[] };
+}
+
 export async function getGridRecentSnowfallIn(
   points: { lat: number; lon: number }[],
   hoursBack: number
@@ -394,48 +421,22 @@ export async function getGridRecentSnowfallIn(
   const lons = points.map((p) => p.lon).join(",");
   const url =
     `${FORECAST_BASE}?latitude=${lats}&longitude=${lons}` +
-    `&hourly=snowfall&precipitation_unit=inch&past_days=1&forecast_days=1&timezone=auto`;
+    `&hourly=snowfall&precipitation_unit=inch&past_days=${Math.ceil(hoursBack / 24)}&forecast_days=1&timezone=auto`;
 
-  const raw = asArray(
-    await fetchJson<
-      | { latitude: number; longitude: number; hourly: { time: string[]; snowfall: number[] } }
-      | { latitude: number; longitude: number; hourly: { time: string[]; snowfall: number[] } }[]
-    >(url)
-  );
-  const now = Date.now();
-  const cutoff = now - hoursBack * 60 * 60 * 1000;
-  return raw.map((r, i) => {
-    const valueIn = r.hourly.time.reduce((sum, time, j) => {
-      const t = new Date(time).getTime();
-      return t >= cutoff && t <= now ? sum + r.hourly.snowfall[j] : sum;
-    }, 0);
-    return { lat: points[i].lat, lon: points[i].lon, valueIn };
-  });
+  const raw = asArray(await fetchJson<GridHourlySnowfall | GridHourlySnowfall[]>(url));
+  return raw.map((r, i) => ({ lat: points[i].lat, lon: points[i].lon, valueIn: sumPastHours(r.hourly, r.utc_offset_seconds, hoursBack) }));
 }
 
-/** Batched multi-location trailing-N-day snowfall total (including today so far) — same reanalysis substitute as getGridRecentSnowfallIn, coarser granularity. */
+/**
+ * Batched multi-location trailing-N-day snowfall total — past hours only,
+ * (now - N×24h, now]. Used to sum whole daily totals, which included the
+ * *rest of today's forecast* in a "past 7 days" number.
+ */
 export async function getGridPastDailySnowfallIn(
   points: { lat: number; lon: number }[],
   days: number
 ): Promise<{ lat: number; lon: number; valueIn: number }[]> {
-  if (points.length === 0) return [];
-  const lats = points.map((p) => p.lat).join(",");
-  const lons = points.map((p) => p.lon).join(",");
-  const url =
-    `${FORECAST_BASE}?latitude=${lats}&longitude=${lons}` +
-    `&daily=snowfall_sum&precipitation_unit=inch&past_days=${days}&forecast_days=1&timezone=auto`;
-
-  const raw = asArray(
-    await fetchJson<
-      | { latitude: number; longitude: number; daily: { snowfall_sum: number[] } }
-      | { latitude: number; longitude: number; daily: { snowfall_sum: number[] } }[]
-    >(url)
-  );
-  return raw.map((r, i) => {
-    // past_days=N + forecast_days=1 returns N+1 daily entries (N past + today) — take the trailing `days` of them (today plus the N-1 days before it).
-    const valueIn = r.daily.snowfall_sum.slice(-days).reduce((sum, v) => sum + (v ?? 0), 0);
-    return { lat: points[i].lat, lon: points[i].lon, valueIn };
-  });
+  return getGridRecentSnowfallIn(points, days * 24);
 }
 
 const COMPARISON_MODELS = ["gfs_seamless", "ecmwf_ifs04", "icon_seamless"] as const;
