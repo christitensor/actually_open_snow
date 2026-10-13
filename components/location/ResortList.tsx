@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { useFavorites } from "@/lib/favorites";
+import { useDragReorder } from "@/lib/use-drag-reorder";
+import DragGrip from "@/components/DragGrip";
 import type { Location } from "@/lib/models/types";
 
 interface ResortRow {
@@ -22,6 +24,59 @@ function toLocation(r: ResortRow): Location {
 
 function bySnowDesc(a: ResortRow, b: ResortRow) {
   return (b.snowfallTodayIn ?? 0) - (a.snowfallTodayIn ?? 0);
+}
+
+// PERS-07: "Most snow" (default — the list's job is "where's it dumping")
+// vs "My order" (starred resorts first, in the order you dragged them).
+// A per-device display preference, so plain localStorage.
+type SortMode = "snow" | "mine";
+const SORT_STORAGE_KEY = "actually-open-snow:resort-sort";
+const SORT_CHANGE_EVENT = "actually-open-snow:resort-sort-changed";
+
+function readSortMode(): SortMode {
+  try {
+    return window.localStorage.getItem(SORT_STORAGE_KEY) === "mine" ? "mine" : "snow";
+  } catch {
+    return "snow";
+  }
+}
+
+function writeSortMode(mode: SortMode) {
+  try {
+    window.localStorage.setItem(SORT_STORAGE_KEY, mode);
+  } catch {
+    // Private mode etc. — the choice just won't stick past this page.
+  }
+  window.dispatchEvent(new Event(SORT_CHANGE_EVENT));
+}
+
+function subscribeSortMode(callback: () => void) {
+  window.addEventListener(SORT_CHANGE_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(SORT_CHANGE_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function SortToggle({ mode }: { mode: SortMode }) {
+  const option = (value: SortMode, label: string) => (
+    <button
+      onClick={() => writeSortMode(value)}
+      aria-pressed={mode === value}
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+        mode === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="inline-flex rounded-full bg-muted p-0.5" role="group" aria-label="Sort resorts">
+      {option("snow", "Most snow")}
+      {option("mine", "My order")}
+    </div>
+  );
 }
 
 function fmtIn(v: number | undefined): string {
@@ -47,11 +102,15 @@ function Row({
   active,
   onHover,
   onRef,
+  grip,
+  dragging = false,
 }: {
   r: ResortRow;
   active: boolean;
   onHover: (id: string | null) => void;
   onRef: (id: string, el: HTMLLIElement | null) => void;
+  grip?: ReactNode;
+  dragging?: boolean;
 }) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const starred = isFavorite(toLocation(r));
@@ -59,20 +118,21 @@ function Row({
   return (
     <li
       ref={(el) => onRef(r.id, el)}
-      className="relative"
+      className={`relative ${dragging ? "z-10" : ""}`}
       onMouseEnter={() => onHover(r.id)}
       onMouseLeave={() => onHover(null)}
     >
       <Link
         href={`/location/${r.id}`}
-        className={`card block px-4 py-3 pr-11 transition hover:shadow-md hover:-translate-y-0.5 ${
+        className={`card block py-3 pr-11 transition hover:shadow-md hover:-translate-y-0.5 ${grip ? "pl-9" : "pl-4"} ${
           active ? "border-primary ring-2 ring-primary/30" : ""
-        }`}
+        } ${dragging ? "scale-[1.02] shadow-lg ring-2 ring-primary/40" : ""}`}
       >
         <div className="text-base font-bold tracking-tight">{r.name}</div>
         <div className="text-xs font-normal text-muted-foreground">{r.region}</div>
         <SnowStats r={r} />
       </Link>
+      {grip && <div className="absolute top-1/2 left-1.5 -translate-y-1/2">{grip}</div>}
       <button
         onClick={(e) => {
           e.preventDefault();
@@ -106,7 +166,7 @@ function UpdatedLabel({ fetchedAt }: { fetchedAt?: string }) {
   // Rendered client-side only (Date.now()-derived), so it never disagrees
   // with the server-rendered markup during hydration.
   if (!label) return null;
-  return <p className="mb-2 text-xs text-muted-foreground">{label}</p>;
+  return <p className="text-xs text-muted-foreground">{label}</p>;
 }
 
 // Puts primaryResortIds (data/resorts.ts) plus anything starred at the
@@ -130,12 +190,22 @@ export default function ResortList({
   onHover?: (id: string | null) => void;
   fetchedAt?: string;
 }) {
-  const { isFavorite } = useFavorites();
+  const { favorites, isFavorite, reorderFavorites } = useFavorites();
   const [showAll, setShowAll] = useState(false);
   const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  const sortMode = useSyncExternalStore(subscribeSortMode, readSortMode, () => "snow" as SortMode);
 
   const visible = favoritesOnly ? resorts.filter((r) => isFavorite(toLocation(r))) : resorts;
-  const top = visible.filter((r) => primaryIds.includes(r.id) || isFavorite(toLocation(r))).sort(bySnowDesc);
+  const topBySnow = visible.filter((r) => primaryIds.includes(r.id) || isFavorite(toLocation(r))).sort(bySnowDesc);
+
+  // "My order": starred resorts first in your saved order (draggable),
+  // then the non-starred defaults by snow as before.
+  const starredOrder = favorites.flatMap((f) => (f.source === "resort" && f.resortId ? [f.resortId] : []));
+  const starred = starredOrder.flatMap((id) => visible.filter((r) => r.id === id));
+  const drag = useDragReorder(starred, (r) => r.id, (ordered) => reorderFavorites(ordered.map(toLocation)));
+  const canReorder = starred.length >= 2;
+  const myOrder = sortMode === "mine" && canReorder;
+  const top = myOrder ? [...drag.ordered, ...topBySnow.filter((r) => !starredOrder.includes(r.id))] : topBySnow;
   const topIds = new Set(top.map((r) => r.id));
   const rest = visible.filter((r) => !topIds.has(r.id)).sort(bySnowDesc);
 
@@ -152,6 +222,7 @@ export default function ResortList({
   const handleRef = (id: string, el: HTMLLIElement | null) => {
     if (el) rowRefs.current.set(id, el);
     else rowRefs.current.delete(id);
+    drag.registerRow(id, el);
   };
 
   if (favoritesOnly && top.length === 0 && rest.length === 0) {
@@ -160,11 +231,29 @@ export default function ResortList({
 
   return (
     <div>
-      <UpdatedLabel fetchedAt={fetchedAt} />
+      <div className="mb-2 flex items-center justify-between gap-2 empty:hidden">
+        <UpdatedLabel fetchedAt={fetchedAt} />
+        {canReorder && (
+          <div className="ml-auto">
+            <SortToggle mode={sortMode} />
+          </div>
+        )}
+      </div>
       <ul className="space-y-2">
-        {top.map((r) => (
-          <Row key={r.id} r={r} active={r.id === hoveredId || r.id === selectedId} onHover={(id) => onHover?.(id)} onRef={handleRef} />
-        ))}
+        {top.map((r) => {
+          const starredIndex = myOrder ? drag.ordered.findIndex((o) => o.id === r.id) : -1;
+          return (
+            <Row
+              key={r.id}
+              r={r}
+              active={r.id === hoveredId || r.id === selectedId}
+              onHover={(id) => onHover?.(id)}
+              onRef={handleRef}
+              dragging={r.id === drag.dragKey}
+              grip={starredIndex !== -1 ? <DragGrip label={r.name} {...drag.gripProps(r.id, starredIndex)} /> : undefined}
+            />
+          );
+        })}
       </ul>
 
       {rest.length > 0 && (

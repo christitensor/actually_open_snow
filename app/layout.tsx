@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
+import UndoToast from "@/components/UndoToast";
 import { AuthProvider } from "@/lib/auth";
 
 const geistSans = Geist({
@@ -52,7 +53,10 @@ const THEME_INIT_SCRIPT = `
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    // suppressHydrationWarning: THEME_INIT_SCRIPT adds .dark/.light to
+    // <html> before React hydrates, so its className never matches the
+    // server's. Scoped to this one element's attributes, not its children.
+    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
@@ -68,6 +72,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               body's column layout without that side effect. */}
           <main className="min-w-0 flex-1 pb-20 sm:pb-0">{children}</main>
           <BottomNav />
+          <UndoToast />
         </AuthProvider>
       </body>
     </html>

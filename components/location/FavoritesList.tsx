@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useFavorites } from "@/lib/favorites";
+import { favoriteKey } from "@/lib/util/favorite-key";
+import { useDragReorder } from "@/lib/use-drag-reorder";
+import DragGrip from "@/components/DragGrip";
 
 interface QuickSnow {
   todayIn: number;
@@ -21,14 +24,19 @@ function pointKey(lat: number, lon: number): string {
 // PERS-01/MAP-17: saved backcountry pins (resort favorites now live in
 // ResortList's top section instead — see app/page.tsx).
 export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void }) {
-  const { favorites, toggleFavorite } = useFavorites();
-  const spots = favorites.filter((f) => f.source === "pin");
+  const { favorites, toggleFavorite, reorderFavorites } = useFavorites();
+  const savedSpots = favorites.filter((f) => f.source === "pin");
   const [stats, setStats] = useState<Record<string, QuickSnow>>({});
+
+  // PERS-07: drag the ⋮⋮ grip to reorder — see lib/use-drag-reorder.ts.
+  const drag = useDragReorder(savedSpots, favoriteKey, reorderFavorites);
+  const spots = drag.ordered;
 
   // Unlike ResortList's server-fetched stats, pins aren't known until this
   // client component reads them from localStorage/the account API, so the
   // quick 12h/today/7d visual for them has to be a client-side fetch.
-  const pointsKey = spots.map((s) => pointKey(s.lat, s.lon)).join("|");
+  // Sorted, so reordering (or a live drag) doesn't refetch the same points.
+  const pointsKey = savedSpots.map((s) => pointKey(s.lat, s.lon)).sort().join("|");
 
   useEffect(() => {
     if (!pointsKey) return;
@@ -67,20 +75,29 @@ export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void })
 
   return (
     <ul className="space-y-2">
-      {spots.map((f) => {
+      {spots.map((f, i) => {
+        const key = favoriteKey(f);
         const href = `/location/pin?lat=${f.lat}&lon=${f.lon}`;
         const s = stats[pointKey(f.lat, f.lon)];
+        const dragging = key === drag.dragKey;
         return (
-          <li key={href} className="card px-4 py-3 text-sm">
-            <div className="flex items-center justify-between">
-              <Link href={href} className="font-medium hover:text-primary">
-                {f.name}
-              </Link>
+          <li
+            key={key}
+            ref={(el) => drag.registerRow(key, el)}
+            className={`card px-4 py-3 text-sm transition-shadow ${dragging ? "relative z-10 scale-[1.02] shadow-lg ring-2 ring-primary/40" : ""}`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                {spots.length > 1 && <DragGrip label={f.name} className="-ml-2" {...drag.gripProps(key, i)} />}
+                <Link href={href} className="truncate font-medium hover:text-primary">
+                  {f.name}
+                </Link>
+              </div>
               <button onClick={() => toggleFavorite(f)} className="btn-ghost !px-2 !py-1 text-xs">
                 remove
               </button>
             </div>
-            <div className="mt-1.5 flex items-center gap-1.5">
+            <div className={`mt-1.5 flex items-center gap-1.5 ${spots.length > 1 ? "pl-4" : ""}`}>
               <span className="pill bg-primary/10 text-primary">Today {fmtIn(s?.todayIn)}</span>
               <span className="pill bg-muted text-muted-foreground">12h {fmtIn(s?.last12hIn)}</span>
               <span className="pill bg-muted text-muted-foreground">7d {fmtIn(s?.last7dIn)}</span>
