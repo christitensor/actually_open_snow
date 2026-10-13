@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useFavorites } from "@/lib/favorites";
 import { favoriteKey } from "@/lib/util/favorite-key";
-import type { FavoriteLocation } from "@/lib/models/types";
+import { useDragReorder } from "@/lib/use-drag-reorder";
+import DragGrip from "@/components/DragGrip";
 
 interface QuickSnow {
   todayIn: number;
@@ -14,13 +15,6 @@ interface QuickSnow {
 
 function fmtIn(v: number | undefined): string {
   return v != null ? `${v.toFixed(1)}"` : "—";
-}
-
-function moveItem<T>(list: T[], from: number, to: number): T[] {
-  const next = [...list];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item);
-  return next;
 }
 
 function pointKey(lat: number, lon: number): string {
@@ -34,76 +28,15 @@ export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void })
   const savedSpots = favorites.filter((f) => f.source === "pin");
   const [stats, setStats] = useState<Record<string, QuickSnow>>({});
 
-  // PERS-07 drag-to-reorder. While a drag is live, `dragOrder` is the
-  // working order rendered in place of the saved one; it's committed via
-  // reorderFavorites (localStorage or account) on release. Pointer events
-  // cover mouse and touch alike; the grip has touch-action:none so a drag
-  // on it doesn't scroll the page, while the rest of the row still does.
-  // Move/up are listened for on window, not via pointer capture on the
-  // grip: reordering moves the row's DOM node, which drops capture
-  // mid-drag (and with it every later event on touch devices).
-  const [dragKey, setDragKey] = useState<string | null>(null);
-  const [dragOrder, setDragOrder] = useState<FavoriteLocation[] | null>(null);
-  const rowRefs = useRef(new Map<string, HTMLLIElement>());
-  const spots = dragOrder ?? savedSpots;
-
-  const latest = useRef({ dragOrder, savedSpots, reorderFavorites });
-  useEffect(() => {
-    latest.current = { dragOrder, savedSpots, reorderFavorites };
-  });
-
-  useEffect(() => {
-    if (!dragKey) return;
-
-    const onMove = (e: globalThis.PointerEvent) => {
-      const order = latest.current.dragOrder;
-      if (!order) return;
-      const from = order.findIndex((f) => favoriteKey(f) === dragKey);
-      // Target slot = how many other rows' midpoints the pointer is below.
-      let to = 0;
-      for (const f of order) {
-        const k = favoriteKey(f);
-        if (k === dragKey) continue;
-        const rect = rowRefs.current.get(k)?.getBoundingClientRect();
-        if (rect && e.clientY > rect.top + rect.height / 2) to++;
-      }
-      if (from !== -1 && to !== from) setDragOrder(moveItem(order, from, to));
-    };
-
-    const onEnd = () => {
-      const { dragOrder: order, savedSpots: saved, reorderFavorites: commit } = latest.current;
-      if (order && order.some((f, i) => favoriteKey(f) !== favoriteKey(saved[i] ?? f))) commit(order);
-      setDragKey(null);
-      setDragOrder(null);
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onEnd);
-    window.addEventListener("pointercancel", onEnd);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onEnd);
-      window.removeEventListener("pointercancel", onEnd);
-    };
-  }, [dragKey]);
-
-  function onGripPointerDown(e: PointerEvent<HTMLButtonElement>, key: string) {
-    e.preventDefault();
-    setDragKey(key);
-    setDragOrder(savedSpots);
-  }
-
-  function onGripKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const to = e.key === "ArrowUp" ? index - 1 : e.key === "ArrowDown" ? index + 1 : -1;
-    if (to < 0 || to >= savedSpots.length) return;
-    e.preventDefault();
-    reorderFavorites(moveItem(savedSpots, index, to));
-  }
+  // PERS-07: drag the ⋮⋮ grip to reorder — see lib/use-drag-reorder.ts.
+  const drag = useDragReorder(savedSpots, favoriteKey, reorderFavorites);
+  const spots = drag.ordered;
 
   // Unlike ResortList's server-fetched stats, pins aren't known until this
   // client component reads them from localStorage/the account API, so the
   // quick 12h/today/7d visual for them has to be a client-side fetch.
-  const pointsKey = spots.map((s) => pointKey(s.lat, s.lon)).join("|");
+  // Sorted, so reordering (or a live drag) doesn't refetch the same points.
+  const pointsKey = savedSpots.map((s) => pointKey(s.lat, s.lon)).sort().join("|");
 
   useEffect(() => {
     if (!pointsKey) return;
@@ -146,37 +79,16 @@ export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void })
         const key = favoriteKey(f);
         const href = `/location/pin?lat=${f.lat}&lon=${f.lon}`;
         const s = stats[pointKey(f.lat, f.lon)];
-        const dragging = key === dragKey;
+        const dragging = key === drag.dragKey;
         return (
           <li
             key={key}
-            ref={(el) => {
-              if (el) rowRefs.current.set(key, el);
-              else rowRefs.current.delete(key);
-            }}
+            ref={(el) => drag.registerRow(key, el)}
             className={`card px-4 py-3 text-sm transition-shadow ${dragging ? "relative z-10 scale-[1.02] shadow-lg ring-2 ring-primary/40" : ""}`}
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                {spots.length > 1 && (
-                  <button
-                    type="button"
-                    aria-label={`Reorder ${f.name} (drag, or use arrow keys)`}
-                    title="Drag to reorder"
-                    className="-ml-2 flex h-8 w-6 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded text-muted-foreground hover:bg-muted active:cursor-grabbing"
-                    onPointerDown={(e) => onGripPointerDown(e, key)}
-                    onKeyDown={(e) => onGripKeyDown(e, i)}
-                  >
-                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-                      <circle cx="2" cy="3" r="1.5" />
-                      <circle cx="8" cy="3" r="1.5" />
-                      <circle cx="2" cy="8" r="1.5" />
-                      <circle cx="8" cy="8" r="1.5" />
-                      <circle cx="2" cy="13" r="1.5" />
-                      <circle cx="8" cy="13" r="1.5" />
-                    </svg>
-                  </button>
-                )}
+                {spots.length > 1 && <DragGrip label={f.name} className="-ml-2" {...drag.gripProps(key, i)} />}
                 <Link href={href} className="truncate font-medium hover:text-primary">
                   {f.name}
                 </Link>

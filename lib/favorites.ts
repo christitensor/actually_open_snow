@@ -17,6 +17,7 @@ import type { FavoriteLocation, Location } from "@/lib/models/types";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import { FAVORITES_CHANGE_EVENT, FAVORITES_STORAGE_KEY } from "@/lib/favorites-storage";
 import { useAuth } from "@/lib/auth";
+import { showUndoToast } from "@/components/UndoToast";
 
 function readRaw(): string {
   if (typeof window === "undefined") return "[]";
@@ -39,6 +40,27 @@ function subscribe(callback: () => void) {
 
 function getServerSnapshot() {
   return "[]";
+}
+
+// Stable sort of `list` into the order of `keys`; anything not in `keys`
+// keeps its relative order at the end.
+function sortByKeys(list: FavoriteLocation[], keys: string[]): FavoriteLocation[] {
+  const rank = (f: FavoriteLocation) => {
+    const i = keys.indexOf(favoriteKey(f));
+    return i === -1 ? keys.length : i;
+  };
+  return [...list].sort((a, b) => rank(a) - rank(b));
+}
+
+/** POSTs to a favorites endpoint; resolves to the server's updated list, or null on any failure (the next load() reconciles). */
+async function postFavorites(url: string, body: unknown): Promise<FavoriteLocation[] | null> {
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) return null;
+    return ((await res.json()) as { favorites: FavoriteLocation[] }).favorites;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchServerFavorites(): Promise<FavoriteLocation[] | null> {
@@ -91,74 +113,72 @@ export function useFavorites() {
     [favorites]
   );
 
+  const restoreFavorite = useCallback(
+    (fav: FavoriteLocation, prevKeys: string[]) => {
+      const key = favoriteKey(fav);
+      if (signedIn) {
+        setServerFavorites((current) => (current.some((f) => favoriteKey(f) === key) ? current : sortByKeys([...current, fav], prevKeys)));
+        (async () => {
+          const added = await postFavorites("/api/favorites/toggle", { location: fav });
+          if (!added) return;
+          const next = await postFavorites("/api/favorites/reorder", { keys: sortByKeys(added, prevKeys).map(favoriteKey) });
+          setServerFavorites(next ?? added);
+        })();
+        return;
+      }
+      const current: FavoriteLocation[] = JSON.parse(readRaw());
+      if (current.some((f) => favoriteKey(f) === key)) return;
+      writeLocalFavorites(sortByKeys([...current, fav], prevKeys));
+    },
+    [signedIn]
+  );
+
   const toggleFavorite = useCallback(
     (loc: Location) => {
+      const key = favoriteKey(loc);
+      const removed = favorites.find((f) => favoriteKey(f) === key);
+      const prevKeys = favorites.map(favoriteKey);
+
       if (signedIn) {
-        const key = favoriteKey(loc);
         // Optimistic update — reconciled with the server's response below.
         setServerFavorites((current) =>
           current.some((f) => favoriteKey(f) === key)
             ? current.filter((f) => favoriteKey(f) !== key)
             : [...current, { ...loc, savedAt: new Date().toISOString() }]
         );
-        (async () => {
-          try {
-            const res = await fetch("/api/favorites/toggle", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ location: loc }),
-            });
-            if (res.ok) {
-              const body = (await res.json()) as { favorites: FavoriteLocation[] };
-              setServerFavorites(body.favorites);
-            }
-          } catch {
-            // Leave the optimistic state — next load() reconciles it.
-          }
-        })();
-        return;
+        postFavorites("/api/favorites/toggle", { location: loc }).then((next) => next && setServerFavorites(next));
+      } else {
+        const current: FavoriteLocation[] = JSON.parse(readRaw());
+        const exists = current.some((f) => favoriteKey(f) === key);
+        writeLocalFavorites(
+          exists ? current.filter((f) => favoriteKey(f) !== key) : [...current, { ...loc, savedAt: new Date().toISOString() }]
+        );
       }
 
-      const current: FavoriteLocation[] = JSON.parse(readRaw());
-      const key = favoriteKey(loc);
-      const exists = current.some((f) => favoriteKey(f) === key);
-      const next = exists
-        ? current.filter((f) => favoriteKey(f) !== key)
-        : [...current, { ...loc, savedAt: new Date().toISOString() }];
-      writeLocalFavorites(next);
+      // PERS-08: removing is one tap, so make it undoable — and restore the
+      // bookmark to the slot it had in a custom (drag-to-reorder) order.
+      if (removed) showUndoToast(`Removed ${removed.name}`, () => restoreFavorite(removed, prevKeys));
     },
-    [signedIn]
+    [signedIn, favorites, restoreFavorite]
   );
 
   // PERS-07: drag-to-reorder. `ordered` can be a subset (e.g. just the
-  // backcountry pins) — it's spliced back into the slots those items held,
-  // so the other favorites (resorts) keep their positions.
+  // backcountry pins, or just starred resorts) — it's spliced back into
+  // the slots those items held, so the other favorites keep their places.
   const reorderFavorites = useCallback(
-    (ordered: FavoriteLocation[]) => {
+    (ordered: Location[]) => {
       const merge = (current: FavoriteLocation[]): FavoriteLocation[] => {
         const subset = new Set(ordered.map(favoriteKey));
-        const queue = ordered.filter((f) => current.some((c) => favoriteKey(c) === favoriteKey(f)));
+        const queue = ordered
+          .map((o) => current.find((c) => favoriteKey(c) === favoriteKey(o)))
+          .filter((c): c is FavoriteLocation => c !== undefined);
         return current.map((c) => (subset.has(favoriteKey(c)) ? (queue.shift() ?? c) : c));
       };
 
       if (signedIn) {
         const next = merge(serverFavorites);
         setServerFavorites(next);
-        (async () => {
-          try {
-            const res = await fetch("/api/favorites/reorder", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ keys: next.map(favoriteKey) }),
-            });
-            if (res.ok) {
-              const body = (await res.json()) as { favorites: FavoriteLocation[] };
-              setServerFavorites(body.favorites);
-            }
-          } catch {
-            // Leave the optimistic order — next load() reconciles it.
-          }
-        })();
+        postFavorites("/api/favorites/reorder", { keys: next.map(favoriteKey) }).then((saved) => saved && setServerFavorites(saved));
         return;
       }
 
