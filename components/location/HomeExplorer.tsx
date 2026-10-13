@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
+import type { MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 import SkiMap, { type SkiMapHandle } from "@/components/map/SkiMap";
 import ResortList from "@/components/location/ResortList";
 import FavoritesList from "@/components/location/FavoritesList";
@@ -17,6 +18,7 @@ interface ResortRow {
   snowfallTodayIn?: number;
   last12hIn?: number;
   last7dIn?: number;
+  measured?: MeasuredSnowNearby | null;
 }
 
 function FilterPill({ active, onClick, children, href }: { active?: boolean; onClick?: () => void; children: React.ReactNode; href?: string }) {

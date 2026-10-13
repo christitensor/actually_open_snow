@@ -6,11 +6,14 @@ import { useFavorites } from "@/lib/favorites";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import { useDragReorder } from "@/lib/use-drag-reorder";
 import DragGrip from "@/components/DragGrip";
+import MeasuredSnow from "@/components/location/MeasuredSnow";
+import type { MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 
 interface QuickSnow {
   todayIn: number;
   last12hIn: number;
   last7dIn: number;
+  measured: MeasuredSnowNearby | null;
 }
 
 function fmtIn(v: number | undefined): string {
@@ -44,7 +47,7 @@ export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void })
       try {
         const res = await fetch(`/api/quick-snow?points=${encodeURIComponent(pointsKey)}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { results: { lat: number; lon: number; todayIn: number; last12hIn: number; last7dIn: number }[] };
+        const body = (await res.json()) as { results: (QuickSnow & { lat: number; lon: number })[] };
         const map: Record<string, QuickSnow> = {};
         for (const r of body.results) map[pointKey(r.lat, r.lon)] = r;
         setStats(map);
@@ -102,6 +105,7 @@ export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void })
               <span className="pill bg-muted text-muted-foreground">12h {fmtIn(s?.last12hIn)}</span>
               <span className="pill bg-muted text-muted-foreground">7d {fmtIn(s?.last7dIn)}</span>
             </div>
+            <MeasuredSnow m={s?.measured} className={spots.length > 1 ? "pl-4" : ""} />
           </li>
         );
       })}

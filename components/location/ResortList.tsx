@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
+import type { MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 import { useFavorites } from "@/lib/favorites";
 import { useDragReorder } from "@/lib/use-drag-reorder";
 import DragGrip from "@/components/DragGrip";
+import MeasuredSnow from "@/components/location/MeasuredSnow";
 import type { Location } from "@/lib/models/types";
 
 interface ResortRow {
@@ -16,6 +18,7 @@ interface ResortRow {
   snowfallTodayIn?: number;
   last12hIn?: number;
   last7dIn?: number;
+  measured?: MeasuredSnowNearby | null;
 }
 
 function toLocation(r: ResortRow): Location {
@@ -131,6 +134,7 @@ function Row({
         <div className="text-base font-bold tracking-tight">{r.name}</div>
         <div className="text-xs font-normal text-muted-foreground">{r.region}</div>
         <SnowStats r={r} />
+        <MeasuredSnow m={r.measured} />
       </Link>
       {grip && <div className="absolute top-1/2 left-1.5 -translate-y-1/2">{grip}</div>}
       <button
