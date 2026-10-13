@@ -68,7 +68,8 @@ function rowToFavorite(row: FavoriteRow): FavoriteLocation {
 export async function listFavoritesForUser(userId: number): Promise<FavoriteLocation[]> {
   const sql = await getSql();
   const rows = (await sql`
-    SELECT location_json FROM favorites WHERE user_id = ${userId} ORDER BY saved_at ASC
+    SELECT location_json FROM favorites WHERE user_id = ${userId}
+    ORDER BY sort_order ASC NULLS LAST, saved_at ASC
   `) as FavoriteRow[];
   return rows.map(rowToFavorite);
 }
@@ -90,6 +91,17 @@ export async function toggleFavoriteForUser(userId: number, location: Location):
       VALUES (${userId}, ${key}, ${JSON.stringify(favorite)}, ${favorite.savedAt})
     `;
   }
+  return listFavoritesForUser(userId);
+}
+
+/** Persists a user-chosen order: keys[i] gets sort_order i. Keys not belonging to the user are ignored. */
+export async function reorderFavoritesForUser(userId: number, keys: string[]): Promise<FavoriteLocation[]> {
+  const sql = await getSql();
+  await sql`
+    UPDATE favorites AS f SET sort_order = o.ord
+    FROM unnest(${keys}::text[]) WITH ORDINALITY AS o(key, ord)
+    WHERE f.user_id = ${userId} AND f.favorite_key = o.key
+  `;
   return listFavoritesForUser(userId);
 }
 

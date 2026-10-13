@@ -130,5 +130,42 @@ export function useFavorites() {
     [signedIn]
   );
 
-  return { favorites, isFavorite, toggleFavorite };
+  // PERS-07: drag-to-reorder. `ordered` can be a subset (e.g. just the
+  // backcountry pins) — it's spliced back into the slots those items held,
+  // so the other favorites (resorts) keep their positions.
+  const reorderFavorites = useCallback(
+    (ordered: FavoriteLocation[]) => {
+      const merge = (current: FavoriteLocation[]): FavoriteLocation[] => {
+        const subset = new Set(ordered.map(favoriteKey));
+        const queue = ordered.filter((f) => current.some((c) => favoriteKey(c) === favoriteKey(f)));
+        return current.map((c) => (subset.has(favoriteKey(c)) ? (queue.shift() ?? c) : c));
+      };
+
+      if (signedIn) {
+        const next = merge(serverFavorites);
+        setServerFavorites(next);
+        (async () => {
+          try {
+            const res = await fetch("/api/favorites/reorder", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ keys: next.map(favoriteKey) }),
+            });
+            if (res.ok) {
+              const body = (await res.json()) as { favorites: FavoriteLocation[] };
+              setServerFavorites(body.favorites);
+            }
+          } catch {
+            // Leave the optimistic order — next load() reconciles it.
+          }
+        })();
+        return;
+      }
+
+      writeLocalFavorites(merge(JSON.parse(readRaw()) as FavoriteLocation[]));
+    },
+    [signedIn, serverFavorites]
+  );
+
+  return { favorites, isFavorite, toggleFavorite, reorderFavorites };
 }

@@ -42,6 +42,10 @@ async function ensureSchema(sql: Sql): Promise<void> {
       UNIQUE(user_id, favorite_key)
     )
   `;
+  // PERS-07: user-chosen order (drag-to-reorder). NULL = never reordered,
+  // which sorts after ordered rows by saved_at — so a newly saved favorite
+  // lands at the bottom without needing a sort_order of its own.
+  await sql`ALTER TABLE favorites ADD COLUMN IF NOT EXISTS sort_order INTEGER`;
   // PERS-06: one row per (device push endpoint, location) — see lib/db/push-subscriptions.ts.
   await sql`
     CREATE TABLE IF NOT EXISTS push_subscriptions (
