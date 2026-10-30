@@ -3,7 +3,7 @@
 // `npx web-push generate-vapid-keys`). Without them, isPushConfigured is
 // false and the UI/API say so instead of pretending to subscribe.
 import webpush from "web-push";
-import { deleteAllForEndpoint, type PushKeys } from "@/lib/db/push-subscriptions";
+import { deleteAllForEndpoint, isAllowedPushEndpoint, type PushKeys } from "@/lib/db/push-subscriptions";
 
 const PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -34,6 +34,11 @@ export type SendPushResult = { sent: true } | { sent: false; gone: boolean; erro
 
 export async function sendPush(keys: PushKeys, payload: PushPayload): Promise<SendPushResult> {
   ensureConfigured();
+  // Defense in depth: rows saved before the endpoint allowlist existed are
+  // re-checked here, so the nightly cron never POSTs to a non-push host.
+  if (!isAllowedPushEndpoint(keys.endpoint)) {
+    return { sent: false, gone: false, error: "Push endpoint is not a known Web Push service" };
+  }
   try {
     await webpush.sendNotification(
       { endpoint: keys.endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } },

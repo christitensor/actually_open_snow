@@ -4,7 +4,7 @@ import { consumeMagicLinkToken } from "@/lib/auth/magic-link";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
 import { safeNextPath } from "@/lib/util/api";
 
-// PERS-04: the link target from the sign-in email. Burns the token,
+// PERS-04: the link target from the sign-in email. Checks the token,
 // creates (or reuses) the account, starts a session, and redirects home —
 // designed to be clicked, not fetched, so it returns a redirect rather
 // than JSON. `signedIn=1` on the redirect tells the client to import any
@@ -13,15 +13,24 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   const nextPath = safeNextPath(req.nextUrl.searchParams.get("next"));
 
-  const email = token ? consumeMagicLinkToken(token) : null;
-  if (!email) {
+  const failed = () => {
     const url = new URL("/", req.url);
     url.searchParams.set("signInError", "1");
     return NextResponse.redirect(url);
-  }
+  };
 
-  const user = await getOrCreateUser(email);
-  const { token: sessionToken, expiresAt } = createSession(user.id, user.email);
+  let session: ReturnType<typeof createSession>;
+  try {
+    const email = token ? consumeMagicLinkToken(token) : null;
+    if (!email) return failed();
+    const user = await getOrCreateUser(email);
+    session = createSession(user.id, user.email);
+  } catch (err) {
+    // e.g. SESSION_SECRET unset in production, or the database unreachable.
+    console.error("Magic-link sign-in failed:", err);
+    return failed();
+  }
+  const { token: sessionToken, expiresAt } = session;
 
   const url = new URL(nextPath, req.url);
   url.searchParams.set("signedIn", "1");
