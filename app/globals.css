@@ -5,6 +5,15 @@
    app/layout.tsx that sets this class before first paint. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* iPhone Duo: the unfolded inner display is ~626–669 CSS px wide depending on
+   whose point math you trust, straddling Tailwind's default 640px `sm`. Pull
+   `sm` down to 600px so both land on the same (tablet-ish) layout instead of
+   flipping between two; no regular phone portrait width (max ~440px) is
+   affected. */
+@theme {
+  --breakpoint-sm: 37.5rem;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;

@@ -101,13 +101,13 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         </div>
       )}
 
-      {/* Below lg: everything stacks full-width, map last — unchanged
-          mobile layout. At lg+: main content in a flowing left column,
+      {/* Below md: everything stacks full-width, map last — unchanged
+          mobile layout. At md+ (incl. an unfolded iPhone Duo in landscape): main content in a flowing left column,
           map pinned in a sticky right sidebar so it stays visible while
           scrolling through a long page, instead of only reachable at the
           very bottom of a stretched single column. */}
-      <div className="lg:flex lg:items-start lg:gap-6">
-        <div className="space-y-5 lg:min-w-0 lg:flex-1">
+      <div className="md:flex md:items-start md:gap-6">
+        <div className="space-y-5 md:min-w-0 md:flex-1">
           <section className="card p-4">
             <h2 className="mb-2 font-bold tracking-tight">Conditions summary</h2>
             <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
@@ -309,8 +309,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           </section>
         </div>
 
-        <aside className="mt-5 lg:mt-0 lg:w-96 lg:shrink-0">
-          <section className="card h-72 overflow-hidden lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
+        <aside className="mt-5 md:mt-0 md:w-80 md:shrink-0 lg:w-96">
+          <section className="card h-72 overflow-hidden md:sticky md:top-20 md:h-[calc(100dvh-7rem)]">
             <SkiMap
               resorts={resorts}
               webcams={allWebcams}

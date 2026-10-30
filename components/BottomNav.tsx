@@ -5,16 +5,18 @@ import { usePathname } from "next/navigation";
 import { NAV_TABS } from "@/lib/nav-tabs";
 
 // Mobile-app-style bottom tab bar — the primary nav surface on phone/iPad.
-// Hidden at sm+ in favor of HeaderNav's inline links (a fixed bottom bar
+// Hidden at md+ in favor of HeaderNav's inline links (a fixed bottom bar
 // reads as a mobile-only pattern; on desktop it just floated over content
-// with nothing to justify the persistent chrome). Fixed + safe-area
+// with nothing to justify the persistent chrome). Kept through sm so the
+// iPhone Duo's unfolded inner display — held two-handed — still gets thumb-
+// reachable tabs instead of top links. Fixed + safe-area
 // padding for the iOS home indicator.
 export default function BottomNav() {
   const pathname = usePathname();
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-border sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-border md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {/* Backdrop-filter on the same element as the tappable links can eat
