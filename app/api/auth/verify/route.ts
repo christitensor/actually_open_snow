@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSession, getOrCreateUser } from "@/lib/db/users";
 import { consumeMagicLinkToken } from "@/lib/auth/magic-link";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
+import { safeNextPath } from "@/lib/util/api";
 
 // PERS-04: the link target from the sign-in email. Burns the token,
 // creates (or reuses) the account, starts a session, and redirects home —
@@ -10,8 +11,7 @@ import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
 // localStorage favorites into the new account (see lib/auth.tsx).
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
-  const next = req.nextUrl.searchParams.get("next");
-  const nextPath = next && next.startsWith("/") ? next : "/";
+  const nextPath = safeNextPath(req.nextUrl.searchParams.get("next"));
 
   const email = token ? consumeMagicLinkToken(token) : null;
   if (!email) {

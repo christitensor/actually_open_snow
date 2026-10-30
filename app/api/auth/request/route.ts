@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMagicLinkToken, currentMagicLinkCode } from "@/lib/auth/magic-link";
 import { sendEmail } from "@/lib/email";
-import { badRequest, serverError } from "@/lib/util/api";
+import { badRequest, safeNextPath, serverError } from "@/lib/util/api";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const { email, next } = body as Record<string, unknown>;
   if (typeof email !== "string" || !EMAIL_RE.test(email)) return badRequest("A valid email is required");
-  const nextPath = typeof next === "string" && next.startsWith("/") ? next : "/";
+  const nextPath = safeNextPath(next);
 
   try {
     const { token } = createMagicLinkToken(email);

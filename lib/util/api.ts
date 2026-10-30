@@ -16,3 +16,21 @@ export function serverError(err: unknown) {
   const message = err instanceof Error ? err.message : "Unknown error";
   return NextResponse.json({ error: message }, { status: 502 });
 }
+
+/**
+ * A same-origin path to send the user to after sign-in, or "/" if `next`
+ * isn't one. A plain startsWith("/") check isn't enough: "//evil.com",
+ * "/\evil.com" and "/\t/evil.com" all start with "/" yet resolve to another
+ * host, turning the sign-in redirect into an open redirect.
+ */
+export function safeNextPath(next: unknown): string {
+  if (typeof next !== "string" || !next.startsWith("/")) return "/";
+  try {
+    const base = "http://same-origin.invalid";
+    const url = new URL(next, base);
+    if (url.origin !== base) return "/";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
+}
