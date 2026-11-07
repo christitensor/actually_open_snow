@@ -21,12 +21,19 @@ export interface Location {
 export interface Resort {
   id: string;
   name: string;
-  region: "Northern Utah" | "Southeast Idaho";
+  /** "Northern Utah"/"Southeast Idaho" for curated resorts; state/province (e.g. "Wyoming") for catalog ski areas */
+  region: string;
   lat: number;
   lon: number;
   baseElevationFt: number;
   midElevationFt?: number;
   summitElevationFt: number;
+  /** Resort's own website — catalog ski areas only (data/ski-areas.json); used to auto-discover webcams */
+  website?: string;
+  /** Two-letter state/province code — catalog ski areas only */
+  state?: string;
+  /** true for the hand-curated resorts in data/resorts.json (verified webcams, snow reports, home-page list) */
+  curated?: boolean;
 }
 
 export interface HourlyForecastPoint {

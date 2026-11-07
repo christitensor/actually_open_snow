@@ -312,7 +312,9 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       // Same outcome as clicking that resort's pin: select it in the list
       // (home page) or open its forecast (everywhere else).
       map.flyTo({ center: [pick.resort.lon, pick.resort.lat], zoom: Math.max(map.getZoom(), 11) });
-      if (onResortSelect) onResortSelect(pick.resort.id);
+      // Catalog ski areas (anywhere in the US/Canada) aren't in the home
+      // page's list to select, so they always open their resort page.
+      if (onResortSelect && pick.resort.curated !== false) onResortSelect(pick.resort.id);
       else router.push(`/location/${pick.resort.id}`);
       return;
     }

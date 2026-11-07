@@ -8,6 +8,7 @@ See `TRACE_MATRIX.md` for the full feature inventory and build status, and `ARCH
 
 - Real forecasts (Open-Meteo), snow level by elevation (NWS `snowLevel` gridpoint field), severe weather alerts (NWS), avalanche forecasts (avalanche.org), nearby SNOTEL snowpack readings, air quality, historical lookback, and a multi-source corroborated conditions summary that reconciles NOAA's own forecaster-written discussion against the model spread.
 - A map with resort pins (colored by today's forecast snow — Powder Finder), live webcam snapshots, current radar, an OpenStreetMap piste overlay, and — the backcountry feature — **click anywhere to drop a pin** and get the exact same forecast/avalanche/snow-level pipeline as a curated resort. A dedicated `/webcams` page shows live images with auto-refresh.
+- **Search any ski resort in the US or Canada** (~750, from OpenSkiMap/OpenStreetMap — `data/ski-areas.json`, rebuilt by `scripts/build-ski-areas.mjs`) and get the same full resort page as the curated ones. Their webcams are auto-discovered from the resort's own website (`lib/data-sources/webcam-discovery.ts`: HD Relay, YouTube, CamStreamer, Roundshot, plain JPEG snapshots, …); sites behind bot walls fall back to a link.
 - Favorites (resorts or dropped pins), stored locally by default — sign in with just an email (magic link, no password) to sync them across devices instead.
 - Email snow alerts: subscribe by email + location + threshold, no login — see "Environment variables" below to actually enable delivery.
 
@@ -44,7 +45,7 @@ npx eslint .                      # lint
 - `lib/db/`, `lib/email.ts`, `lib/alerts/` — the alert-subscription backend (SQLite storage, pluggable email, threshold checking)
 - `lib/location-dashboard.ts` — orchestrates every source into one payload for a location page
 - `components/` — map (MapLibre), location dashboard, and webcam grid UI
-- `data/` — curated seed data (resorts, webcams)
+- `data/` — curated seed data (resorts, webcams) plus the full US/Canada ski-area catalog (`ski-areas.json`, © OpenStreetMap contributors / OpenSkiMap, ODbL)
 
 ## Status
 

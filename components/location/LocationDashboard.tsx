@@ -6,8 +6,9 @@ import ForecastDiscussion from "@/components/location/ForecastDiscussion";
 import DangerRose from "@/components/location/DangerRose";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
+import DiscoveredWebcams from "@/components/webcams/DiscoveredWebcams";
 import SkiMap from "@/components/map/SkiMap";
-import { resorts } from "@/data/resorts";
+import { getResortById, resorts } from "@/data/resorts";
 import { webcams as allWebcams } from "@/data/webcams";
 import { degToCompass } from "@/lib/util/wind";
 
@@ -70,6 +71,10 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
 
   const currentSnowLevelFt = snowLevel.points[0]?.snowLevelFt ?? snowLevel.points[0]?.freezingLevelFt ?? null;
   const resortWebcams = location.resortId ? allWebcams.filter((w) => w.resortId === location.resortId) : [];
+  const resort = location.resortId ? getResortById(location.resortId) : undefined;
+  // Catalog ski areas (not hand-curated) get their webcams auto-discovered
+  // from the resort's own website instead of data/webcams.json.
+  const discoverWebcams = resort != null && !resort.curated && resortWebcams.length === 0;
 
   // Next-24-hours can span into tomorrow — surface sunrise/sunset for
   // every calendar day the window actually covers, not just today's.
@@ -87,6 +92,19 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             {elevationFt != null ? ` · ${elevationFt.toLocaleString()} ft` : ""}
             {location.source === "pin" ? " · Backcountry pin" : ""}
           </p>
+          {resort && (
+            <p className="text-sm text-muted-foreground">
+              {resort.region} · {resort.baseElevationFt.toLocaleString()}–{resort.summitElevationFt.toLocaleString()} ft
+              {resort.website && (
+                <>
+                  {" · "}
+                  <a href={resort.website} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
+                    Website ↗
+                  </a>
+                </>
+              )}
+            </p>
+          )}
         </div>
         <FavoriteButton location={location} />
       </header>
@@ -190,6 +208,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               <WebcamGrid webcams={resortWebcams} />
             </section>
           )}
+          {discoverWebcams && <DiscoveredWebcams resortId={resort.id} resortName={resort.name} />}
 
           {multiModelTodaySnowfallIn && (
             <section className="card p-4">

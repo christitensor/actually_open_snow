@@ -76,6 +76,7 @@ export interface LocationDashboardData {
 }
 
 const HOURLY_DISPLAY_HOURS = 24;
+const MAX_SNOTEL_MILES = 40;
 const PAST_DAYS_LOOKBACK = 15; // matches the Snow Summary timeline's "Prev 11-15 Days" bucket
 
 export async function getLocationDashboardData(location: Location): Promise<LocationDashboardData> {
@@ -98,7 +99,10 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
         .then((layer) => findZoneForPoint(layer, lat, lon))
         .catch(() => null),
       findNearbyStations(lat, lon, 1)
-        .then((stations) => (stations[0] ? getLatestReading(stations[0]) : null))
+        // SNOTEL lookups only cover UT/ID (snotel.ts), so a resort elsewhere
+        // (any ski area opened via search) would otherwise get a station
+        // hundreds of miles away presented as "nearest" — drop far ones.
+        .then((stations) => (stations[0] && stations[0].distanceMi <= MAX_SNOTEL_MILES ? getLatestReading(stations[0]) : null))
         .catch(() => null),
       getNearbyStations(lat, lon).catch(() => [] as NwsStation[]),
       getAirQuality(lat, lon).catch(() => null),

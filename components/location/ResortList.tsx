@@ -199,7 +199,16 @@ export default function ResortList({
   const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
   const sortMode = useSyncExternalStore(subscribeSortMode, readSortMode, () => "snow" as SortMode);
 
-  const visible = favoritesOnly ? resorts.filter((r) => isFavorite(toLocation(r))) : resorts;
+  // Starred resorts from outside the curated list (any ski area opened via
+  // search) still belong at the top — shown from the saved favorite, just
+  // without the batched snow numbers the curated rows get server-side.
+  const starredElsewhere: ResortRow[] = favorites.flatMap((f) =>
+    f.source === "resort" && f.resortId && !resorts.some((r) => r.id === f.resortId)
+      ? [{ id: f.resortId, name: f.name, region: "Saved resort", lat: f.lat, lon: f.lon }]
+      : []
+  );
+  const allRows = starredElsewhere.length ? [...resorts, ...starredElsewhere] : resorts;
+  const visible = favoritesOnly ? allRows.filter((r) => isFavorite(toLocation(r))) : allRows;
   const topBySnow = visible.filter((r) => primaryIds.includes(r.id) || isFavorite(toLocation(r))).sort(bySnowDesc);
 
   // "My order": starred resorts first in your saved order (draggable),

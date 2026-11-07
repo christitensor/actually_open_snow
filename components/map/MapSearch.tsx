@@ -24,6 +24,54 @@ export interface SearchableResort {
   name: string;
   lat: number;
   lon: number;
+  /** State/province, shown next to catalog ski areas so same-named hills are distinguishable */
+  region?: string;
+  /** false for catalog ski areas (data/ski-areas.json); undefined/true for the curated set */
+  curated?: boolean;
+}
+
+// Every ski area in the US/Canada (curated + OpenSkiMap catalog), fetched
+// once on first focus — see app/api/ski-areas/route.ts. Module-level so
+// it's shared by every search box and survives remounts.
+let catalogPromise: Promise<SearchableResort[]> | null = null;
+function loadCatalog(): Promise<SearchableResort[]> {
+  catalogPromise ??= fetch("/api/ski-areas")
+    .then((r) => (r.ok ? (r.json() as Promise<SearchableResort[]>) : []))
+    .catch(() => {
+      catalogPromise = null; // let a later focus retry
+      return [];
+    });
+  return catalogPromise;
+}
+
+// "Snowbasin Resort", "mount bachelor", "Jackson Hole ski area" should all
+// find the resort: compare on normalized tokens, ignoring generic words.
+const GENERIC = new Set(["resort", "resorts", "ski", "skiing", "area", "the", "and", "of", "at", "snow"]);
+const SYNONYM: Record<string, string> = { mount: "mt", saint: "st", mtn: "mountain" };
+function tokens(s: string): string[] {
+  return s
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((t) => t && !GENERIC.has(t))
+    .map((t) => SYNONYM[t] ?? t);
+}
+
+/** 0 = no match; higher = better. Every query token must prefix-match a name token. */
+export function resortMatchScore(query: string, name: string): number {
+  const q = tokens(query);
+  const n = tokens(name);
+  if (q.length === 0 || n.length === 0) return 0;
+  let score = 0;
+  for (const qt of q) {
+    const i = n.findIndex((nt) => nt.startsWith(qt));
+    if (i === -1) return 0;
+    score += n[i] === qt ? 3 : 2;
+    if (i === 0) score += 1;
+  }
+  return score - n.length * 0.1; // tighter names win ties ("Alta" over "Alta Lake")
 }
 
 export type SearchPick =
@@ -51,6 +99,27 @@ function parseCoords(text: string): { lat: number; lon: number } | null {
   return { lat, lon };
 }
 
+function distKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const r = Math.PI / 180;
+  const x = (bLon - aLon) * r * Math.cos(((aLat + bLat) / 2) * r);
+  const y = (bLat - aLat) * r;
+  return Math.sqrt(x * x + y * y) * 6371;
+}
+
+/** A known ski area the geocoded place sits on — only when the label reads like that resort, so a town that merely neighbors one still flies to the town. */
+function nearbySkiArea(list: SearchableResort[], label: string, lat: number, lon: number): SearchableResort | null {
+  const placeName = label.split(",")[0];
+  let best: { r: SearchableResort; d: number } | null = null;
+  for (const r of list) {
+    const d = distKm(lat, lon, r.lat, r.lon);
+    if (d > 5) continue;
+    const named = resortMatchScore(placeName, r.name) > 0 || resortMatchScore(r.name, placeName) > 0;
+    if (!named && !(d < 2 && /\b(ski|resort|basin|bowl)\b/i.test(placeName))) continue;
+    if (!best || d < best.d) best = { r, d };
+  }
+  return best?.r ?? null;
+}
+
 interface MapSearchProps {
   resorts: SearchableResort[];
   /** Current map center, read lazily at query time to bias geocoder results. */
@@ -60,6 +129,7 @@ interface MapSearchProps {
 
 export default function MapSearch({ resorts, getBias, onPick }: MapSearchProps) {
   const [query, setQuery] = useState("");
+  const [catalog, setCatalog] = useState<SearchableResort[]>([]);
   const [open, setOpen] = useState(false);
   // Results are tagged with the query they answer, so stale ones (from a
   // since-edited query) are simply ignored at render time instead of
@@ -74,12 +144,17 @@ export default function MapSearch({ resorts, getBias, onPick }: MapSearchProps) 
   const trimmed = query.trim();
   const coords = parseCoords(trimmed);
   const lower = trimmed.toLowerCase();
+  // Curated resorts (the map's own pins) first, then the full catalog —
+  // de-duplicated by id, since the catalog list includes the curated set.
+  const searchable = [...resorts, ...catalog.filter((c) => !resorts.some((r) => r.id === c.id))];
   const resortMatches: Suggestion[] =
     lower.length >= 2
-      ? resorts
-          .filter((r) => r.name.toLowerCase().includes(lower))
-          .slice(0, 4)
-          .map((r) => ({ kind: "resort", key: `resort:${r.id}`, label: r.name, resort: r }))
+      ? searchable
+          .map((r) => ({ r, score: resortMatchScore(trimmed, r.name) || (r.name.toLowerCase().includes(lower) ? 1 : 0) }))
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+          .map(({ r }) => ({ kind: "resort", key: `resort:${r.id}`, label: r.region && r.curated === false ? `${r.name}, ${r.region}` : r.name, resort: r }))
       : [];
   const suggestions: Suggestion[] = [
     ...(coords
@@ -156,13 +231,21 @@ export default function MapSearch({ resorts, getBias, onPick }: MapSearchProps) 
           setError("Couldn't find that place.");
           return;
         }
-        onPick({
-          kind: "place",
-          label: s.label,
-          lat: c.location.y,
-          lon: c.location.x,
-          bbox: c.extent ? [c.extent.xmin, c.extent.ymin, c.extent.xmax, c.extent.ymax] : undefined,
-        });
+        // The geocoder knows ski resorts as places too ("Big Sky Resort,
+        // MT") — when its answer is a known ski area, open the full resort
+        // page (webcams and all) instead of just dropping a map marker.
+        const skiArea = nearbySkiArea(searchable, s.label, c.location.y, c.location.x);
+        if (skiArea) {
+          onPick({ kind: "resort", resort: skiArea });
+        } else {
+          onPick({
+            kind: "place",
+            label: s.label,
+            lat: c.location.y,
+            lon: c.location.x,
+            bbox: c.extent ? [c.extent.xmin, c.extent.ymin, c.extent.xmax, c.extent.ymax] : undefined,
+          });
+        }
       } catch {
         setError("Place search is unavailable right now.");
         return;
@@ -226,7 +309,12 @@ export default function MapSearch({ resorts, getBias, onPick }: MapSearchProps) 
             setActiveIndex(-1);
             setError(null);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            void loadCatalog().then((list) => {
+              if (list.length) setCatalog(list);
+            });
+          }}
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
         />
