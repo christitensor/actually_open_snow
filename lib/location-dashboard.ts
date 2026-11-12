@@ -27,6 +27,7 @@ import { estimateDailyPowderQuality } from "@/lib/derive/powder-quality";
 import { estimateTrailConditions, type TrailConditionsEstimate } from "@/lib/derive/trail-conditions";
 import { wetBulbF } from "@/lib/derive/wet-bulb";
 import { buildConditionsSummary } from "@/lib/derive/conditions-summary";
+import { getElevationModelInputs } from "@/lib/elevation-model";
 import type {
   AfdProduct,
   AirQuality,
@@ -34,6 +35,7 @@ import type {
   AvalancheZone,
   ConditionsSummary,
   DailySnowLine,
+  ElevationModelInputs,
   ForecastResponse,
   HistoricalDay,
   KeyStationReading,
@@ -52,6 +54,8 @@ export interface LocationDashboardData {
   snowLineStatus: ElevationVsSnowLine;
   /** FC-10: one afternoon snow-line estimate per day in `forecast.daily`, same order/length */
   dailySnowLines: DailySnowLine[];
+  /** FC-10-adj: inputs for the forecast table's elevation model (NWS + Open-Meteo + SNOTEL gradient); null if gathering them failed, in which case the table shows Open-Meteo's daily numbers unadjusted. */
+  elevationModel: ElevationModelInputs | null;
   powderQualityToday: ReturnType<typeof estimateDailyPowderQuality>;
   trailConditions: TrailConditionsEstimate | null;
   wetBulbNowF: number | null;
@@ -87,7 +91,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
   // parallel with forecast the way the other independent sources can.
   const forecast = await getForecast(lat, lon);
 
-  const [elevationResult, snowLevel, alerts, avalancheZoneResult, snotelResult, nwsStations, airQuality, recentWindow] =
+  const [elevationResult, snowLevel, alerts, avalancheZoneResult, snotelResult, nwsStations, airQuality, recentWindow, elevationModel] =
     await Promise.all([
       location.elevationFt != null
         ? Promise.resolve({ elevationFt: location.elevationFt })
@@ -103,6 +107,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
       getNearbyStations(lat, lon).catch(() => [] as NwsStation[]),
       getAirQuality(lat, lon).catch(() => null),
       getRecentHourlyWindow(lat, lon).catch(() => []),
+      getElevationModelInputs(lat, lon, forecast).catch(() => null),
     ]);
 
   const today = new Date();
@@ -171,6 +176,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     snowLevel,
     snowLineStatus: elevationFt != null ? elevationVsSnowLine(elevationFt, latestSnowLevelPoint) : "unknown",
     dailySnowLines: computeDailySnowLines(forecast.daily, forecast.hourly, snowLevel.points, forecast.utcOffsetSeconds),
+    elevationModel,
     powderQualityToday: estimateDailyPowderQuality(todaysHours),
     trailConditions: estimateTrailConditions(recentWindow),
     wetBulbNowF,

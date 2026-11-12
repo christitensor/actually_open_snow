@@ -2,7 +2,7 @@
 // descriptive User-Agent per NWS API policy. US coverage only.
 // Backs SEV-01 (alerts), FC-10 (snowLevel gridpoint field), DATA-01 (stations).
 
-import type { NwsAlert, SnowLevelPoint } from "@/lib/models/types";
+import type { NwsAlert, NwsPrecipForecast, NwsPrecipPeriod, SnowLevelPoint } from "@/lib/models/types";
 
 const BASE = "https://api.weather.gov";
 
@@ -62,10 +62,84 @@ interface GridpointValue {
   value: number | null;
 }
 
+interface GridpointLayer {
+  uom: string;
+  values: GridpointValue[];
+}
+
 interface GridpointResponse {
   properties: {
-    snowLevel?: { uom: string; values: GridpointValue[] };
+    elevation?: { unitCode: string; value: number };
+    snowLevel?: GridpointLayer;
+    quantitativePrecipitation?: GridpointLayer;
+    snowfallAmount?: GridpointLayer;
+    temperature?: GridpointLayer;
   };
+}
+
+/** "2026-01-01T00:00:00+00:00/PT6H" -> [startMs, endMs]. Durations seen live: PT1H..PT12H, P1D, P1DT6H. */
+function parseValidTime(validTime: string): [number, number] {
+  const [start, duration] = validTime.split("/");
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$/.exec(duration ?? "");
+  const hours = m ? Number(m[1] ?? 0) * 24 + Number(m[2] ?? 0) + Number(m[3] ?? 0) / 60 : 1;
+  const startMs = new Date(start).getTime();
+  return [startMs, startMs + hours * 3600_000];
+}
+
+/** Time-weighted mean of a gridpoint layer over [fromMs, toMs); null if the layer doesn't cover any of it. */
+function meanOver(layer: GridpointLayer | undefined, fromMs: number, toMs: number): number | null {
+  let weighted = 0;
+  let covered = 0;
+  for (const v of layer?.values ?? []) {
+    if (v.value == null) continue;
+    const [s, e] = parseValidTime(v.validTime);
+    const overlap = Math.min(e, toMs) - Math.max(s, fromMs);
+    if (overlap > 0) {
+      weighted += v.value * overlap;
+      covered += overlap;
+    }
+  }
+  return covered > 0 ? weighted / covered : null;
+}
+
+const MM_PER_IN = 25.4;
+const cToF = (c: number) => (c * 9) / 5 + 32;
+
+/**
+ * FC-10-adj primary source for days ~1-7: NWS gridpoint QPF + snowfall +
+ * temperature + snow level, as 6h periods at the NWS grid cell's own
+ * elevation (returned too — the slider adjusts from *that* elevation, not
+ * the resort base). This is the same data behind NOAA's point forecasts,
+ * which run a higher, temperature-dependent snow ratio than Open-Meteo's
+ * flat ~7:1. Same gridpoint URL as getSnowLevel(), so Next's fetch cache
+ * serves both from one request (~180KB, under the 2MB cache ceiling).
+ */
+export async function getNwsPrecipForecast(lat: number, lon: number): Promise<NwsPrecipForecast> {
+  const meta = await getPointMeta(lat, lon);
+  const { properties: p } = await fetchJson<GridpointResponse>(meta.forecastGridDataUrl);
+  if (!p.elevation || !p.quantitativePrecipitation) throw new Error("NWS gridpoint response missing elevation/QPF");
+
+  const elevM = p.elevation.unitCode.endsWith(":ft") ? p.elevation.value / 3.28084 : p.elevation.value;
+  const snowByValidTime = new Map((p.snowfallAmount?.values ?? []).map((v) => [v.validTime, v.value]));
+
+  const periods: NwsPrecipPeriod[] = p.quantitativePrecipitation.values
+    .filter((v) => v.value != null)
+    .map((v) => {
+      const [startMs, endMs] = parseValidTime(v.validTime);
+      const snowMm = snowByValidTime.get(v.validTime);
+      const tempC = meanOver(p.temperature, startMs, endMs);
+      const snowLevelM = meanOver(p.snowLevel, startMs, endMs);
+      return {
+        startMs,
+        hours: Math.round((endMs - startMs) / 3600_000),
+        qpfIn: (v.value as number) / MM_PER_IN,
+        snowIn: snowMm != null ? snowMm / MM_PER_IN : null,
+        tempF: tempC != null ? cToF(tempC) : null,
+        snowLevelFt: snowLevelM != null ? snowLevelM * 3.28084 : null,
+      };
+    });
+
+  return { gridElevationFt: Math.round(elevM * 3.28084), periods };
 }
 
 /**
