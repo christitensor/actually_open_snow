@@ -137,7 +137,13 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             />
           </section>
 
-          <ForecastTable location={location} elevationFt={elevationFt} dailyForecast={forecast.daily} dailySnowLines={dailySnowLines} />
+          <ForecastTable
+            location={location}
+            elevationFt={elevationFt}
+            dailyForecast={forecast.daily}
+            dailySnowLines={dailySnowLines}
+            elevationModel={data.elevationModel}
+          />
 
           {upcomingHours.length > 0 && (
             <section className="card p-4">

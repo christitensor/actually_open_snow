@@ -5,7 +5,6 @@
 import type {
   AirQuality,
   DailyForecastDay,
-  ElevationAdjustedDay,
   ElevationResponse,
   ForecastResponse,
   HistoricalDay,
@@ -44,6 +43,8 @@ const DAILY_PARAMS = [
 
 interface OpenMeteoForecastRaw {
   utc_offset_seconds: number;
+  /** meters — the elevation the point forecast was downscaled to (Open-Meteo's own DEM when no override is passed) */
+  elevation: number;
   hourly: {
     time: string[];
     temperature_2m: number[];
@@ -149,6 +150,7 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     hourly,
     daily,
     source: "open-meteo",
+    modelElevationFt: Math.round(raw.elevation * 3.28084),
     utcOffsetSeconds: raw.utc_offset_seconds,
   };
 }
@@ -164,43 +166,6 @@ export async function getElevation(lat: number, lon: number): Promise<ElevationR
     elevationFt: Math.round(meters * 3.28084),
     source: "open-meteo-elevation",
   };
-}
-
-/**
- * FC-10-adj: re-requests the daily forecast with Open-Meteo's `elevation`
- * override, which downscales temperature (and, live-verified, precipitation
- * too — not just a lapse-rate-on-temperature trick) to a specific elevation
- * rather than the weather model's native grid elevation. Backs the
- * elevation-adjuster slider (components/location/ElevationAdjuster.tsx) —
- * deliberately a narrow daily-only request (no hourly, 7 days) since it's
- * refetched on every slider move.
- */
-export async function getElevationAdjustedDaily(
-  lat: number,
-  lon: number,
-  elevationM: number
-): Promise<ElevationAdjustedDay[]> {
-  const url =
-    `${FORECAST_BASE}?latitude=${lat}&longitude=${lon}&elevation=${elevationM}` +
-    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum` +
-    `&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=14`;
-  const raw = await fetchJson<{
-    daily: {
-      time: string[];
-      temperature_2m_max: number[];
-      temperature_2m_min: number[];
-      precipitation_sum: number[];
-      snowfall_sum: number[];
-    };
-  }>(url);
-
-  return raw.daily.time.map((date, i) => ({
-    date,
-    tempMaxF: raw.daily.temperature_2m_max[i],
-    tempMinF: raw.daily.temperature_2m_min[i],
-    precipitationSumIn: raw.daily.precipitation_sum[i],
-    snowfallSumIn: raw.daily.snowfall_sum[i],
-  }));
 }
 
 /**

@@ -11,7 +11,8 @@
 // work) — there is no `durationCount`/`periodRef=END` shortcut.
 
 import { haversineMiles } from "@/lib/util/geo";
-import type { SnotelReading, SnotelStation } from "@/lib/models/types";
+import type { PrecipGradient, SnotelReading, SnotelStation } from "@/lib/models/types";
+import { defaultPrecipGradient, fitPrecipGradient, type GradientStation } from "@/lib/derive/precip-gradient";
 
 const BASE = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
 
@@ -304,4 +305,67 @@ export async function getMeasuredSnowNearPoints(
       readingAt: new Date(latest.t).toISOString(),
     };
   });
+}
+
+const GRADIENT_RADIUS_MI = 20;
+const GRADIENT_MAX_STATIONS = 12;
+const GRADIENT_YEARS = 10;
+/** Newer stations with only a few (possibly unusually wet/dry) years would skew a mean-precip comparison. */
+const GRADIENT_MIN_YEARS = 7;
+const gradientCache = new Map<string, { at: number; gradient: Promise<PrecipGradient> }>();
+const GRADIENT_TTL_MS = 24 * 3600 * 1000;
+
+/**
+ * FC-10-adj: SNOTEL-calibrated precip-vs-elevation gradient around a
+ * point (see lib/derive/precip-gradient.ts for the method and caveats).
+ * Uses the AWDB WATER_YEAR duration for PREC (accumulated water-year
+ * precip) — one value per station per year, confirmed live — averaged
+ * over the last ~10 complete water years. Falls back to the default
+ * gradient outside Phase 1's UT/ID coverage or when too few stations
+ * qualify. Cached per ~1km cell for a day: these totals change once a year.
+ */
+export function getPrecipGradient(lat: number, lon: number, now = new Date()): Promise<PrecipGradient> {
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  const hit = gradientCache.get(key);
+  if (hit && Date.now() - hit.at < GRADIENT_TTL_MS) return hit.gradient;
+  const gradient = getPrecipGradientUncached(lat, lon, now).catch(() => {
+    gradientCache.delete(key);
+    return defaultPrecipGradient();
+  });
+  gradientCache.set(key, { at: Date.now(), gradient });
+  return gradient;
+}
+
+async function getPrecipGradientUncached(lat: number, lon: number, now: Date): Promise<PrecipGradient> {
+  const all = await fetchPhase1Stations();
+  const nearby = all
+    .map((s) => ({ s, distanceMi: haversineMiles(lat, lon, s.latitude, s.longitude) }))
+    .filter((n) => n.distanceMi <= GRADIENT_RADIUS_MI)
+    .sort((a, b) => a.distanceMi - b.distanceMi)
+    .slice(0, GRADIENT_MAX_STATIONS);
+  if (nearby.length === 0) return defaultPrecipGradient();
+
+  // Water year N runs Oct 1 (N-1) - Sep 30 N; only use complete ones.
+  const lastCompleteWy = now.getUTCMonth() >= 9 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const firstWy = lastCompleteWy - GRADIENT_YEARS + 1;
+  const triplets = nearby.map((n) => n.s.stationTriplet).join(",");
+  const url =
+    `${BASE}/data?stationTriplets=${triplets}&elements=PREC&duration=WATER_YEAR` +
+    `&beginDate=${firstWy - 1}-10-01&endDate=${lastCompleteWy}-09-30`;
+  const res = await fetch(url, { next: { revalidate: 86400 } });
+  if (!res.ok) throw new Error(`SNOTEL water-year request failed (${res.status})`);
+  const raw = (await res.json()) as {
+    stationTriplet: string;
+    data: { values: { year: number; value: number | null }[] }[];
+  }[];
+  const byTriplet = new Map(raw.map((r) => [r.stationTriplet, r]));
+
+  const stations: GradientStation[] = nearby.flatMap(({ s, distanceMi }) => {
+    const years = (byTriplet.get(s.stationTriplet)?.data[0]?.values ?? []).filter(
+      (v): v is { year: number; value: number } => v.value != null && v.value > 0 && v.year >= firstWy && v.year <= lastCompleteWy
+    );
+    if (years.length < GRADIENT_MIN_YEARS) return [];
+    return [{ elevationFt: s.elevation, meanPrecipIn: years.reduce((a, v) => a + v.value, 0) / years.length, distanceMi }];
+  });
+  return fitPrecipGradient(stations);
 }

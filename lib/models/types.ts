@@ -57,13 +57,57 @@ export interface DailyForecastDay {
   sunset: string;
 }
 
-/** A lightweight, elevation-overridden daily forecast — see FC-10-adj (elevation adjuster). Not the full ForecastResponse: no hourly block, no wind. */
+/** One day of the elevation-adjusted forecast (FC-10-adj), produced by lib/derive/elevation-snow.ts. Not the full ForecastResponse: no hourly block, no wind. */
 export interface ElevationAdjustedDay {
   date: string;
   tempMaxF: number;
   tempMinF: number;
   precipitationSumIn: number;
   snowfallSumIn: number;
+  /** Which forecast the day's precip/snow came from: NWS gridpoint (days ~1-7), Open-Meteo (beyond NWS range / outside the US), or both (the day NWS coverage ends). */
+  precipSource: "nws" | "open-meteo" | "mixed";
+}
+
+/** One NWS gridpoint QPF period (usually 6h), with the matching snow/temp/snow-level forecasts averaged over it. All values are for the NWS grid cell's own elevation. */
+export interface NwsPrecipPeriod {
+  /** UTC epoch ms */
+  startMs: number;
+  hours: number;
+  qpfIn: number;
+  /** null when NWS has no snowfallAmount for this period (its snow grid usually ends one period before QPF). */
+  snowIn: number | null;
+  tempF: number | null;
+  snowLevelFt: number | null;
+}
+
+export interface NwsPrecipForecast {
+  /** Elevation of the NWS 2.5km grid cell the forecast is valid for — not the resort's base. */
+  gridElevationFt: number;
+  periods: NwsPrecipPeriod[];
+}
+
+/** FC-10-adj: how much more liquid precip falls per 1,000 ft of elevation gain, calibrated against nearby SNOTEL gauges. */
+export interface PrecipGradient {
+  /** Fraction, e.g. 0.08 = +8% per 1,000 ft. What the model actually uses. */
+  perKft: number;
+  source: "snotel" | "default";
+  /** Raw regression result before blending with the default, when a fit was possible. */
+  fitPerKft: number | null;
+  /** Weighted r² of the fit — how much of the station-to-station difference elevation explains. */
+  r2: number | null;
+  stationCount: number;
+}
+
+/** Everything the elevation slider needs, fetched once per page so the slider can recompute in the browser with no extra requests. */
+export interface ElevationModelInputs {
+  utcOffsetSeconds: number;
+  openMeteo: {
+    /** Elevation Open-Meteo downscaled its point forecast to (its own DEM at the lat/lon). */
+    refElevationFt: number;
+    hourly: { time: string; temperatureF: number; precipitationIn: number; freezingLevelFt: number }[];
+  };
+  nws: NwsPrecipForecast | null;
+  gradient: PrecipGradient;
 }
 
 export interface ForecastResponse {
@@ -72,6 +116,8 @@ export interface ForecastResponse {
   hourly: HourlyForecastPoint[];
   daily: DailyForecastDay[];
   source: "open-meteo";
+  /** Elevation (ft) Open-Meteo downscaled this point forecast to — its own terrain model at the lat/lon, which can differ from a resort's listed base. */
+  modelElevationFt: number;
   /** Seconds east of UTC for this location (e.g. -21600 for MDT) — lets callers build a correct absolute timestamp from a local wall-clock string, since `hourly`/`daily` times carry no offset of their own (Open-Meteo's `timezone=auto`). */
   utcOffsetSeconds: number;
 }
