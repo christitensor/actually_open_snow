@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import type { DailyForecastDay, DailySnowLine, ElevationModelInputs, Location } from "@/lib/models/types";
 import { computeElevationForecast } from "@/lib/derive/elevation-snow";
 import { degToCompass } from "@/lib/util/wind";
+import { describeWeather } from "@/lib/util/weather-code";
+import Section from "@/components/ui/Section";
 
 // FC-10 + FC-10-adj: the 14-day forecast table, with an elevation slider
 // that recalculates High/Low, New snow, and Precip for the whole forecast.
@@ -61,13 +63,16 @@ export default function ForecastTable({
   const nwsDays = modeledByDate ? days.filter((d) => modeledByDate.get(d.date)?.precipSource !== "open-meteo").length : 0;
   const gradient = elevationModel?.gradient;
   const highlight = modeledByDate != null && isAdjusted;
+  const weekSnow = days.slice(0, 7).reduce((s, d) => s + (modeledByDate?.get(d.date)?.snowfallSumIn ?? d.snowfallSumIn), 0);
+  const nextSnowDay = days.find((d) => (modeledByDate?.get(d.date)?.snowfallSumIn ?? d.snowfallSumIn) >= 1);
 
   return (
-    <section className="card p-4">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="font-bold tracking-tight">{FORECAST_DISPLAY_DAYS}-day forecast</h2>
-        {highlight && <span className="pill bg-primary/10 text-primary">At {selected.toLocaleString()} ft</span>}
-      </div>
+    <Section
+      id="daily-forecast"
+      title={`${FORECAST_DISPLAY_DAYS}-day forecast`}
+      meta={highlight ? <span className="pill bg-primary/10 text-primary">At {selected.toLocaleString()} ft</span> : undefined}
+      summary={`${weekSnow.toFixed(1)}" over the next 7 days${nextSnowDay ? ` · next 1"+ day: ${nextSnowDay === days[0] ? "today" : fmtDate(nextSnowDay.date)}` : ""}`}
+    >
       <p className="mb-3 text-xs text-muted-foreground">
         Days 8+ are lower-confidence trend guidance from Open-Meteo&apos;s model blend, not a precise day-by-day call —
         treat them as a heads-up on pattern changes, not a packing list.
@@ -99,11 +104,12 @@ export default function ForecastTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[780px] text-sm">
           <thead>
             <tr className="text-left text-muted-foreground">
               <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Day</th>
-              <th className="py-1 pr-4 pl-4 font-medium">High / Low</th>
+              <th className="py-1 pr-4 pl-4 font-medium">Sky</th>
+              <th className="py-1 pr-4 font-medium">High / Low</th>
               <th className="py-1 pr-4 font-medium">New snow</th>
               <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
               <th className="py-1 pr-4 font-medium">Snow line</th>
@@ -119,7 +125,10 @@ export default function ForecastTable({
               return (
                 <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
                   <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
-                  <td className={`py-1.5 pr-4 pl-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
+                  <td className="py-1.5 pr-4 pl-4">
+                    <SkyCell day={d} />
+                  </td>
+                  <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
                     {Math.round(row.tempMaxF)}° / {Math.round(row.tempMinF)}°
                   </td>
                   <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
@@ -161,6 +170,29 @@ export default function ForecastTable({
           don&apos;t change with the slider.
         </p>
       </div>
-    </section>
+    </Section>
+  );
+}
+
+// Icon + one-word sky, then the two numbers that answer "will it be nice
+// out": highest precip chance and hours of direct sun.
+function SkyCell({ day }: { day: DailyForecastDay }) {
+  const w = describeWeather(day.weatherCode);
+  const sun = day.sunshineHours;
+  const chance = day.precipProbabilityMaxPct;
+  return (
+    <div className="flex items-center gap-2" title={day.cloudCoverMeanPct != null ? `${w.label} · ${day.cloudCoverMeanPct}% avg cloud cover` : w.label}>
+      <span className="text-xl leading-none" role="img" aria-label={w.label}>
+        {w.icon}
+      </span>
+      <div className="leading-tight">
+        <div className="hidden whitespace-nowrap text-xs font-medium text-foreground sm:block">{w.label}</div>
+        <div className="whitespace-nowrap text-[11px] text-muted-foreground tabular-nums">
+          {chance != null && <span className={chance >= 60 ? "font-semibold text-primary" : ""}>☔{chance}%</span>}
+          {chance != null && sun != null && " · "}
+          {sun != null && <span>☀{Math.round(sun)}h</span>}
+        </div>
+      </div>
+    </div>
   );
 }

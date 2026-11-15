@@ -40,6 +40,10 @@ export interface HourlyForecastPoint {
   windDirectionDeg: number;
   weatherCode: number;
   freezingLevelFt: number;
+  /** Total cloud cover, 0-100. null when the model doesn't provide it. */
+  cloudCoverPct: number | null;
+  /** Chance of ≥0.1 mm precip this hour, 0-100 (ensemble-based; runs out before the 16-day range ends). */
+  precipProbabilityPct: number | null;
 }
 
 export interface DailyForecastDay {
@@ -55,6 +59,12 @@ export interface DailyForecastDay {
   /** Local wall-clock ISO datetime (no offset), same convention as HourlyForecastPoint.time */
   sunrise: string;
   sunset: string;
+  /** Mean cloud cover over the day, 0-100 */
+  cloudCoverMeanPct: number | null;
+  /** Highest hourly precip chance in the day, 0-100 */
+  precipProbabilityMaxPct: number | null;
+  /** Hours of direct sun (Open-Meteo sunshine_duration) */
+  sunshineHours: number | null;
 }
 
 /** One day of the elevation-adjusted forecast (FC-10-adj), produced by lib/derive/elevation-snow.ts. Not the full ForecastResponse: no hourly block, no wind. */

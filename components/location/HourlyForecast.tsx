@@ -1,12 +1,15 @@
 import type { DailyForecastDay, HourlyForecastPoint } from "@/lib/models/types";
 import { degToCompass } from "@/lib/util/wind";
+import { describeWeather as sky } from "@/lib/util/weather-code";
+import Section from "@/components/ui/Section";
 
 // FC-02: the next-24-hours view as one aligned strip of small charts instead
 // of a five-column table. Every row shares the same hour columns, so "when
 // does it start snowing, how cold is it then, and is the wind going to shut
 // the lifts" reads straight down a single column:
 //
-//   time · sky icon · temperature line · snow/rain bars · wind arrows
+//   time · sky icon · cloud cover · temperature line · precip chance ·
+//   snow/rain bars · wind arrows
 //
 // Night hours are shaded behind every row (from each day's sunrise/sunset)
 // and midnight gets a divider. The temperature line switches from orange to
@@ -39,6 +42,8 @@ const FREEZING_F = 32;
 const FREEZING_PULL_IN_F = 8;
 const WIND_WATCH_MPH = 25;
 const WIND_HOLD_MPH = 40;
+// Daylight hours under this much cloud count as "sunny" in the summary.
+const SUNNY_MAX_CLOUD_PCT = 40;
 
 function hourLabel(time: string): string {
   const h = Number(time.slice(11, 13));
@@ -56,23 +61,6 @@ function sunTime(iso: string): string {
   const h = Number(iso.slice(11, 13));
   const m = iso.slice(14, 16);
   return `${h % 12 === 0 ? 12 : h % 12}:${m} ${h < 12 ? "AM" : "PM"}`;
-}
-
-// WMO weather interpretation codes (Open-Meteo `weather_code`).
-function sky(code: number, night: boolean): { icon: string; label: string } {
-  if (code === 0) return night ? { icon: "🌙", label: "Clear" } : { icon: "☀️", label: "Clear" };
-  if (code === 1) return night ? { icon: "🌙", label: "Mostly clear" } : { icon: "🌤️", label: "Mostly clear" };
-  if (code === 2) return night ? { icon: "☁️", label: "Partly cloudy" } : { icon: "⛅", label: "Partly cloudy" };
-  if (code === 3) return { icon: "☁️", label: "Overcast" };
-  if (code === 45 || code === 48) return { icon: "🌫️", label: "Fog" };
-  if (code >= 51 && code <= 57) return { icon: "🌦️", label: "Drizzle" };
-  if (code === 66 || code === 67) return { icon: "🧊", label: "Freezing rain" };
-  if (code >= 61 && code <= 65) return { icon: "🌧️", label: "Rain" };
-  if (code >= 71 && code <= 77) return { icon: "🌨️", label: "Snow" };
-  if (code >= 80 && code <= 82) return { icon: "🌦️", label: "Rain showers" };
-  if (code === 85 || code === 86) return { icon: "🌨️", label: "Snow showers" };
-  if (code >= 95) return { icon: "⛈️", label: "Thunderstorm" };
-  return { icon: "·", label: "Unknown" };
 }
 
 function inchesShort(x: number): string {
@@ -114,6 +102,9 @@ export default function HourlyForecast({ hours, daily }: Props) {
   const gustIdx = hours.reduce((best, h, i) => (Math.max(h.windGustMph, h.windSpeedMph) > Math.max(hours[best].windGustMph, hours[best].windSpeedMph) ? i : best), 0);
   const peakGust = Math.round(Math.max(hours[gustIdx].windGustMph, hours[gustIdx].windSpeedMph));
   const heaviestIdx = hours.reduce((best, h, i) => (h.snowfallIn > hours[best].snowfallIn ? i : best), 0);
+  const daylight = hours.filter((h) => !isNight(h.time) && h.cloudCoverPct != null);
+  const sunnyHours = daylight.filter((h) => h.cloudCoverPct! < SUNNY_MAX_CLOUD_PCT).length;
+  const maxChance = Math.max(0, ...hours.map((h) => h.precipProbabilityPct ?? 0));
   const timeName = (i: number) => (i === 0 ? "now" : hourLabel(hours[i].time));
 
   // ---- temperature geometry -------------------------------------------
@@ -149,21 +140,17 @@ export default function HourlyForecast({ hours, daily }: Props) {
   const running = hours.map((_, i) => hours.slice(0, i + 1).reduce((s, h) => s + h.snowfallIn, 0));
 
   return (
-    <section className="card p-4">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="font-bold tracking-tight">Next {n} hours</h2>
-        {sunDays.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {sunDays.map((d, i) => (
-              <span key={d.date}>
-                {i > 0 && " · "}
-                {sunDays.length > 1 && `${weekday(d.date)} `}↑{sunTime(d.sunrise)} ↓{sunTime(d.sunset)}
-              </span>
-            ))}
-          </p>
-        )}
-      </div>
-
+    <Section
+      id="hourly"
+      title={`Next ${n} hours`}
+      meta={sunDays.map((d, i) => (
+        <span key={d.date}>
+          {i > 0 && " · "}
+          {sunDays.length > 1 && `${weekday(d.date)} `}↑{sunTime(d.sunrise)} ↓{sunTime(d.sunset)}
+        </span>
+      ))}
+      summary={`${totalSnow >= 0.1 ? `${totalSnow.toFixed(1)}" snow` : "No snow"} · ${Math.round(lo)}–${Math.round(hi)}°F · gusts ${peakGust} mph${daylight.length > 0 ? ` · ${sunnyHours} sunny hr${sunnyHours === 1 ? "" : "s"}` : ""}`}
+    >
       {/* Headline numbers — the answer before the chart. */}
       <div className="mb-3 flex flex-wrap gap-2 text-sm">
         <span className={`pill ${totalSnow >= 0.1 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
@@ -182,6 +169,19 @@ export default function HourlyForecast({ hours, daily }: Props) {
             💧 Rain likely {rainyHours} hr{rainyHours === 1 ? "" : "s"}
           </span>
         )}
+        {daylight.length > 0 && (
+          <span
+            className={`pill ${sunnyHours > 0 ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300" : "bg-muted text-muted-foreground"}`}
+            title={`Daylight hours with under ${SUNNY_MAX_CLOUD_PCT}% cloud cover`}
+          >
+            {sunnyHours > 0 ? `☀️ ${sunnyHours} of ${daylight.length} daylight hrs sunny` : "☁️ Cloudy all daylight"}
+          </span>
+        )}
+        {maxChance > 0 && (
+          <span className="pill bg-muted text-foreground" title="Highest hourly chance of measurable precipitation">
+            ☔ Precip chance up to {maxChance}%
+          </span>
+        )}
         <span className="pill bg-muted text-foreground">
           🌡 {Math.round(lo)}° – {Math.round(hi)}°F
         </span>
@@ -198,6 +198,7 @@ export default function HourlyForecast({ hours, daily }: Props) {
           <div className="sticky left-0 z-20 shrink-0 bg-card pr-1 text-[11px] font-medium text-muted-foreground" style={{ width: GUTTER_PX }}>
             <div className="h-9" />
             <div className="flex h-8 items-center">Sky</div>
+            <div className="flex h-4 items-center">Clouds</div>
             <div className="relative" style={{ height: TEMP_ROW_PX }}>
               <span className="absolute top-1">Temp</span>
               {freezingVisible && (
@@ -206,6 +207,7 @@ export default function HourlyForecast({ hours, daily }: Props) {
                 </span>
               )}
             </div>
+            <div className="flex h-5 items-center">Chance</div>
             <div className="flex items-end pb-1" style={{ height: SNOW_ROW_PX }}>
               Snow
             </div>
@@ -246,6 +248,18 @@ export default function HourlyForecast({ hours, daily }: Props) {
                   </span>
                 );
               })}
+            </div>
+
+            {/* Cloud cover: darker = cloudier; one continuous strip reads as the sky over the day */}
+            <div className="relative grid h-4 items-center" style={cols}>
+              {hours.map((h) => (
+                <div
+                  key={h.time}
+                  className="h-2.5"
+                  title={h.cloudCoverPct != null ? `${h.cloudCoverPct}% cloud cover` : "No cloud data"}
+                  style={{ background: h.cloudCoverPct != null ? `rgb(100 116 139 / ${((h.cloudCoverPct / 100) * 0.75).toFixed(2)})` : undefined }}
+                />
+              ))}
             </div>
 
             {/* Temperature line */}
@@ -305,6 +319,19 @@ export default function HourlyForecast({ hours, daily }: Props) {
                       style={{ top: y, left: 0 }}
                     />
                   </div>
+                );
+              })}
+            </div>
+
+            {/* Chance of precip */}
+            <div className="relative grid h-5 items-center text-center text-[10px] tabular-nums" style={cols}>
+              {hours.map((h) => {
+                const p = h.precipProbabilityPct;
+                const tone = p == null ? "" : p >= 60 ? "font-bold text-primary" : p >= 30 ? "font-semibold text-primary/75" : "text-muted-foreground";
+                return (
+                  <span key={h.time} className={tone} title={p != null ? `${p}% chance of precip` : undefined}>
+                    {p != null && p >= 10 ? `${p}%` : ""}
+                  </span>
                 );
               })}
             </div>
@@ -372,6 +399,9 @@ export default function HourlyForecast({ hours, daily }: Props) {
           <span className="ml-1 h-2 w-2 rounded-full bg-accent" />above freezing
         </span>
         <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-6 rounded-sm bg-gradient-to-r from-slate-500/5 to-slate-500/75" /> Clouds 0→100%
+        </span>
+        <span className="inline-flex items-center gap-1">
           <span className="h-2.5 w-2.5 rounded-sm bg-slate-500/20" /> Night
         </span>
         <span>
@@ -386,12 +416,14 @@ export default function HourlyForecast({ hours, daily }: Props) {
           Precip (liquid) is rain+snow water content, not snow depth — see Snow for that. {totalLiquid.toFixed(2)}&quot; liquid over the next {n} hours.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="text-left text-muted-foreground">
                 <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Time</th>
                 <th className="py-1 pr-4 pl-4 font-medium">Sky</th>
+                <th className="py-1 pr-4 font-medium">Clouds</th>
                 <th className="py-1 pr-4 font-medium">Temp</th>
+                <th className="py-1 pr-4 font-medium">Chance</th>
                 <th className="py-1 pr-4 font-medium">Snow</th>
                 <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
                 <th className="py-1 font-medium">Wind</th>
@@ -404,7 +436,9 @@ export default function HourlyForecast({ hours, daily }: Props) {
                     {i === 0 ? "Now" : `${weekday(h.time.slice(0, 10))} ${hourLabel(h.time)}`}
                   </td>
                   <td className="py-1.5 pr-4 pl-4">{sky(h.weatherCode, isNight(h.time)).label}</td>
+                  <td className="py-1.5 pr-4">{h.cloudCoverPct != null ? `${h.cloudCoverPct}%` : "—"}</td>
                   <td className="py-1.5 pr-4">{Math.round(h.temperatureF)}°</td>
+                  <td className="py-1.5 pr-4">{h.precipProbabilityPct != null ? `${h.precipProbabilityPct}%` : "—"}</td>
                   <td className="py-1.5 pr-4">{h.snowfallIn > 0 ? `${h.snowfallIn.toFixed(2)}"` : "—"}</td>
                   <td className="py-1.5 pr-4">{h.precipitationIn > 0 ? `${h.precipitationIn.toFixed(2)}"` : "—"}</td>
                   <td className="py-1.5">
@@ -417,6 +451,6 @@ export default function HourlyForecast({ hours, daily }: Props) {
           </table>
         </div>
       </details>
-    </section>
+    </Section>
   );
 }

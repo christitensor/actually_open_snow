@@ -1,5 +1,6 @@
 import { parseAfdSections } from "@/lib/util/afd-format";
 import type { AfdProduct } from "@/lib/models/types";
+import Section from "@/components/ui/Section";
 
 // EXP-01 (blocked, per TRACE_MATRIX.md — no free feed replaces OpenSnow's
 // human forecaster posts) was already substituted by SNOW-03's one-line
@@ -15,15 +16,15 @@ export default function ForecastDiscussion({ afd }: { afd: AfdProduct | null }) 
   const sections = parseAfdSections(afd.text).filter((s) => !IRRELEVANT_HEADING_RE.test(s.heading));
   if (sections.length === 0) return null;
 
+  const issued = new Date(afd.issuedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   return (
-    <section className="card p-4">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="font-bold tracking-tight">Forecast discussion</h2>
-        <span className="text-xs text-muted-foreground">
-          NWS {afd.wfo} ·{" "}
-          {new Date(afd.issuedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-        </span>
-      </div>
+    <Section
+      id="forecast-discussion"
+      title="Forecast discussion"
+      meta={`NWS ${afd.wfo} · ${issued}`}
+      summary="The NWS meteorologist's reasoning behind the forecast"
+      defaultOpen={false}
+    >
       <div className="space-y-4">
         {sections.map((s) => (
           <div key={s.heading}>
@@ -40,6 +41,6 @@ export default function ForecastDiscussion({ afd }: { afd: AfdProduct | null }) 
         The National Weather Service&apos;s own forecast discussion, unedited — the meteorologist reasoning behind
         the numbers above.
       </p>
-    </section>
+    </Section>
   );
 }

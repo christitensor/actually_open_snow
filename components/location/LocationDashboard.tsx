@@ -11,6 +11,7 @@ import SkiMap from "@/components/map/SkiMap";
 import { resorts } from "@/data/resorts";
 import { webcams as allWebcams } from "@/data/webcams";
 import { degToCompass } from "@/lib/util/wind";
+import Section, { SectionControls } from "@/components/ui/Section";
 
 const SEVERITY_COLOR: Record<string, string> = {
   Extreme: "bg-red-600 text-white",
@@ -71,7 +72,10 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             {location.source === "pin" ? " · Backcountry pin" : ""}
           </p>
         </div>
-        <FavoriteButton location={location} />
+        <div className="flex items-center gap-2">
+          <SectionControls />
+          <FavoriteButton location={location} />
+        </div>
       </header>
 
       {alerts.length > 0 && (
@@ -91,8 +95,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           very bottom of a stretched single column. */}
       <div className="md:flex md:items-start md:gap-6">
         <div className="space-y-5 md:min-w-0 md:flex-1">
-          <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Conditions summary</h2>
+          <Section id="conditions-summary" title="Conditions summary" summary={conditionsSummary.narrative}>
             <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className={`pill ${conditionsSummary.corroboration.modelsAgree ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"}`}>
@@ -102,11 +105,23 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <span className="pill bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">NWS discussion flags uncertainty</span>
               )}
             </div>
-          </section>
+          </Section>
 
           <SnowSummary pastDays={pastDays} forecastDaily={forecast.daily} />
 
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Section
+            id="current-conditions"
+            title="Current conditions"
+            summary={[
+              currentSnowLevelFt != null ? `Snow level ${currentSnowLevelFt.toLocaleString()} ft` : null,
+              powderQualityToday?.quality ?? null,
+              trailConditions?.label ?? null,
+              airQuality?.currentUsAqi != null ? `${airQuality.currentUsAqi} AQI` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
             <StatTile label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above" : "Below"} />
             <StatTile label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
@@ -118,7 +133,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               value={airQuality?.currentUsAqi != null ? `${airQuality.currentUsAqi} AQI` : "—"}
               sub={airQuality?.currentUsAqi != null ? AQI_LABEL(airQuality.currentUsAqi).label : undefined}
             />
-          </section>
+          </div>
+          </Section>
 
           <ForecastTable
             location={location}
@@ -131,15 +147,21 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           <HourlyForecast hours={upcomingHours} daily={forecast.daily} />
 
           {resortWebcams.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-3 font-bold tracking-tight">Live webcams</h2>
+            <Section id="webcams" title="Live webcams" summary={`${resortWebcams.length} camera${resortWebcams.length === 1 ? "" : "s"}`} defaultOpen={false}>
               <WebcamGrid webcams={resortWebcams} />
-            </section>
+            </Section>
           )}
 
           {multiModelTodaySnowfallIn && (
-            <section className="card p-4">
-              <h2 className="mb-2 font-bold tracking-tight">Today&apos;s new snow — by model</h2>
+            <Section
+              id="models"
+              title="Today’s new snow — by model"
+              summary={(() => {
+                const v = Object.values(multiModelTodaySnowfallIn);
+                return v.length ? `Models range ${Math.min(...v).toFixed(1)}–${Math.max(...v).toFixed(1)}"` : undefined;
+              })()}
+              defaultOpen={false}
+            >
               <div className="flex flex-wrap gap-2 text-sm">
                 {Object.entries(multiModelTodaySnowfallIn).map(([model, inches]) => (
                   <div key={model} className="rounded-xl border border-border bg-muted px-3 py-1.5">
@@ -148,11 +170,24 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           )}
 
-          <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Avalanche forecast</h2>
+          <Section
+            id="avalanche"
+            title="Avalanche forecast"
+            summary={
+              avalancheForecast &&
+              [avalancheForecast.dangerAboveTreeline, avalancheForecast.dangerNearTreeline, avalancheForecast.dangerBelowTreeline].every((l) => l == null || l <= 0)
+                ? "No danger ratings posted right now"
+                : avalancheForecast
+                ? `Danger ${avalancheForecast.dangerAboveTreeline ?? "?"} / ${avalancheForecast.dangerNearTreeline ?? "?"} / ${avalancheForecast.dangerBelowTreeline ?? "?"} (above / near / below treeline)`
+                : avalancheZone
+                  ? "Forecast unavailable"
+                  : "No forecast zone here"
+            }
+            defaultOpen={false}
+          >
             {avalancheForecast ? (
               <div className="space-y-3 text-sm">
                 <DangerRose
@@ -175,11 +210,15 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             ) : (
               <p className="text-sm text-muted-foreground">No avalanche forecast zone covers this point (outside avalanche.org coverage, or the point/zone-boundary API needs verification — see ARCHITECTURE.md).</p>
             )}
-          </section>
+          </Section>
 
           {pastDays.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-3 font-bold tracking-tight">Past 7 days</h2>
+            <Section
+              id="past-7-days"
+              title="Past 7 days"
+              summary={`${pastDays.slice(-7).reduce((s, d) => s + d.snowfallSumIn, 0).toFixed(1)}" of snow`}
+              defaultOpen={false}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[420px] text-sm">
                   <thead>
@@ -200,12 +239,19 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Section>
           )}
 
           {keyStations.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-1 font-bold tracking-tight">{keyStationsRangeName} weather stations</h2>
+            <Section
+              id="key-stations"
+              title={`${keyStationsRangeName} weather stations`}
+              summary={keyStations
+                .slice(0, 3)
+                .map((st) => `${st.name} ${st.tempF != null ? `${Math.round(st.tempF)}°F` : "—"}`)
+                .join(" · ")}
+              defaultOpen={false}
+            >
               <p className="mb-3 text-xs text-muted-foreground">
                 Curated high-elevation stations backcountry travelers actually watch here — the generic
                 &quot;nearest station&quot; is almost always a valley airport, which doesn&apos;t tell you much about
@@ -226,12 +272,20 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           )}
 
           {(nearestSnotel || nearestNwsStations.length > 0) && (
-            <section className="card p-4">
-              <h2 className="mb-1 font-bold tracking-tight">Nearby stations</h2>
+            <Section
+              id="nearby-stations"
+              title="Nearby stations"
+              summary={
+                nearestSnotel
+                  ? `SNOTEL ${nearestSnotel.station.name}: ${nearestSnotel.snowDepthIn != null ? `${nearestSnotel.snowDepthIn}" depth` : "no depth reading"}`
+                  : nearestNwsStations[0]?.name
+              }
+              defaultOpen={false}
+            >
               {nearestSnotel && (
                 <p className="text-sm text-foreground/90">
                   <strong>SNOTEL</strong> — {nearestSnotel.station.name} ({nearestSnotel.station.distanceMi.toFixed(1)} mi away, {nearestSnotel.station.elevationFt.toLocaleString()} ft) —{" "}
@@ -244,15 +298,14 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   <strong>NWS observation stations</strong> — {nearestNwsStations.slice(0, 3).map((s) => s.name).join(", ")}
                 </p>
               )}
-            </section>
+            </Section>
           )}
 
           <ForecastDiscussion afd={afd} />
 
-          <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Powder wake-up</h2>
+          <Section id="wake-alarm" title="Powder wake-up" summary="Get pinged when a powder morning is coming" defaultOpen={false}>
             <WakeAlarmForm location={location} />
-          </section>
+          </Section>
         </div>
 
         <aside className="mt-5 md:mt-0 md:w-80 md:shrink-0 lg:w-96">
