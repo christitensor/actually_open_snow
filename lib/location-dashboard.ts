@@ -164,7 +164,14 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
 
   const todaysHours = forecast.hourly.filter((h) => h.time.startsWith(forecast.daily[0]?.date ?? ""));
 
-  const nearestFutureHour = forecast.hourly.find((h) => new Date(h.time).getTime() >= Date.now()) ?? forecast.hourly[0];
+  // Hourly times are the location's local wall clock with no offset, so
+  // `new Date(h.time)` would read them in the server's timezone (UTC on
+  // Vercel) and land hours off. Convert with the forecast's UTC offset, and
+  // keep the hour that's in progress so the list starts at "now".
+  const currentHourStartMs = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+  const isCurrentOrFuture = (h: { time: string }) =>
+    new Date(`${h.time}Z`).getTime() - forecast.utcOffsetSeconds * 1000 >= currentHourStartMs;
+  const nearestFutureHour = forecast.hourly.find(isCurrentOrFuture) ?? forecast.hourly[0];
   const wetBulbNowF = nearestFutureHour
     ? wetBulbF(nearestFutureHour.temperatureF, nearestFutureHour.relativeHumidityPct)
     : null;
@@ -192,6 +199,6 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     airQuality,
     multiModelTodaySnowfallIn,
     pastDays,
-    upcomingHours: forecast.hourly.filter((h) => new Date(h.time).getTime() >= Date.now()).slice(0, HOURLY_DISPLAY_HOURS),
+    upcomingHours: forecast.hourly.filter(isCurrentOrFuture).slice(0, HOURLY_DISPLAY_HOURS),
   };
 }
