@@ -1,6 +1,9 @@
+"use client";
+
 import type { DailyForecastDay, HistoricalDay } from "@/lib/models/types";
 import SnowTimelineScroller from "@/components/location/SnowTimelineScroller";
 import Section from "@/components/ui/Section";
+import { ElevationSlider, useElevation, useSnowAt } from "@/components/location/ElevationContext";
 
 // A single past+future snowfall timeline in one scannable strip, rather
 // than the two separate "Past 7 days" / "14-day forecast" tables making
@@ -12,6 +15,11 @@ import Section from "@/components/ui/Section";
 // the safe default" for a single measure) with an emphasis highlight on
 // "Today" — past days render de-emphasized (context, already happened),
 // future days in the primary hue (the actionable part).
+//
+// Forecast days follow the page-wide elevation (ElevationContext): same
+// elevation-modeled snow as the 14-day table, and the compact slider here
+// is the same control as the one down there. History is measured/reanalysis
+// at the location itself and doesn't change with the slider.
 
 const TIMELINE_FUTURE_DAYS = 14;
 const GROUP_SIZE_DAYS = 5;
@@ -95,6 +103,8 @@ export default function SnowSummary({
   pastDays: HistoricalDay[];
   forecastDaily: DailyForecastDay[];
 }) {
+  const { selected, isAdjusted, modeledByDate } = useElevation();
+  const snowAt = useSnowAt();
   const todayDate = forecastDaily[0]?.date;
   if (!todayDate) return null;
 
@@ -102,7 +112,9 @@ export default function SnowSummary({
   // means that entry is often incomplete/zero anyway) — drop anything not
   // strictly before today so the forecast side owns "today" exclusively.
   const historyDays = pastDays.filter((d) => d.date < todayDate);
-  const forecastDays = forecastDaily.slice(0, TIMELINE_FUTURE_DAYS);
+  const forecastDays = forecastDaily
+    .slice(0, TIMELINE_FUTURE_DAYS)
+    .map((d) => ({ ...d, snowfallSumIn: snowAt(d.date, d.snowfallSumIn) }));
 
   const groups = buildGroups(historyDays, forecastDays, todayDate);
   const maxSnowIn = Math.max(1, ...groups.flatMap((g) => g.days.map((d) => d.snowIn)));
@@ -116,7 +128,13 @@ export default function SnowSummary({
     <Section
       id="snow-summary"
       title="Snow Summary"
-      meta={`Past 15 days · next ${TIMELINE_FUTURE_DAYS} days`}
+      meta={
+        isAdjusted && modeledByDate ? (
+          <span className="pill bg-primary/10 text-primary">Forecast at {selected.toLocaleString()} ft</span>
+        ) : (
+          `Past 15 days · next ${TIMELINE_FUTURE_DAYS} days`
+        )
+      }
       summary={groups
         .filter((g) => g.label === "Prev 1-5 Days" || g.label === "Next 1-5 Days")
         .map((g) => `${g.label}: ${formatGroupInches(g.days.reduce((s, d) => s + d.snowIn, 0))}`)
@@ -186,8 +204,12 @@ export default function SnowSummary({
         </div>
       </SnowTimelineScroller>
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        Each block totals its days; bar labels are new snow that day (gray = past/actual, blue = forecast, orange = today). Swipe for more.
+      <div className="mt-3">
+        <ElevationSlider compact />
+      </div>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Each block totals its days; bar labels are new snow that day (gray = past/actual, blue = forecast, orange = today). Swipe for more. Forecast bars follow the elevation slider (same model as the 14-day forecast); past days are at the location itself.
       </p>
     </Section>
   );
