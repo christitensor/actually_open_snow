@@ -97,7 +97,7 @@ export default function DangerRose({
       </svg>
       <div className="space-y-1 text-xs text-muted-foreground">
         <p>Shown by elevation band (outer ring = above treeline, inner = below).</p>
-        <p>UAC&apos;s full rose also varies by aspect within a band — see the full forecast for that detail.</p>
+        <p>The full forecast rose also varies by aspect within a band — see the avalanche problems below and the full forecast for that detail.</p>
       </div>
     </div>
   );

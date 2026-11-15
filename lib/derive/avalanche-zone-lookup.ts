@@ -43,6 +43,22 @@ function minVertexDistanceMiles(lat: number, lon: number, geometry: GeoJSON.Poly
   return min;
 }
 
+export function toZone(feature: AvalancheZoneMapLayer["features"][number]): AvalancheZone {
+  const p = feature.properties;
+  return {
+    zoneId: String(feature.id),
+    centerId: p.center_id,
+    centerName: p.center,
+    zoneName: p.name,
+    link: p.link ?? null,
+    // -1 = "no rating", 0 = none issued; only 1-5 are real danger levels
+    overallDanger: p.danger_level >= 1 && p.danger_level <= 5 ? p.danger_level : null,
+    offSeason: p.off_season ?? false,
+    travelAdvice: p.travel_advice ?? null,
+    timezone: p.timezone ?? null,
+  };
+}
+
 export function findZoneForPoint(
   mapLayer: AvalancheZoneMapLayer,
   lat: number,
@@ -55,11 +71,7 @@ export function findZoneForPoint(
     try {
       const geometry = feature.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon;
       if (booleanPointInPolygon(pt, geometry)) {
-        return {
-          zoneId: String(feature.id),
-          centerName: feature.properties.center,
-          zoneName: feature.properties.name,
-        };
+        return toZone(feature);
       }
       const distanceMiles = minVertexDistanceMiles(lat, lon, geometry);
       if (!nearest || distanceMiles < nearest.distanceMiles) {
@@ -72,11 +84,7 @@ export function findZoneForPoint(
   }
 
   if (nearest && nearest.distanceMiles <= NEAREST_ZONE_FALLBACK_MAX_MILES) {
-    return {
-      zoneId: String(nearest.feature.id),
-      centerName: nearest.feature.properties.center,
-      zoneName: nearest.feature.properties.name,
-    };
+    return toZone(nearest.feature);
   }
   return null;
 }

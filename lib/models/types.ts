@@ -172,15 +172,42 @@ export interface NwsAlert {
 
 export interface AvalancheZone {
   zoneId: string;
+  /** Short center code, e.g. "UAC", "CAIC" — required by avalanche.org's forecast query. */
+  centerId: string;
   centerName: string;
   zoneName: string;
+  /** The center's own forecast page for this zone. */
+  link: string | null;
+  /** Today's highest rating from the map layer, 1-5; null when the center posts "no rating" (-1/0). */
+  overallDanger: number | null;
+  offSeason: boolean;
+  travelAdvice: string | null;
+  /** IANA timezone of the center, e.g. "America/Denver" */
+  timezone: string | null;
+}
+
+export interface AvalancheProblem {
+  name: string;
+  likelihood: string | null;
+  /** D-scale size range, e.g. ["1.0", "1.5"] */
+  size: string[];
+  /** e.g. "northwest upper" — aspect + elevation band (upper/middle/lower) */
+  locations: string[];
 }
 
 export interface AvalancheForecast {
   zoneId: string;
+  /** The forecast's own name for this zone, when it has one (CAIC's map-layer names are just "CAIC zone"). */
+  zoneName: string | null;
   dangerAboveTreeline: number | null;
   dangerNearTreeline: number | null;
   dangerBelowTreeline: number | null;
+  /** Highest current rating: from the elevation bands when the center publishes them, else the map layer's overall rating. */
+  overallDanger: number | null;
+  /** False when the center only publishes an overall rating to avalanche.org (e.g. UAC) — the elevation breakdown lives on its own site. */
+  hasBandRatings: boolean;
+  tomorrow: { above: number | null; near: number | null; below: number | null } | null;
+  problems: AvalancheProblem[];
   summary: string;
   issuedAt: string;
   expiresAt: string;

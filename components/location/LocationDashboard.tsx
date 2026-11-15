@@ -4,7 +4,7 @@ import WakeAlarmForm from "@/components/location/WakeAlarmForm";
 import ForecastTable from "@/components/location/ForecastTable";
 import HourlyForecast from "@/components/location/HourlyForecast";
 import ForecastDiscussion from "@/components/location/ForecastDiscussion";
-import DangerRose from "@/components/location/DangerRose";
+import AvalancheCard from "@/components/location/AvalancheCard";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
@@ -173,44 +173,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             </Section>
           )}
 
-          <Section
-            id="avalanche"
-            title="Avalanche forecast"
-            summary={
-              avalancheForecast &&
-              [avalancheForecast.dangerAboveTreeline, avalancheForecast.dangerNearTreeline, avalancheForecast.dangerBelowTreeline].every((l) => l == null || l <= 0)
-                ? "No danger ratings posted right now"
-                : avalancheForecast
-                ? `Danger ${avalancheForecast.dangerAboveTreeline ?? "?"} / ${avalancheForecast.dangerNearTreeline ?? "?"} / ${avalancheForecast.dangerBelowTreeline ?? "?"} (above / near / below treeline)`
-                : avalancheZone
-                  ? "Forecast unavailable"
-                  : "No forecast zone here"
-            }
-            defaultOpen={false}
-          >
-            {avalancheForecast ? (
-              <div className="space-y-3 text-sm">
-                <DangerRose
-                  aboveTreeline={avalancheForecast.dangerAboveTreeline}
-                  nearTreeline={avalancheForecast.dangerNearTreeline}
-                  belowTreeline={avalancheForecast.dangerBelowTreeline}
-                />
-                <div className="flex gap-4">
-                  <DangerBadge label="Above treeline" level={avalancheForecast.dangerAboveTreeline} />
-                  <DangerBadge label="Near treeline" level={avalancheForecast.dangerNearTreeline} />
-                  <DangerBadge label="Below treeline" level={avalancheForecast.dangerBelowTreeline} />
-                </div>
-                <p className="text-foreground/90">{avalancheForecast.summary}</p>
-                <a href={avalancheForecast.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                  Full forecast ↗
-                </a>
-              </div>
-            ) : avalancheZone ? (
-              <p className="text-sm text-muted-foreground">Zone matched ({avalancheZone.zoneName}) but forecast couldn&apos;t be loaded.</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No avalanche forecast zone covers this point (outside avalanche.org coverage, or the point/zone-boundary API needs verification — see ARCHITECTURE.md).</p>
-            )}
-          </Section>
+          <AvalancheCard zone={avalancheZone} forecast={avalancheForecast} />
 
           {pastDays.length > 0 && (
             <Section
@@ -334,19 +297,6 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-bold tracking-tight">{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
-    </div>
-  );
-}
-
-function DangerBadge({ label, level }: { label: string; level: number | null }) {
-  const colors = ["bg-muted", "bg-green-500", "bg-yellow-400", "bg-orange-500", "bg-red-600", "bg-black"];
-  const color = level != null && level >= 0 && level <= 5 ? colors[level] : "bg-muted";
-  return (
-    <div className="text-center">
-      <div className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${color}`}>
-        {level ?? "?"}
-      </div>
-      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }

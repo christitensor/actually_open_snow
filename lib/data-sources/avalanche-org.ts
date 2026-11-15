@@ -1,14 +1,21 @@
 // avalanche.org public API client — unofficial but widely used by
 // third-party apps (US + parts of Canada). Backs BC-01/BC-02.
 //
-// Field names below were confirmed against a live request during this
-// build session (Aug 2026) — see the zone lookup's use of the *top-level*
-// GeoJSON Feature `id` (not `properties.id`, which doesn't exist) and
-// `properties.center` (full name; `center_id` is the short code, e.g.
-// "UAC"). Terms of use for production reliance still haven't been
-// re-checked, per the existing caveat on BC-01 in TRACE_MATRIX.md.
+// Verified live against in-season data (Nov 2026):
+// - Zone id is the map-layer GeoJSON Feature's top-level `id`;
+//   `properties.center_id` is the short code ("UAC", "CAIC").
+// - The forecast lives at /product?type=forecast&center_id=X&zone_id=Y.
+//   The old /product/{zoneId} path takes a *product* id, so passing a zone
+//   id returned an all-empty shell even for zones with a live forecast.
+// - `danger[]` is [{upper, middle, lower, valid_day: "current"|"tomorrow"}].
+// - Some centers (UAC is the big one) publish only a stub to avalanche.org
+//   — status "published" but no danger bands and no text — and expose
+//   their rating solely through the map layer's `danger_level`. For those
+//   we fall back to that overall rating and link to the center's own page.
+// Terms of use for production reliance still haven't been re-checked, per
+// the existing caveat on BC-01 in TRACE_MATRIX.md.
 
-import type { AvalancheForecast } from "@/lib/models/types";
+import type { AvalancheForecast, AvalancheProblem, AvalancheZone } from "@/lib/models/types";
 
 const MAP_LAYER_URL = "https://api.avalanche.org/v2/public/products/map-layer";
 const PRODUCT_URL = "https://api.avalanche.org/v2/public/product";
@@ -21,6 +28,10 @@ export interface AvalancheZoneFeature {
     center: string;
     center_id: string;
     danger_level: number;
+    link?: string;
+    off_season?: boolean;
+    travel_advice?: string;
+    timezone?: string;
     warning?: { product: unknown } | null;
   };
   geometry: GeoJSON.Geometry;
@@ -40,44 +51,83 @@ export async function getZoneMapLayer(): Promise<AvalancheZoneMapLayer> {
   return res.json() as Promise<AvalancheZoneMapLayer>;
 }
 
-// Confirmed live (Aug 2026): avalanche_center, forecast_zone, danger,
-// published_time, expires_time, bottom_line/hazard_discussion all exist
-// as top-level keys. Every US center is off-season in August, so
-// `danger`/`avalanche_center`/`forecast_zone` all came back empty in
-// every live check made during this build — the *populated*, in-season
-// shape of `danger[]` (upper/middle/lower band field names below) is
-// still an educated guess from public write-ups, not a verified live
-// response. Re-check once the season starts and a zone actually has an
-// active forecast.
 interface AvalancheProductResponse {
   danger?: {
-    upper?: number;
-    middle?: number;
-    lower?: number;
+    upper?: number | null;
+    middle?: number | null;
+    lower?: number | null;
+    valid_day?: string;
   }[];
-  bottom_line?: string;
-  hazard_discussion?: string;
-  published_time?: string;
-  expires_time?: string;
+  forecast_avalanche_problems?: {
+    name?: string;
+    rank?: number;
+    likelihood?: string | null;
+    size?: string[] | null;
+    location?: string[] | null;
+  }[];
+  forecast_zone?: { id?: number; name?: string }[];
+  bottom_line?: string | null;
+  hazard_discussion?: string | null;
+  published_time?: string | null;
+  expires_time?: string | null;
 }
 
-/** BC-01: full forecast (danger by elevation band + discussion) for a zone. */
-export async function getAvalancheForecast(zoneId: string | number): Promise<AvalancheForecast> {
-  const res = await fetch(`${PRODUCT_URL}/${zoneId}`, { next: { revalidate: 1800 } });
+const level = (x: number | null | undefined) => (x != null && x >= 1 && x <= 5 ? x : null);
+
+/** Forecast text arrives as HTML; the dashboard renders plain text. */
+function htmlToText(html: string | null | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<\/(p|div|li|h\d)>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&rsquo;|&lsquo;/g, "'")
+    .replace(/&ldquo;|&rdquo;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .trim();
+}
+
+/** BC-01: today's forecast for a zone — danger by elevation band where the center publishes it, the map layer's overall rating otherwise. */
+export async function getAvalancheForecast(zone: AvalancheZone): Promise<AvalancheForecast> {
+  const url = `${PRODUCT_URL}?type=forecast&center_id=${encodeURIComponent(zone.centerId)}&zone_id=${encodeURIComponent(zone.zoneId)}`;
+  const res = await fetch(url, { next: { revalidate: 1800 } });
   if (!res.ok) {
-    throw new Error(`avalanche.org product request failed (${res.status}) for zone ${zoneId}`);
+    throw new Error(`avalanche.org product request failed (${res.status}) for ${zone.centerId} zone ${zone.zoneId}`);
   }
   const raw = (await res.json()) as AvalancheProductResponse;
-  const latestDanger = raw.danger?.[0];
+  const current = raw.danger?.find((d) => d.valid_day === "current") ?? raw.danger?.[0];
+  const tomorrow = raw.danger?.find((d) => d.valid_day === "tomorrow");
+
+  const above = level(current?.upper);
+  const near = level(current?.middle);
+  const below = level(current?.lower);
+  const hasBandRatings = above != null || near != null || below != null;
+  const bandMax = hasBandRatings ? Math.max(above ?? 0, near ?? 0, below ?? 0) : null;
+
+  const problems: AvalancheProblem[] = (raw.forecast_avalanche_problems ?? [])
+    .slice()
+    .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
+    .filter((p) => p.name)
+    .map((p) => ({ name: p.name!, likelihood: p.likelihood ?? null, size: p.size ?? [], locations: p.location ?? [] }));
 
   return {
-    zoneId: String(zoneId),
-    dangerAboveTreeline: latestDanger?.upper ?? null,
-    dangerNearTreeline: latestDanger?.middle ?? null,
-    dangerBelowTreeline: latestDanger?.lower ?? null,
-    summary: raw.bottom_line ?? raw.hazard_discussion ?? "",
+    zoneId: zone.zoneId,
+    zoneName: raw.forecast_zone?.find((z) => String(z.id) === zone.zoneId)?.name ?? null,
+    dangerAboveTreeline: above,
+    dangerNearTreeline: near,
+    dangerBelowTreeline: below,
+    overallDanger: bandMax ?? zone.overallDanger,
+    hasBandRatings,
+    tomorrow: tomorrow ? { above: level(tomorrow.upper), near: level(tomorrow.middle), below: level(tomorrow.lower) } : null,
+    problems,
+    summary: htmlToText(raw.bottom_line) || htmlToText(raw.hazard_discussion) || zone.travelAdvice || "",
     issuedAt: raw.published_time ?? "",
     expiresAt: raw.expires_time ?? "",
-    url: `https://avalanche.org/forecasts/${zoneId}`,
+    url: zone.link ?? `https://avalanche.org/forecasts/${zone.zoneId}`,
   };
 }

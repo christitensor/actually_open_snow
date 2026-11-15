@@ -123,7 +123,7 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
   const latestSnowLevelPoint = snowLevel.points[0];
 
   const avalancheForecast = avalancheZoneResult
-    ? await getAvalancheForecast(avalancheZoneResult.zoneId).catch(() => null)
+    ? await getAvalancheForecast(avalancheZoneResult).catch(() => null)
     : null;
 
   const zoneKeyStations = getKeyStationsForZone(avalancheZoneResult?.zoneId);
