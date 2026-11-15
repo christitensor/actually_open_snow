@@ -16,6 +16,8 @@
 // the existing caveat on BC-01 in TRACE_MATRIX.md.
 
 import type { AvalancheForecast, AvalancheProblem, AvalancheZone } from "@/lib/models/types";
+import { htmlToText } from "@/lib/util/html";
+import { getUacForecast, mergeUacForecast } from "@/lib/data-sources/uac-forecast";
 
 const MAP_LAYER_URL = "https://api.avalanche.org/v2/public/products/map-layer";
 const PRODUCT_URL = "https://api.avalanche.org/v2/public/product";
@@ -74,24 +76,6 @@ interface AvalancheProductResponse {
 
 const level = (x: number | null | undefined) => (x != null && x >= 1 && x <= 5 ? x : null);
 
-/** Forecast text arrives as HTML; the dashboard renders plain text. */
-function htmlToText(html: string | null | undefined): string {
-  if (!html) return "";
-  return html
-    .replace(/<\/(p|div|li|h\d)>|<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&rsquo;|&lsquo;/g, "'")
-    .replace(/&ldquo;|&rdquo;/g, '"')
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\s*\n\s*/g, "\n")
-    .trim();
-}
-
 /** BC-01: today's forecast for a zone — danger by elevation band where the center publishes it, the map layer's overall rating otherwise. */
 export async function getAvalancheForecast(zone: AvalancheZone): Promise<AvalancheForecast> {
   const url = `${PRODUCT_URL}?type=forecast&center_id=${encodeURIComponent(zone.centerId)}&zone_id=${encodeURIComponent(zone.zoneId)}`;
@@ -115,7 +99,7 @@ export async function getAvalancheForecast(zone: AvalancheZone): Promise<Avalanc
     .filter((p) => p.name)
     .map((p) => ({ name: p.name!, likelihood: p.likelihood ?? null, size: p.size ?? [], locations: p.location ?? [] }));
 
-  return {
+  const base: AvalancheForecast = {
     zoneId: zone.zoneId,
     zoneName: raw.forecast_zone?.find((z) => String(z.id) === zone.zoneId)?.name ?? null,
     dangerAboveTreeline: above,
@@ -129,5 +113,20 @@ export async function getAvalancheForecast(zone: AvalancheZone): Promise<Avalanc
     issuedAt: raw.published_time ?? "",
     expiresAt: raw.expires_time ?? "",
     url: zone.link ?? `https://avalanche.org/forecasts/${zone.zoneId}`,
+    rose: null,
+    warning: null,
+    discussion: [],
+    author: null,
+    forecastDate: null,
+    isStale: false,
+    source: "avalanche.org",
   };
+
+  // UAC only sends avalanche.org a stub — pull the full forecast from UAC
+  // itself. A UAC failure just leaves the avalanche.org version in place.
+  if (zone.centerId === "UAC") {
+    const uac = await getUacForecast(zone.zoneName).catch(() => null);
+    if (uac) return mergeUacForecast(base, uac);
+  }
+  return base;
 }

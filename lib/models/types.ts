@@ -193,6 +193,8 @@ export interface AvalancheProblem {
   size: string[];
   /** e.g. "northwest upper" — aspect + elevation band (upper/middle/lower) */
   locations: string[];
+  /** Forecaster's discussion of this problem (UAC). */
+  description?: string;
 }
 
 export interface AvalancheForecast {
@@ -212,6 +214,18 @@ export interface AvalancheForecast {
   issuedAt: string;
   expiresAt: string;
   url: string;
+  /** Per-aspect danger, 24 values: above treeline N,NE,E,SE,S,SW,W,NW, then near, then below. 1-5 or null. Only when the center publishes it (UAC). */
+  rose: (number | null)[] | null;
+  /** Avalanche Warning / special bulletin text, if one is in effect. */
+  warning: string | null;
+  /** Extra forecaster sections (recent activity, weather, ...). */
+  discussion: { heading: string; text: string }[];
+  author: string | null;
+  /** The forecast's own date (YYYY-MM-DD, center-local), when known. */
+  forecastDate: string | null;
+  /** True when the latest available forecast is older than yesterday. */
+  isStale: boolean;
+  source: "avalanche.org" | "uac";
 }
 
 /** BC-03: a single field report from utahavalanchecenter.org's public observations feed — either an avalanche occurrence or a general (no-avalanche) field observation. */
