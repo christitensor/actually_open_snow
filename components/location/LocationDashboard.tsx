@@ -2,16 +2,16 @@ import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import WakeAlarmForm from "@/components/location/WakeAlarmForm";
 import ForecastTable from "@/components/location/ForecastTable";
+import HourlyForecast from "@/components/location/HourlyForecast";
 import ForecastDiscussion from "@/components/location/ForecastDiscussion";
-import DangerRose from "@/components/location/DangerRose";
+import AvalancheCard from "@/components/location/AvalancheCard";
 import SnowSummary from "@/components/location/SnowSummary";
 import WebcamGrid from "@/components/webcams/WebcamGrid";
 import SkiMap from "@/components/map/SkiMap";
 import { resorts } from "@/data/resorts";
 import { webcams as allWebcams } from "@/data/webcams";
 import { degToCompass } from "@/lib/util/wind";
-
-const HOURLY_DISPLAY_HOURS = 24;
+import Section, { SectionControls } from "@/components/ui/Section";
 
 const SEVERITY_COLOR: Record<string, string> = {
   Extreme: "bg-red-600 text-white",
@@ -22,16 +22,6 @@ const SEVERITY_COLOR: Record<string, string> = {
 
 function fmtDate(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-}
-
-function fmtHour(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric" });
-}
-
-// Unlike hourly forecast points, sunrise/sunset don't fall on the hour —
-// fmtHour's hour-only formatting would round "6:40 AM" down to "6 AM".
-function fmtSunTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 const AQI_LABEL = (aqi: number): { label: string; color: string } => {
@@ -71,12 +61,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
   const currentSnowLevelFt = snowLevel.points[0]?.snowLevelFt ?? snowLevel.points[0]?.freezingLevelFt ?? null;
   const resortWebcams = location.resortId ? allWebcams.filter((w) => w.resortId === location.resortId) : [];
 
-  // Next-24-hours can span into tomorrow — surface sunrise/sunset for
-  // every calendar day the window actually covers, not just today's.
-  const upcomingSunTimes = Array.from(new Set(upcomingHours.map((h) => h.time.slice(0, 10))))
-    .map((date) => forecast.daily.find((d) => d.date === date))
-    .filter((d): d is NonNullable<typeof d> => d != null);
-
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -88,7 +72,10 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             {location.source === "pin" ? " · Backcountry pin" : ""}
           </p>
         </div>
-        <FavoriteButton location={location} />
+        <div className="flex items-center gap-2">
+          <SectionControls />
+          <FavoriteButton location={location} />
+        </div>
       </header>
 
       {alerts.length > 0 && (
@@ -108,8 +95,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           very bottom of a stretched single column. */}
       <div className="md:flex md:items-start md:gap-6">
         <div className="space-y-5 md:min-w-0 md:flex-1">
-          <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Conditions summary</h2>
+          <Section id="conditions-summary" title="Conditions summary" summary={conditionsSummary.narrative}>
             <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className={`pill ${conditionsSummary.corroboration.modelsAgree ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"}`}>
@@ -119,11 +105,23 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <span className="pill bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">NWS discussion flags uncertainty</span>
               )}
             </div>
-          </section>
+          </Section>
 
           <SnowSummary pastDays={pastDays} forecastDaily={forecast.daily} />
 
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Section
+            id="current-conditions"
+            title="Current conditions"
+            summary={[
+              currentSnowLevelFt != null ? `Snow level ${currentSnowLevelFt.toLocaleString()} ft` : null,
+              powderQualityToday?.quality ?? null,
+              trailConditions?.label ?? null,
+              airQuality?.currentUsAqi != null ? `${airQuality.currentUsAqi} AQI` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
             <StatTile label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above" : "Below"} />
             <StatTile label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
@@ -135,7 +133,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
               value={airQuality?.currentUsAqi != null ? `${airQuality.currentUsAqi} AQI` : "—"}
               sub={airQuality?.currentUsAqi != null ? AQI_LABEL(airQuality.currentUsAqi).label : undefined}
             />
-          </section>
+          </div>
+          </Section>
 
           <ForecastTable
             location={location}
@@ -145,61 +144,24 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             elevationModel={data.elevationModel}
           />
 
-          {upcomingHours.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-1 font-bold tracking-tight">Next {HOURLY_DISPLAY_HOURS} hours</h2>
-              {upcomingSunTimes.length > 0 && (
-                <p className="mb-1 text-xs text-muted-foreground">
-                  {upcomingSunTimes.map((d, i) => (
-                    <span key={d.date}>
-                      {i > 0 && " · "}
-                      {upcomingSunTimes.length > 1 && `${fmtDate(d.date)}: `}
-                      Sunrise {fmtSunTime(d.sunrise)} · Sunset {fmtSunTime(d.sunset)}
-                    </span>
-                  ))}
-                </p>
-              )}
-              <p className="mb-2 text-xs text-muted-foreground">Precip (liquid) is rain+snow water content, not snow depth — see New snow for that.</p>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      <th className="sticky left-0 z-10 border-r border-border bg-card py-1 pr-4 font-medium">Time</th>
-                      <th className="py-1 pr-4 pl-4 font-medium">Temp</th>
-                      <th className="py-1 pr-4 font-medium">Snow</th>
-                      <th className="py-1 pr-4 font-medium">Precip (liquid)</th>
-                      <th className="py-1 font-medium">Wind</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {upcomingHours.map((h) => (
-                      <tr key={h.time} className="border-t border-border">
-                        <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtHour(h.time)}</td>
-                        <td className="py-1.5 pr-4 pl-4">{Math.round(h.temperatureF)}°</td>
-                        <td className="py-1.5 pr-4">{h.snowfallIn > 0 ? `${h.snowfallIn.toFixed(2)}"` : "—"}</td>
-                        <td className="py-1.5 pr-4">{h.precipitationIn > 0 ? `${h.precipitationIn.toFixed(2)}"` : "—"}</td>
-                        <td className="py-1.5">
-                          {Math.round(h.windSpeedMph)}
-                          {h.windGustMph > h.windSpeedMph + 3 ? ` G${Math.round(h.windGustMph)}` : ""} mph {degToCompass(h.windDirectionDeg)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
+          <HourlyForecast hours={upcomingHours} daily={forecast.daily} />
 
           {resortWebcams.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-3 font-bold tracking-tight">Live webcams</h2>
+            <Section id="webcams" title="Live webcams" summary={`${resortWebcams.length} camera${resortWebcams.length === 1 ? "" : "s"}`} defaultOpen={false}>
               <WebcamGrid webcams={resortWebcams} />
-            </section>
+            </Section>
           )}
 
           {multiModelTodaySnowfallIn && (
-            <section className="card p-4">
-              <h2 className="mb-2 font-bold tracking-tight">Today&apos;s new snow — by model</h2>
+            <Section
+              id="models"
+              title="Today’s new snow — by model"
+              summary={(() => {
+                const v = Object.values(multiModelTodaySnowfallIn);
+                return v.length ? `Models range ${Math.min(...v).toFixed(1)}–${Math.max(...v).toFixed(1)}"` : undefined;
+              })()}
+              defaultOpen={false}
+            >
               <div className="flex flex-wrap gap-2 text-sm">
                 {Object.entries(multiModelTodaySnowfallIn).map(([model, inches]) => (
                   <div key={model} className="rounded-xl border border-border bg-muted px-3 py-1.5">
@@ -208,38 +170,18 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           )}
 
-          <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Avalanche forecast</h2>
-            {avalancheForecast ? (
-              <div className="space-y-3 text-sm">
-                <DangerRose
-                  aboveTreeline={avalancheForecast.dangerAboveTreeline}
-                  nearTreeline={avalancheForecast.dangerNearTreeline}
-                  belowTreeline={avalancheForecast.dangerBelowTreeline}
-                />
-                <div className="flex gap-4">
-                  <DangerBadge label="Above treeline" level={avalancheForecast.dangerAboveTreeline} />
-                  <DangerBadge label="Near treeline" level={avalancheForecast.dangerNearTreeline} />
-                  <DangerBadge label="Below treeline" level={avalancheForecast.dangerBelowTreeline} />
-                </div>
-                <p className="text-foreground/90">{avalancheForecast.summary}</p>
-                <a href={avalancheForecast.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                  Full forecast ↗
-                </a>
-              </div>
-            ) : avalancheZone ? (
-              <p className="text-sm text-muted-foreground">Zone matched ({avalancheZone.zoneName}) but forecast couldn&apos;t be loaded.</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No avalanche forecast zone covers this point (outside avalanche.org coverage, or the point/zone-boundary API needs verification — see ARCHITECTURE.md).</p>
-            )}
-          </section>
+          <AvalancheCard zone={avalancheZone} forecast={avalancheForecast} />
 
           {pastDays.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-3 font-bold tracking-tight">Past 7 days</h2>
+            <Section
+              id="past-7-days"
+              title="Past 7 days"
+              summary={`${pastDays.slice(-7).reduce((s, d) => s + d.snowfallSumIn, 0).toFixed(1)}" of snow`}
+              defaultOpen={false}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[420px] text-sm">
                   <thead>
@@ -260,12 +202,19 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Section>
           )}
 
           {keyStations.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-1 font-bold tracking-tight">{keyStationsRangeName} weather stations</h2>
+            <Section
+              id="key-stations"
+              title={`${keyStationsRangeName} weather stations`}
+              summary={keyStations
+                .slice(0, 3)
+                .map((st) => `${st.name} ${st.tempF != null ? `${Math.round(st.tempF)}°F` : "—"}`)
+                .join(" · ")}
+              defaultOpen={false}
+            >
               <p className="mb-3 text-xs text-muted-foreground">
                 Curated high-elevation stations backcountry travelers actually watch here — the generic
                 &quot;nearest station&quot; is almost always a valley airport, which doesn&apos;t tell you much about
@@ -286,12 +235,20 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           )}
 
           {(nearestSnotel || nearestNwsStations.length > 0) && (
-            <section className="card p-4">
-              <h2 className="mb-1 font-bold tracking-tight">Nearby stations</h2>
+            <Section
+              id="nearby-stations"
+              title="Nearby stations"
+              summary={
+                nearestSnotel
+                  ? `SNOTEL ${nearestSnotel.station.name}: ${nearestSnotel.snowDepthIn != null ? `${nearestSnotel.snowDepthIn}" depth` : "no depth reading"}`
+                  : nearestNwsStations[0]?.name
+              }
+              defaultOpen={false}
+            >
               {nearestSnotel && (
                 <p className="text-sm text-foreground/90">
                   <strong>SNOTEL</strong> — {nearestSnotel.station.name} ({nearestSnotel.station.distanceMi.toFixed(1)} mi away, {nearestSnotel.station.elevationFt.toLocaleString()} ft) —{" "}
@@ -304,15 +261,14 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                   <strong>NWS observation stations</strong> — {nearestNwsStations.slice(0, 3).map((s) => s.name).join(", ")}
                 </p>
               )}
-            </section>
+            </Section>
           )}
 
           <ForecastDiscussion afd={afd} />
 
-          <section className="card p-4">
-            <h2 className="mb-2 font-bold tracking-tight">Powder wake-up</h2>
+          <Section id="wake-alarm" title="Powder wake-up" summary="Get pinged when a powder morning is coming" defaultOpen={false}>
             <WakeAlarmForm location={location} />
-          </section>
+          </Section>
         </div>
 
         <aside className="mt-5 md:mt-0 md:w-80 md:shrink-0 lg:w-96">
@@ -341,19 +297,6 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-bold tracking-tight">{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
-    </div>
-  );
-}
-
-function DangerBadge({ label, level }: { label: string; level: number | null }) {
-  const colors = ["bg-muted", "bg-green-500", "bg-yellow-400", "bg-orange-500", "bg-red-600", "bg-black"];
-  const color = level != null && level >= 0 && level <= 5 ? colors[level] : "bg-muted";
-  return (
-    <div className="text-center">
-      <div className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${color}`}>
-        {level ?? "?"}
-      </div>
-      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }

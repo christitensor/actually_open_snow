@@ -40,6 +40,10 @@ export interface HourlyForecastPoint {
   windDirectionDeg: number;
   weatherCode: number;
   freezingLevelFt: number;
+  /** Total cloud cover, 0-100. null when the model doesn't provide it. */
+  cloudCoverPct: number | null;
+  /** Chance of ≥0.1 mm precip this hour, 0-100 (ensemble-based; runs out before the 16-day range ends). */
+  precipProbabilityPct: number | null;
 }
 
 export interface DailyForecastDay {
@@ -55,6 +59,12 @@ export interface DailyForecastDay {
   /** Local wall-clock ISO datetime (no offset), same convention as HourlyForecastPoint.time */
   sunrise: string;
   sunset: string;
+  /** Mean cloud cover over the day, 0-100 */
+  cloudCoverMeanPct: number | null;
+  /** Highest hourly precip chance in the day, 0-100 */
+  precipProbabilityMaxPct: number | null;
+  /** Hours of direct sun (Open-Meteo sunshine_duration) */
+  sunshineHours: number | null;
 }
 
 /** One day of the elevation-adjusted forecast (FC-10-adj), produced by lib/derive/elevation-snow.ts. Not the full ForecastResponse: no hourly block, no wind. */
@@ -162,19 +172,60 @@ export interface NwsAlert {
 
 export interface AvalancheZone {
   zoneId: string;
+  /** Short center code, e.g. "UAC", "CAIC" — required by avalanche.org's forecast query. */
+  centerId: string;
   centerName: string;
   zoneName: string;
+  /** The center's own forecast page for this zone. */
+  link: string | null;
+  /** Today's highest rating from the map layer, 1-5; null when the center posts "no rating" (-1/0). */
+  overallDanger: number | null;
+  offSeason: boolean;
+  travelAdvice: string | null;
+  /** IANA timezone of the center, e.g. "America/Denver" */
+  timezone: string | null;
+}
+
+export interface AvalancheProblem {
+  name: string;
+  likelihood: string | null;
+  /** D-scale size range, e.g. ["1.0", "1.5"] */
+  size: string[];
+  /** e.g. "northwest upper" — aspect + elevation band (upper/middle/lower) */
+  locations: string[];
+  /** Forecaster's discussion of this problem (UAC). */
+  description?: string;
 }
 
 export interface AvalancheForecast {
   zoneId: string;
+  /** The forecast's own name for this zone, when it has one (CAIC's map-layer names are just "CAIC zone"). */
+  zoneName: string | null;
   dangerAboveTreeline: number | null;
   dangerNearTreeline: number | null;
   dangerBelowTreeline: number | null;
+  /** Highest current rating: from the elevation bands when the center publishes them, else the map layer's overall rating. */
+  overallDanger: number | null;
+  /** False when the center only publishes an overall rating to avalanche.org (e.g. UAC) — the elevation breakdown lives on its own site. */
+  hasBandRatings: boolean;
+  tomorrow: { above: number | null; near: number | null; below: number | null } | null;
+  problems: AvalancheProblem[];
   summary: string;
   issuedAt: string;
   expiresAt: string;
   url: string;
+  /** Per-aspect danger, 24 values: above treeline N,NE,E,SE,S,SW,W,NW, then near, then below. 1-5 or null. Only when the center publishes it (UAC). */
+  rose: (number | null)[] | null;
+  /** Avalanche Warning / special bulletin text, if one is in effect. */
+  warning: string | null;
+  /** Extra forecaster sections (recent activity, weather, ...). */
+  discussion: { heading: string; text: string }[];
+  author: string | null;
+  /** The forecast's own date (YYYY-MM-DD, center-local), when known. */
+  forecastDate: string | null;
+  /** True when the latest available forecast is older than yesterday. */
+  isStale: boolean;
+  source: "avalanche.org" | "uac";
 }
 
 /** BC-03: a single field report from utahavalanchecenter.org's public observations feed — either an avalanche occurrence or a general (no-avalanche) field observation. */

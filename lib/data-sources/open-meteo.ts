@@ -26,6 +26,8 @@ const HOURLY_PARAMS = [
   "wind_direction_10m",
   "weather_code",
   "freezing_level_height",
+  "cloud_cover",
+  "precipitation_probability",
 ].join(",");
 
 const DAILY_PARAMS = [
@@ -39,6 +41,9 @@ const DAILY_PARAMS = [
   "weather_code",
   "sunrise",
   "sunset",
+  "cloud_cover_mean",
+  "precipitation_probability_max",
+  "sunshine_duration",
 ].join(",");
 
 interface OpenMeteoForecastRaw {
@@ -56,6 +61,8 @@ interface OpenMeteoForecastRaw {
     wind_direction_10m: number[];
     weather_code: number[];
     freezing_level_height: number[];
+    cloud_cover: (number | null)[];
+    precipitation_probability: (number | null)[];
   };
   daily: {
     time: string[];
@@ -69,6 +76,10 @@ interface OpenMeteoForecastRaw {
     weather_code: number[];
     sunrise: string[];
     sunset: string[];
+    cloud_cover_mean: (number | null)[];
+    precipitation_probability_max: (number | null)[];
+    /** seconds */
+    sunshine_duration: (number | null)[];
   };
 }
 
@@ -128,6 +139,8 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     // reading; caught via a wildly implausible 51,990 ft "snow line" in
     // the new per-day forecast table.
     freezingLevelFt: Math.round(raw.hourly.freezing_level_height[i]),
+    cloudCoverPct: raw.hourly.cloud_cover?.[i] ?? null,
+    precipProbabilityPct: raw.hourly.precipitation_probability?.[i] ?? null,
   }));
 
   const daily: DailyForecastDay[] = raw.daily.time.map((date, i) => ({
@@ -142,6 +155,9 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     weatherCode: raw.daily.weather_code[i],
     sunrise: raw.daily.sunrise[i],
     sunset: raw.daily.sunset[i],
+    cloudCoverMeanPct: raw.daily.cloud_cover_mean?.[i] ?? null,
+    precipProbabilityMaxPct: raw.daily.precipitation_probability_max?.[i] ?? null,
+    sunshineHours: raw.daily.sunshine_duration?.[i] != null ? raw.daily.sunshine_duration[i]! / 3600 : null,
   }));
 
   return {

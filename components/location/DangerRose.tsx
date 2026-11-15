@@ -1,104 +1,120 @@
-// BC-01: the classic UAC/avalanche.org "danger rose" — a compass wheel
-// with three rings (above/near/below treeline). The real rose also varies
-// color by aspect within a ring when a specific avalanche problem is
-// aspect-restricted; that detail lives in avalanche.org's
-// forecast_avalanche_problems array, which this app doesn't parse. It's
-// off-season everywhere in the US as of this build (Aug 2026), so that
-// field comes back `[]` on every live check — there's no way to verify
-// its real field names against actual data right now (see the same
-// caveat on lib/data-sources/avalanche-org.ts's danger[] parsing). Rather
-// than guess field names for a safety-relevant diagram, this renders each
-// ring as a uniform color from the three elevation-band values this app
-// already verifies live — an honest subset of the full rose, not a fake
-// full one. "Full forecast ↗" links to the real thing.
+// BC-01: the standard North American avalanche "danger rose" — 8 aspect
+// wedges × 3 elevation rings. Center = above treeline (the summit), outer
+// ring = below treeline, matching the roses avalanche centers (UAC, CAIC)
+// publish themselves.
+//
+// Two inputs:
+// - `rose`: 24 per-aspect danger levels (UAC publishes these) — each wedge
+//   gets its own color.
+// - band levels only (most centers via avalanche.org): each ring is one
+//   color, an honest subset rather than an invented per-aspect breakdown.
+//
+// ProblemRose reuses the geometry to show where one avalanche problem
+// exists (filled) vs. not (gray).
 
 const ASPECT_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
-// Standard North American avalanche danger scale, 1 (Low) through 5
-// (Extreme) — matches DangerBadge's colors in LocationDashboard.tsx.
-const DANGER_COLORS = ["#9ca3af", "#22c55e", "#facc15", "#f97316", "#dc2626", "#000000"];
+// Standard North American danger scale colors, 1 Low … 5 Extreme.
+const DANGER_COLORS = ["#d1d5db", "#50b848", "#fff200", "#f7941e", "#ed1c24", "#231f20"];
+const PROBLEM_COLOR = "#3fb3e9";
+const ABSENT_COLOR = "#d1d5db";
 
-function dangerColor(level: number | null): string {
-  return level != null && level >= 0 && level <= 5 ? DANGER_COLORS[level] : DANGER_COLORS[0];
+export const dangerColor = (level: number | null) => (level != null && level >= 1 && level <= 5 ? DANGER_COLORS[level] : DANGER_COLORS[0]);
+
+const C = 100;
+// Ring radii, inner → outer: above, near, below treeline.
+const RADII: [number, number][] = [
+  [0, 28],
+  [28, 54],
+  [54, 80],
+];
+
+function polar(r: number, deg: number) {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [C + r * Math.cos(a), C + r * Math.sin(a)];
 }
 
-function labelPoint(index: number, radius: number, center: number) {
-  const angle = (index * 45 - 90) * (Math.PI / 180); // 0deg = N = straight up
-  return { x: center + radius * Math.cos(angle), y: center + radius * Math.sin(angle) };
+function wedgePath(band: number, aspect: number) {
+  const [r0, r1] = RADII[band];
+  const a0 = aspect * 45 - 22.5;
+  const a1 = aspect * 45 + 22.5;
+  const [x1, y1] = polar(r1, a0);
+  const [x2, y2] = polar(r1, a1);
+  if (r0 === 0) return `M${C},${C} L${x1},${y1} A${r1},${r1} 0 0 1 ${x2},${y2} Z`;
+  const [x3, y3] = polar(r0, a1);
+  const [x4, y4] = polar(r0, a0);
+  return `M${x1},${y1} A${r1},${r1} 0 0 1 ${x2},${y2} L${x3},${y3} A${r0},${r0} 0 0 0 ${x4},${y4} Z`;
+}
+
+function RoseSvg({ fill, size, label, showLabels = true }: { fill: (band: number, aspect: number) => string; size: number; label: string; showLabels?: boolean }) {
+  return (
+    <svg viewBox="0 0 200 200" width={size} height={size} className="shrink-0" role="img" aria-label={label}>
+      {[0, 1, 2].map((band) =>
+        ASPECT_LABELS.map((_, aspect) => (
+          <path key={`${band}-${aspect}`} d={wedgePath(band, aspect)} fill={fill(band, aspect)} stroke="var(--card, #fff)" strokeWidth={1.5} />
+        ))
+      )}
+      {showLabels &&
+        ASPECT_LABELS.map((l, i) => {
+          const [x, y] = polar(92, i * 45);
+          return (
+            <text key={l} x={x} y={y} textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground" fontSize={11} fontWeight={l === "N" ? 700 : 500}>
+              {l}
+            </text>
+          );
+        })}
+    </svg>
+  );
 }
 
 export default function DangerRose({
+  rose,
   aboveTreeline,
   nearTreeline,
   belowTreeline,
 }: {
+  rose?: (number | null)[] | null;
   aboveTreeline: number | null;
   nearTreeline: number | null;
   belowTreeline: number | null;
 }) {
-  const center = 100;
-  const rings = [
-    { level: aboveTreeline, outerR: 80, innerR: 55 },
-    { level: nearTreeline, outerR: 55, innerR: 30 },
-    { level: belowTreeline, outerR: 30, innerR: 0 },
-  ];
-
+  const bands = [aboveTreeline, nearTreeline, belowTreeline];
+  const perAspect = rose != null && rose.length === 24;
   return (
     <div className="flex items-center gap-4">
-      <svg viewBox="0 0 200 200" width={140} height={140} className="shrink-0" role="img" aria-label="Avalanche danger rose">
-        {rings.map((r, i) =>
-          r.innerR > 0 ? (
-            <circle
-              key={i}
-              cx={center}
-              cy={center}
-              r={(r.outerR + r.innerR) / 2}
-              fill="none"
-              stroke={dangerColor(r.level)}
-              strokeWidth={r.outerR - r.innerR}
-            />
-          ) : (
-            <circle key={i} cx={center} cy={center} r={r.outerR} fill={dangerColor(r.level)} />
-          )
-        )}
-        {/* Thin compass-direction dividers, background-colored so they read as gaps between the 8 wedges a full rose would show. */}
-        {ASPECT_LABELS.map((_, i) => {
-          const p = labelPoint(i, 80, center);
-          return (
-            <line
-              key={i}
-              x1={center}
-              y1={center}
-              x2={p.x}
-              y2={p.y}
-              stroke="var(--color-card, #fff)"
-              strokeWidth={1.5}
-            />
-          );
-        })}
-        <circle cx={center} cy={center} r={80} fill="none" stroke="var(--color-border, #e5e7eb)" strokeWidth={1} />
-        {ASPECT_LABELS.map((label, i) => {
-          const p = labelPoint(i, 92, center);
-          return (
-            <text
-              key={label}
-              x={p.x}
-              y={p.y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="fill-muted-foreground"
-              fontSize={11}
-              fontWeight={label === "N" ? 700 : 500}
-            >
-              {label}
-            </text>
-          );
-        })}
-      </svg>
+      <RoseSvg
+        size={150}
+        label="Avalanche danger rose"
+        fill={(band, aspect) => dangerColor(perAspect ? rose![band * 8 + aspect] : bands[band])}
+      />
       <div className="space-y-1 text-xs text-muted-foreground">
-        <p>Shown by elevation band (outer ring = above treeline, inner = below).</p>
-        <p>UAC&apos;s full rose also varies by aspect within a band — see the full forecast for that detail.</p>
+        <p>Center = above treeline, middle ring = near treeline, outer ring = below treeline.</p>
+        <p>
+          {perAspect
+            ? "Colored by aspect, as published by the avalanche center."
+            : "One color per elevation band — this center doesn't publish a per-aspect breakdown through the feed; see the problems below and the full forecast."}
+        </p>
       </div>
     </div>
+  );
+}
+
+/** Where one avalanche problem exists: filled wedges = present. `locations` like "northwest upper". */
+export function ProblemRose({ locations, size = 64 }: { locations: string[]; size?: number }) {
+  const ASPECTS = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"];
+  const BANDS = ["upper", "middle", "lower"];
+  const present = new Set(
+    locations.map((l) => {
+      const [aspect, band] = l.split(" ");
+      return `${BANDS.indexOf(band)}-${ASPECTS.indexOf(aspect)}`;
+    })
+  );
+  return (
+    <RoseSvg
+      size={size}
+      showLabels={false}
+      label={`Where: ${locations.join(", ")}`}
+      fill={(band, aspect) => (present.has(`${band}-${aspect}`) ? PROBLEM_COLOR : ABSENT_COLOR)}
+    />
   );
 }

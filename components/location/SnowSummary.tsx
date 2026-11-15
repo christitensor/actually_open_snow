@@ -1,5 +1,6 @@
 import type { DailyForecastDay, HistoricalDay } from "@/lib/models/types";
 import SnowTimelineScroller from "@/components/location/SnowTimelineScroller";
+import Section from "@/components/ui/Section";
 
 // A single past+future snowfall timeline in one scannable strip, rather
 // than the two separate "Past 7 days" / "14-day forecast" tables making
@@ -112,11 +113,15 @@ export default function SnowSummary({
   const anchorIndex = lastPastIndex >= 0 ? lastPastIndex : 0;
 
   return (
-    <section className="card p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-bold tracking-tight">Snow Summary</h2>
-        <span className="text-xs text-muted-foreground">Past 15 days · next {TIMELINE_FUTURE_DAYS} days</span>
-      </div>
+    <Section
+      id="snow-summary"
+      title="Snow Summary"
+      meta={`Past 15 days · next ${TIMELINE_FUTURE_DAYS} days`}
+      summary={groups
+        .filter((g) => g.label === "Prev 1-5 Days" || g.label === "Next 1-5 Days")
+        .map((g) => `${g.label}: ${formatGroupInches(g.days.reduce((s, d) => s + d.snowIn, 0))}`)
+        .join(" · ")}
+    >
 
       <SnowTimelineScroller>
         <div className="flex w-max gap-2">
@@ -184,6 +189,6 @@ export default function SnowSummary({
       <p className="mt-3 text-xs text-muted-foreground">
         Each block totals its days; bar labels are new snow that day (gray = past/actual, blue = forecast, orange = today). Swipe for more.
       </p>
-    </section>
+    </Section>
   );
 }
