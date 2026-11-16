@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createMagicLinkToken, currentMagicLinkCode } from "@/lib/auth/magic-link";
 import { sendEmail } from "@/lib/email";
 import { badRequest, serverError } from "@/lib/util/api";
+import { hit } from "@/lib/auth/rate-limit";
+
+// Sends per email per 15 minutes, so the form can't be used to flood an inbox.
+const MAX_SENDS = 4;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,11 +23,15 @@ export async function POST(req: NextRequest) {
     return badRequest("Request body must be JSON");
   }
 
-  const { email, next } = body as Record<string, unknown>;
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) return badRequest("A valid email is required");
-  const nextPath = typeof next === "string" && next.startsWith("/") ? next : "/";
+  const { email: rawEmail, next } = body as Record<string, unknown>;
+  if (typeof rawEmail !== "string" || !EMAIL_RE.test(rawEmail.trim())) return badRequest("A valid email is required");
+  const email = rawEmail.trim().toLowerCase();
+  const nextPath = typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
   try {
+    if (!(await hit(`send:${email}`, MAX_SENDS)).ok) {
+      return NextResponse.json({ error: "Several codes were already sent. Use the latest one, or try again in 15 minutes." }, { status: 429 });
+    }
     const { token } = createMagicLinkToken(email);
     const code = currentMagicLinkCode(email);
     const origin = req.nextUrl.origin;
@@ -31,11 +39,11 @@ export async function POST(req: NextRequest) {
 
     await sendEmail({
       to: email,
-      subject: "Sign in to Actually Open Snow",
-      text: `Click to sign in: ${verifyUrl}\n\nUsing this saved to your home screen? Tapping the link above opens Safari instead of the saved app, so it won't sign that in. Open the app and enter this code instead: ${code}\n\nThe link and code both work once and expire in 15 minutes. If you didn't request this, ignore it.`,
+      subject: `${code} is your Actually Open Snow code`,
+      text: `Your sign-in code: ${code}\n\nEnter it in the app where you asked for it. It expires in 15 minutes.\n\nOr sign in this browser with this link: ${verifyUrl}\n\nTip: once you're in, add a passkey (Account → Sign-in methods) and next time it's just Face ID or Touch ID, on any of your devices.\n\nIf you didn't request this, ignore this email.`,
     });
 
-    return NextResponse.json({ message: `Check ${email} for a sign-in link and code.` });
+    return NextResponse.json({ message: `We sent a 6-digit code to ${email}.` });
   } catch (err) {
     return serverError(err);
   }

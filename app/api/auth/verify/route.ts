@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, getOrCreateUser } from "@/lib/db/users";
+import { getOrCreateUser } from "@/lib/db/users";
 import { consumeMagicLinkToken } from "@/lib/auth/magic-link";
-import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
+import { createSession, setSessionCookie } from "@/lib/auth/sessions";
 
-// PERS-04: the link target from the sign-in email. Burns the token,
-// creates (or reuses) the account, starts a session, and redirects home —
-// designed to be clicked, not fetched, so it returns a redirect rather
-// than JSON. `signedIn=1` on the redirect tells the client to import any
-// localStorage favorites into the new account (see lib/auth.tsx).
+// PERS-04: the link in the sign-in email (the 6-digit code is the primary
+// path; see /api/auth/verify-code). Signs in whichever browser opens it and
+// redirects back. `signedIn=1` tells the client to import local favorites
+// and offer to add a passkey.
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   const next = req.nextUrl.searchParams.get("next");
-  const nextPath = next && next.startsWith("/") ? next : "/";
+  const nextPath = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
   const email = token ? consumeMagicLinkToken(token) : null;
   if (!email) {
@@ -21,11 +20,11 @@ export async function GET(req: NextRequest) {
   }
 
   const user = await getOrCreateUser(email);
-  const { token: sessionToken, expiresAt } = createSession(user.id, user.email);
+  const session = await createSession(user.id, req.headers.get("user-agent"));
 
   const url = new URL(nextPath, req.url);
   url.searchParams.set("signedIn", "1");
   const response = NextResponse.redirect(url);
-  response.cookies.set(SESSION_COOKIE, sessionToken, { ...SESSION_COOKIE_OPTIONS, expires: expiresAt });
+  setSessionCookie(response, session.token, session.expiresAt);
   return response;
 }

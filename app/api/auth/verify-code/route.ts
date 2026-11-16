@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, getOrCreateUser } from "@/lib/db/users";
+import { getOrCreateUser } from "@/lib/db/users";
 import { verifyMagicLinkCode } from "@/lib/auth/magic-link";
-import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
+import { createSession, setSessionCookie } from "@/lib/auth/sessions";
+import { hit, peek } from "@/lib/auth/rate-limit";
 import { badRequest } from "@/lib/util/api";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// A 6-digit code has a million values; cap guesses per email per 15 minutes.
+const MAX_GUESSES = 6;
 
-// PERS-04: the in-app counterpart to /api/auth/verify. A magic link tapped
-// from Mail always opens in Safari, never the saved-to-home-screen app
-// (separate storage silo on iOS), so it can't sign that app in. This lets
-// someone who already has the app open finish sign-in there directly —
-// same effect as the link, just started from a same-origin fetch instead
-// of a top-level navigation, so the session cookie lands in the right place.
+// PERS-04: sign in with the 6-digit emailed code, typed into the app. This
+// is the primary email path because it works inside an iOS home-screen app,
+// where a tapped email link would open Safari instead.
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -20,17 +20,23 @@ export async function POST(req: NextRequest) {
     return badRequest("Request body must be JSON");
   }
 
-  const { email, code } = body as Record<string, unknown>;
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) return badRequest("A valid email is required");
-  if (typeof code !== "string" || !/^\d{6}$/.test(code)) return badRequest("A valid 6-digit code is required");
+  const { email: rawEmail, code } = body as Record<string, unknown>;
+  if (typeof rawEmail !== "string" || !EMAIL_RE.test(rawEmail.trim())) return badRequest("A valid email is required");
+  if (typeof code !== "string" || !/^\d{6}$/.test(code)) return badRequest("Enter the 6-digit code from the email.");
+  const email = rawEmail.trim().toLowerCase();
 
-  const valid = verifyMagicLinkCode(email, code);
-  if (!valid) return NextResponse.json({ error: "That code is invalid, expired, or already used." }, { status: 400 });
+  const guesses = await hit(`guess:${email}`, MAX_GUESSES);
+  if (!guesses.ok) {
+    return NextResponse.json({ error: "Too many tries. Wait 15 minutes, then request a new code." }, { status: 429 });
+  }
+  if ((await peek(`used:${email}:${code}`)) > 0 || !verifyMagicLinkCode(email, code)) {
+    return NextResponse.json({ error: "That code is wrong or has expired. Check the latest email, or send a new code." }, { status: 400 });
+  }
+  await hit(`used:${email}:${code}`, 1); // one-time use
 
   const user = await getOrCreateUser(email);
-  const { token: sessionToken, expiresAt } = createSession(user.id, user.email);
-
+  const session = await createSession(user.id, req.headers.get("user-agent"));
   const response = NextResponse.json({ email: user.email });
-  response.cookies.set(SESSION_COOKIE, sessionToken, { ...SESSION_COOKIE_OPTIONS, expires: expiresAt });
+  setSessionCookie(response, session.token, session.expiresAt);
   return response;
 }

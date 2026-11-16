@@ -5,11 +5,8 @@
 // start a session instead of removing a subscription. Magic links
 // themselves are stateless (lib/auth/magic-link.ts) — see that file for why.
 import { getSql } from "./postgres";
-import { createSessionToken, verifySessionToken } from "@/lib/auth/session-token";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
-
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export interface User {
   id: number;
@@ -29,7 +26,9 @@ interface UserRow {
 
 export async function getOrCreateUser(email: string): Promise<User> {
   const sql = await getSql();
-  const existing = (await sql`SELECT id, email FROM users WHERE email = ${email}`) as UserRow[];
+  email = email.trim().toLowerCase();
+  // Case-insensitive: older rows may have been stored with the casing someone typed.
+  const existing = (await sql`SELECT id, email FROM users WHERE lower(email) = ${email} ORDER BY id LIMIT 1`) as UserRow[];
   if (existing[0]) return existing[0];
 
   const inserted = (await sql`
@@ -38,21 +37,6 @@ export async function getOrCreateUser(email: string): Promise<User> {
     RETURNING id, email
   `) as UserRow[];
   return inserted[0];
-}
-
-// --- Sessions ----------------------------------------------------------
-
-// Stateless: the token itself carries {userId, email, expiresAt} plus an
-// HMAC (lib/auth/session-token.ts), so validating it needs no database
-// lookup — see that file's comment for why (ephemeral SQLite on Vercel).
-export function createSession(userId: number, email: string): { token: string; expiresAt: Date } {
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  return { token: createSessionToken(userId, email, expiresAt), expiresAt };
-}
-
-export function getUserBySessionToken(token: string): User | null {
-  const verified = verifySessionToken(token);
-  return verified ? { id: verified.userId, email: verified.email } : null;
 }
 
 // --- Favorites -----------------------------------------------------------
@@ -116,4 +100,10 @@ export async function importFavoritesForUser(userId: number, favorites: Favorite
     `;
   }
   return listFavoritesForUser(userId);
+}
+
+export async function getUserById(id: number): Promise<User | null> {
+  const sql = await getSql();
+  const rows = (await sql`SELECT id, email FROM users WHERE id = ${id}`) as UserRow[];
+  return rows[0] ?? null;
 }

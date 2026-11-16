@@ -30,11 +30,20 @@ npx eslint .                      # lint
 
 | Variable | Purpose |
 |---|---|
-| `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Account sign-in emails, via `lib/email.ts`. Without these, sign-in links are logged to the server console instead of emailed. Set both to actually deliver email via [Resend](https://resend.com). |
+| `DATABASE_URL` (or `POSTGRES_URL`) | Postgres for accounts, sessions, passkeys and favorites. Neon URLs use Neon's HTTP driver; any other Postgres (self-hosted, Supabase, RDS, local) uses a normal TCP connection. Without it, sign-in is unavailable and favorites stay in the browser. |
+| `SESSION_SECRET` | Signs session cookies and email codes. **Required in production**: a long random string, the same on every instance (`openssl rand -base64 32`). Without it each server instance makes up its own, and sign-ins don't stick. |
+| `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Sign-in code emails, via `lib/email.ts`. Without these, the code is logged to the server console instead of emailed (handy for local dev). Set both to actually deliver email via [Resend](https://resend.com). |
+| `AUTH_ORIGIN` | Optional. The public origin(s) passkeys are bound to, comma-separated (e.g. `https://snow.example.com`). Defaults to the request's host, which is right on Vercel; set it when running behind a proxy that rewrites the host. Passkeys only work on the origin they were created on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Powder wake-up push notifications (PERS-06). Generate once with `npx web-push generate-vapid-keys`; without them the wake-up card says it isn't set up. |
 | `CRON_SECRET` | If set, `/api/push/check` requires `Authorization: Bearer <secret>`. Unset by default for local dev; set it before deploying somewhere public, since nothing else protects that endpoint from being triggered repeatedly. |
 
 `/api/push/check` runs daily via Vercel Cron (`vercel.json`, 11:00 UTC) once deployed there. Set `CRON_SECRET` to lock the endpoint down — Vercel automatically sends it as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change.
+
+## Accounts and sign-in
+
+People sign in with a **passkey** (Face ID / Touch ID / device PIN; synced across their devices by iCloud Keychain or Google Password Manager) or a **6-digit email code**, which is always available as the backup. Both happen inside the page, so they work in an iOS home-screen app too. The account page (`/account`) lets each person add, rename and remove passkeys, and see and sign out their signed-in devices.
+
+Sessions are rows in Postgres (`lib/auth/sessions.ts`) behind an HMAC-signed cookie. They last 180 days from last use, so you stay signed in on any device you keep using. Email codes are single-use and rate-limited (sends and guesses) per address.
 
 ## Project layout
 
