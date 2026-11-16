@@ -2,6 +2,7 @@ import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import WakeAlarmForm from "@/components/location/WakeAlarmForm";
 import ForecastTable from "@/components/location/ForecastTable";
+import { ElevationProvider, TodaySnowTile } from "@/components/location/ElevationContext";
 import HourlyForecast from "@/components/location/HourlyForecast";
 import ForecastDiscussion from "@/components/location/ForecastDiscussion";
 import AvalancheCard from "@/components/location/AvalancheCard";
@@ -94,6 +95,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           scrolling through a long page, instead of only reachable at the
           very bottom of a stretched single column. */}
       <div className="md:flex md:items-start md:gap-6">
+        <ElevationProvider location={location} elevationFt={elevationFt} elevationModel={data.elevationModel}>
         <div className="space-y-5 md:min-w-0 md:flex-1">
           <Section id="conditions-summary" title="Conditions summary" summary={conditionsSummary.narrative}>
             <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
@@ -124,7 +126,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
             <StatTile label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above" : "Below"} />
-            <StatTile label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
+            <TodaySnowTile date={forecast.daily[0]?.date} rawIn={forecast.daily[0]?.snowfallSumIn ?? 0} />
             <StatTile label="Powder quality" value={powderQualityToday?.quality ?? "No new snow"} sub={powderQualityToday ? `~${powderQualityToday.estimatedRatio}:1 (est.)` : undefined} />
             <StatTile label="Trail conditions (est.)" value={trailConditions?.label ?? "—"} sub={trailConditions?.detail} />
             <StatTile label="Wet-bulb temp" value={wetBulbNowF != null ? `${Math.round(wetBulbNowF)}°F` : "—"} sub="Snowmaking-relevant" />
@@ -137,8 +139,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           </Section>
 
           <ForecastTable
-            location={location}
-            elevationFt={elevationFt}
             dailyForecast={forecast.daily}
             dailySnowLines={dailySnowLines}
             elevationModel={data.elevationModel}
@@ -270,6 +270,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             <WakeAlarmForm location={location} />
           </Section>
         </div>
+
+        </ElevationProvider>
 
         <aside className="mt-5 md:mt-0 md:w-80 md:shrink-0 lg:w-96">
           <section className="card h-72 overflow-hidden md:sticky md:top-20 md:h-[calc(100dvh-7rem)]">
