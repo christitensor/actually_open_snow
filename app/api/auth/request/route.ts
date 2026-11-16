@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMagicLinkToken, currentMagicLinkCode } from "@/lib/auth/magic-link";
+import { createMagicLinkToken, magicLinkCode } from "@/lib/auth/magic-link";
 import { sendEmail } from "@/lib/email";
 import { badRequest, serverError } from "@/lib/util/api";
 import { hit } from "@/lib/auth/rate-limit";
@@ -29,11 +29,12 @@ export async function POST(req: NextRequest) {
   const nextPath = typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
   try {
-    if (!(await hit(`send:${email}`, MAX_SENDS)).ok) {
+    const send = await hit(`send:${email}`, MAX_SENDS);
+    if (!send.ok) {
       return NextResponse.json({ error: "Several codes were already sent. Use the latest one, or try again in 15 minutes." }, { status: 429 });
     }
     const { token } = createMagicLinkToken(email);
-    const code = currentMagicLinkCode(email);
+    const code = magicLinkCode(email, send.count); // a different code for each send
     const origin = req.nextUrl.origin;
     const verifyUrl = `${origin}/api/auth/verify?token=${token}&next=${encodeURIComponent(nextPath)}`;
 

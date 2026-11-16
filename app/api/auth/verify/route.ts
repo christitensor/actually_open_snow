@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(nextPath, req.url);
   url.searchParams.set("signedIn", "1");
+  if (user.created) url.searchParams.set("accountCreated", "1");
   const response = NextResponse.redirect(url);
   setSessionCookie(response, session.token, session.expiresAt);
   return response;

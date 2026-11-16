@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateUser } from "@/lib/db/users";
 import { verifyMagicLinkCode } from "@/lib/auth/magic-link";
 import { createSession, setSessionCookie } from "@/lib/auth/sessions";
-import { hit, peek } from "@/lib/auth/rate-limit";
+import { counts, hit, peek } from "@/lib/auth/rate-limit";
 import { badRequest } from "@/lib/util/api";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,14 +29,14 @@ export async function POST(req: NextRequest) {
   if (!guesses.ok) {
     return NextResponse.json({ error: "Too many tries. Wait 15 minutes, then request a new code." }, { status: 429 });
   }
-  if ((await peek(`used:${email}:${code}`)) > 0 || !verifyMagicLinkCode(email, code)) {
+  if ((await peek(`used:${email}:${code}`)) > 0 || !verifyMagicLinkCode(email, code, await counts(`send:${email}`))) {
     return NextResponse.json({ error: "That code is wrong or has expired. Check the latest email, or send a new code." }, { status: 400 });
   }
   await hit(`used:${email}:${code}`, 1); // one-time use
 
   const user = await getOrCreateUser(email);
   const session = await createSession(user.id, req.headers.get("user-agent"));
-  const response = NextResponse.json({ email: user.email });
+  const response = NextResponse.json({ email: user.email, created: user.created });
   setSessionCookie(response, session.token, session.expiresAt);
   return response;
 }

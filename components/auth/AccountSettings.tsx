@@ -65,7 +65,10 @@ export default function AccountSettings() {
     return (
       <div className="card p-4 text-sm">
         <p className="font-semibold">You&apos;re not signed in.</p>
-        <p className="mt-1 text-muted-foreground">Use &ldquo;Sign in&rdquo; at the top of the page, with a passkey or an email code.</p>
+        <p className="mt-1 text-muted-foreground">
+          Tap &ldquo;Sign in&rdquo; at the top of the page. New here? Choose &ldquo;Create account&rdquo;: confirm your email with a code,
+          then create a passkey.
+        </p>
       </div>
     );
   }
