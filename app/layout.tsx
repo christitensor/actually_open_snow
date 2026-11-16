@@ -23,6 +23,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Lets env(safe-area-inset-*) report real values (BottomNav/UndoToast pad
+  // for the home indicator with it); without this they're always 0.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
     { media: "(prefers-color-scheme: dark)", color: "#020617" },
@@ -70,7 +73,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               ballooning the whole page's width instead of letting that one
               table scroll on its own. flex-1 alone still grows main to fill
               body's column layout without that side effect. */}
-          <main className="min-w-0 flex-1 pb-20 sm:pb-0">{children}</main>
+          <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
           <BottomNav />
           <UndoToast />
         </AuthProvider>

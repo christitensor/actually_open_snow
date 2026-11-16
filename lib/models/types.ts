@@ -40,6 +40,10 @@ export interface HourlyForecastPoint {
   windDirectionDeg: number;
   weatherCode: number;
   freezingLevelFt: number;
+  /** Total cloud cover, 0-100. null when the model doesn't provide it. */
+  cloudCoverPct: number | null;
+  /** Chance of ≥0.1 mm precip this hour, 0-100 (ensemble-based; runs out before the 16-day range ends). */
+  precipProbabilityPct: number | null;
 }
 
 export interface DailyForecastDay {
@@ -55,15 +59,65 @@ export interface DailyForecastDay {
   /** Local wall-clock ISO datetime (no offset), same convention as HourlyForecastPoint.time */
   sunrise: string;
   sunset: string;
+  /** Mean cloud cover over the day, 0-100 */
+  cloudCoverMeanPct: number | null;
+  /** Highest hourly precip chance in the day, 0-100 */
+  precipProbabilityMaxPct: number | null;
+  /** Hours of direct sun (Open-Meteo sunshine_duration) */
+  sunshineHours: number | null;
 }
 
-/** A lightweight, elevation-overridden daily forecast — see FC-10-adj (elevation adjuster). Not the full ForecastResponse: no hourly block, no wind. */
+/** One day of the elevation-adjusted forecast (FC-10-adj), produced by lib/derive/elevation-snow.ts. Not the full ForecastResponse: no hourly block, no wind. */
 export interface ElevationAdjustedDay {
   date: string;
   tempMaxF: number;
   tempMinF: number;
   precipitationSumIn: number;
   snowfallSumIn: number;
+  /** Which forecast the day's precip/snow came from: NWS gridpoint (days ~1-7), Open-Meteo (beyond NWS range / outside the US), or both (the day NWS coverage ends). */
+  precipSource: "nws" | "open-meteo" | "mixed";
+}
+
+/** One NWS gridpoint QPF period (usually 6h), with the matching snow/temp/snow-level forecasts averaged over it. All values are for the NWS grid cell's own elevation. */
+export interface NwsPrecipPeriod {
+  /** UTC epoch ms */
+  startMs: number;
+  hours: number;
+  qpfIn: number;
+  /** null when NWS has no snowfallAmount for this period (its snow grid usually ends one period before QPF). */
+  snowIn: number | null;
+  tempF: number | null;
+  snowLevelFt: number | null;
+}
+
+export interface NwsPrecipForecast {
+  /** Elevation of the NWS 2.5km grid cell the forecast is valid for — not the resort's base. */
+  gridElevationFt: number;
+  periods: NwsPrecipPeriod[];
+}
+
+/** FC-10-adj: how much more liquid precip falls per 1,000 ft of elevation gain, calibrated against nearby SNOTEL gauges. */
+export interface PrecipGradient {
+  /** Fraction, e.g. 0.08 = +8% per 1,000 ft. What the model actually uses. */
+  perKft: number;
+  source: "snotel" | "default";
+  /** Raw regression result before blending with the default, when a fit was possible. */
+  fitPerKft: number | null;
+  /** Weighted r² of the fit — how much of the station-to-station difference elevation explains. */
+  r2: number | null;
+  stationCount: number;
+}
+
+/** Everything the elevation slider needs, fetched once per page so the slider can recompute in the browser with no extra requests. */
+export interface ElevationModelInputs {
+  utcOffsetSeconds: number;
+  openMeteo: {
+    /** Elevation Open-Meteo downscaled its point forecast to (its own DEM at the lat/lon). */
+    refElevationFt: number;
+    hourly: { time: string; temperatureF: number; precipitationIn: number; freezingLevelFt: number }[];
+  };
+  nws: NwsPrecipForecast | null;
+  gradient: PrecipGradient;
 }
 
 export interface ForecastResponse {
@@ -72,6 +126,8 @@ export interface ForecastResponse {
   hourly: HourlyForecastPoint[];
   daily: DailyForecastDay[];
   source: "open-meteo";
+  /** Elevation (ft) Open-Meteo downscaled this point forecast to — its own terrain model at the lat/lon, which can differ from a resort's listed base. */
+  modelElevationFt: number;
   /** Seconds east of UTC for this location (e.g. -21600 for MDT) — lets callers build a correct absolute timestamp from a local wall-clock string, since `hourly`/`daily` times carry no offset of their own (Open-Meteo's `timezone=auto`). */
   utcOffsetSeconds: number;
 }
@@ -116,19 +172,60 @@ export interface NwsAlert {
 
 export interface AvalancheZone {
   zoneId: string;
+  /** Short center code, e.g. "UAC", "CAIC" — required by avalanche.org's forecast query. */
+  centerId: string;
   centerName: string;
   zoneName: string;
+  /** The center's own forecast page for this zone. */
+  link: string | null;
+  /** Today's highest rating from the map layer, 1-5; null when the center posts "no rating" (-1/0). */
+  overallDanger: number | null;
+  offSeason: boolean;
+  travelAdvice: string | null;
+  /** IANA timezone of the center, e.g. "America/Denver" */
+  timezone: string | null;
+}
+
+export interface AvalancheProblem {
+  name: string;
+  likelihood: string | null;
+  /** D-scale size range, e.g. ["1.0", "1.5"] */
+  size: string[];
+  /** e.g. "northwest upper" — aspect + elevation band (upper/middle/lower) */
+  locations: string[];
+  /** Forecaster's discussion of this problem (UAC). */
+  description?: string;
 }
 
 export interface AvalancheForecast {
   zoneId: string;
+  /** The forecast's own name for this zone, when it has one (CAIC's map-layer names are just "CAIC zone"). */
+  zoneName: string | null;
   dangerAboveTreeline: number | null;
   dangerNearTreeline: number | null;
   dangerBelowTreeline: number | null;
+  /** Highest current rating: from the elevation bands when the center publishes them, else the map layer's overall rating. */
+  overallDanger: number | null;
+  /** False when the center only publishes an overall rating to avalanche.org (e.g. UAC) — the elevation breakdown lives on its own site. */
+  hasBandRatings: boolean;
+  tomorrow: { above: number | null; near: number | null; below: number | null } | null;
+  problems: AvalancheProblem[];
   summary: string;
   issuedAt: string;
   expiresAt: string;
   url: string;
+  /** Per-aspect danger, 24 values: above treeline N,NE,E,SE,S,SW,W,NW, then near, then below. 1-5 or null. Only when the center publishes it (UAC). */
+  rose: (number | null)[] | null;
+  /** Avalanche Warning / special bulletin text, if one is in effect. */
+  warning: string | null;
+  /** Extra forecaster sections (recent activity, weather, ...). */
+  discussion: { heading: string; text: string }[];
+  author: string | null;
+  /** The forecast's own date (YYYY-MM-DD, center-local), when known. */
+  forecastDate: string | null;
+  /** True when the latest available forecast is older than yesterday. */
+  isStale: boolean;
+  source: "avalanche.org" | "uac";
 }
 
 /** BC-03: a single field report from utahavalanchecenter.org's public observations feed — either an avalanche occurrence or a general (no-avalanche) field observation. */

@@ -101,10 +101,11 @@ export default function HomeExplorer({
 
       {/* Mobile/tablet: one panel at a time behind a Map/List toggle, so
           getting to resort data doesn't mean scrolling past the whole map
-          first. Desktop (lg+): both panels side by side, list primary
+          first. Tablet/desktop (md+, which includes an unfolded iPhone Duo in
+          landscape): both panels side by side, list primary
           (left, independently scrolling), map pinned (right) — swapped
           from the map-first layout this replaced. */}
-      <div className="mb-4 flex gap-1 rounded-full border border-border bg-card p-1 text-sm font-semibold lg:hidden">
+      <div className="mb-4 flex gap-1 rounded-full border border-border bg-card p-1 text-sm font-semibold md:hidden">
         {(["list", "map"] as const).map((v) => (
           <button
             key={v}
@@ -120,15 +121,15 @@ export default function HomeExplorer({
 
       {/* One real instance of each panel — critically, one real MapLibre
           instance — repositioned by CSS rather than mounted twice for
-          "mobile" and "desktop" layouts. `hidden`/`lg:block` toggles
+          "mobile" and "desktop" layouts. `hidden`/`md:block` toggles
           visibility per viewport without ever unmounting either panel, so
           switching the mobile Map/List pill doesn't reinitialize the map;
           the ResizeObserver SkiMap already has (for sticky-sidebar layouts
           not having a final size at mount) is exactly what makes the map
           redraw correctly the moment its container goes from hidden
           (0×0) to visible on a view switch. */}
-      <div className="lg:flex lg:items-start lg:gap-6">
-        <div className={`lg:min-w-0 lg:flex-1 ${mobileView === "map" ? "hidden lg:block" : ""}`}>
+      <div className="md:flex md:items-start md:gap-6">
+        <div className={`md:min-w-0 md:flex-1 ${mobileView === "map" ? "hidden md:block" : ""}`}>
           <div className="space-y-6">
             <section>
               <h2 className="mb-2 font-bold tracking-tight">Resorts</h2>
@@ -150,8 +151,8 @@ export default function HomeExplorer({
           </div>
         </div>
 
-        <div className={`lg:w-[440px] lg:shrink-0 xl:w-[500px] ${mobileView === "list" ? "hidden lg:block" : ""}`}>
-          <section className="card h-[38vh] min-h-[280px] overflow-hidden sm:h-[55vh] lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
+        <div className={`md:w-[360px] md:shrink-0 lg:w-[440px] xl:w-[500px] ${mobileView === "list" ? "hidden md:block" : ""}`}>
+          <section className="card h-[38dvh] min-h-[280px] overflow-hidden sm:h-[55dvh] md:sticky md:top-20 md:h-[calc(100dvh-7rem)]">
             <SkiMap
               ref={skiMapRef}
               resorts={resorts}

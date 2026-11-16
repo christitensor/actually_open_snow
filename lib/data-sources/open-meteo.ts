@@ -5,7 +5,6 @@
 import type {
   AirQuality,
   DailyForecastDay,
-  ElevationAdjustedDay,
   ElevationResponse,
   ForecastResponse,
   HistoricalDay,
@@ -27,6 +26,8 @@ const HOURLY_PARAMS = [
   "wind_direction_10m",
   "weather_code",
   "freezing_level_height",
+  "cloud_cover",
+  "precipitation_probability",
 ].join(",");
 
 const DAILY_PARAMS = [
@@ -40,10 +41,15 @@ const DAILY_PARAMS = [
   "weather_code",
   "sunrise",
   "sunset",
+  "cloud_cover_mean",
+  "precipitation_probability_max",
+  "sunshine_duration",
 ].join(",");
 
 interface OpenMeteoForecastRaw {
   utc_offset_seconds: number;
+  /** meters — the elevation the point forecast was downscaled to (Open-Meteo's own DEM when no override is passed) */
+  elevation: number;
   hourly: {
     time: string[];
     temperature_2m: number[];
@@ -55,6 +61,8 @@ interface OpenMeteoForecastRaw {
     wind_direction_10m: number[];
     weather_code: number[];
     freezing_level_height: number[];
+    cloud_cover: (number | null)[];
+    precipitation_probability: (number | null)[];
   };
   daily: {
     time: string[];
@@ -68,6 +76,10 @@ interface OpenMeteoForecastRaw {
     weather_code: number[];
     sunrise: string[];
     sunset: string[];
+    cloud_cover_mean: (number | null)[];
+    precipitation_probability_max: (number | null)[];
+    /** seconds */
+    sunshine_duration: (number | null)[];
   };
 }
 
@@ -127,6 +139,8 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     // reading; caught via a wildly implausible 51,990 ft "snow line" in
     // the new per-day forecast table.
     freezingLevelFt: Math.round(raw.hourly.freezing_level_height[i]),
+    cloudCoverPct: raw.hourly.cloud_cover?.[i] ?? null,
+    precipProbabilityPct: raw.hourly.precipitation_probability?.[i] ?? null,
   }));
 
   const daily: DailyForecastDay[] = raw.daily.time.map((date, i) => ({
@@ -141,6 +155,9 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     weatherCode: raw.daily.weather_code[i],
     sunrise: raw.daily.sunrise[i],
     sunset: raw.daily.sunset[i],
+    cloudCoverMeanPct: raw.daily.cloud_cover_mean?.[i] ?? null,
+    precipProbabilityMaxPct: raw.daily.precipitation_probability_max?.[i] ?? null,
+    sunshineHours: raw.daily.sunshine_duration?.[i] != null ? raw.daily.sunshine_duration[i]! / 3600 : null,
   }));
 
   return {
@@ -149,6 +166,7 @@ export async function getForecast(lat: number, lon: number): Promise<ForecastRes
     hourly,
     daily,
     source: "open-meteo",
+    modelElevationFt: Math.round(raw.elevation * 3.28084),
     utcOffsetSeconds: raw.utc_offset_seconds,
   };
 }
@@ -164,43 +182,6 @@ export async function getElevation(lat: number, lon: number): Promise<ElevationR
     elevationFt: Math.round(meters * 3.28084),
     source: "open-meteo-elevation",
   };
-}
-
-/**
- * FC-10-adj: re-requests the daily forecast with Open-Meteo's `elevation`
- * override, which downscales temperature (and, live-verified, precipitation
- * too — not just a lapse-rate-on-temperature trick) to a specific elevation
- * rather than the weather model's native grid elevation. Backs the
- * elevation-adjuster slider (components/location/ElevationAdjuster.tsx) —
- * deliberately a narrow daily-only request (no hourly, 7 days) since it's
- * refetched on every slider move.
- */
-export async function getElevationAdjustedDaily(
-  lat: number,
-  lon: number,
-  elevationM: number
-): Promise<ElevationAdjustedDay[]> {
-  const url =
-    `${FORECAST_BASE}?latitude=${lat}&longitude=${lon}&elevation=${elevationM}` +
-    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum` +
-    `&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=14`;
-  const raw = await fetchJson<{
-    daily: {
-      time: string[];
-      temperature_2m_max: number[];
-      temperature_2m_min: number[];
-      precipitation_sum: number[];
-      snowfall_sum: number[];
-    };
-  }>(url);
-
-  return raw.daily.time.map((date, i) => ({
-    date,
-    tempMaxF: raw.daily.temperature_2m_max[i],
-    tempMinF: raw.daily.temperature_2m_min[i],
-    precipitationSumIn: raw.daily.precipitation_sum[i],
-    snowfallSumIn: raw.daily.snowfall_sum[i],
-  }));
 }
 
 /**

@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { NAV_TABS } from "@/lib/nav-tabs";
 
 // Desktop counterpart to BottomNav — inline text links in the header,
-// hidden below sm where the fixed bottom tab bar takes over instead.
+// hidden below md where the fixed bottom tab bar takes over instead.
 export default function HeaderNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="hidden items-center gap-1 sm:flex">
+    <nav className="hidden items-center gap-1 md:flex">
       {NAV_TABS.map((tab) => {
         const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
         return (
