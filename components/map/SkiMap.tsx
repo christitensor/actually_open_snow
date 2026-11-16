@@ -44,14 +44,33 @@ function powderColor(inches: number | undefined): string {
 const BASE_LAYER_IDS: BaseLayerId[] = ["osm", "topo", "satellite"];
 const BASE_LAYER_LABELS: Record<BaseLayerId, string> = { osm: "Street", topo: "Topo", satellite: "Satellite" };
 
+// North American trail-sign colors. Black runs (and lifts) draw white on
+// the dark street map, where black would vanish.
 const DIFFICULTY_COLORS: Record<string, string> = {
   novice: "#22c55e",
   easy: "#22c55e",
   intermediate: "#3b82f6",
   advanced: "#111827",
   expert: "#111827",
+  extreme: "#111827",
   freeride: "#f97316",
 };
+const BLACK_ON_DARK = "#f8fafc";
+
+function runColorExpression(dark: boolean) {
+  const entries = Object.entries(DIFFICULTY_COLORS).flatMap(([k, c]) => [k, dark && c === "#111827" ? BLACK_ON_DARK : c]);
+  return ["match", ["get", "difficulty"], ...entries, "#6b7280"] as unknown as DataDrivenPropertyValueSpecification<string>;
+}
+
+/** One z10 tile of runs + lifts, from public/ski/ (scripts/build-ski-data.mjs) or the live /api/pistes fallback. */
+interface SkiTile {
+  runs: { id: string | number; difficulty: string | null; lines: [number, number][][] }[];
+  lifts: { id: string | number; name: string | null; lines: [number, number][][] }[];
+}
+interface SkiIndex {
+  tiles: string[];
+  attribution: string;
+}
 
 interface PisteWay {
   id: number;
@@ -206,6 +225,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // switcher indefinitely. The map's one-time "load" event is what
   // actually marks the style ready for setLayoutProperty calls.
   const styleReadyRef = useRef(false);
+  // Whether the visible base map is dark (dark street map or satellite), so run/lift colors stay visible.
+  const darkBackdropRef = useRef(false);
   const applyObservationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
   // Resort markers are created once at mount (see the empty deps array
   // below); keeping the element refs around lets a separate effect update
@@ -404,76 +425,102 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       new Marker({ element: el }).setLngLat([cam.lon, cam.lat]).setPopup(popup).addTo(map);
     }
 
-    // MAP-13: piste overlay. Runs are fetched per fixed z10 tile (see
-    // app/api/pistes/route.ts) once zoomed in far enough to see them. Each
-    // tile is fetched once per page and kept, so panning back is free and
-    // the CDN serves the same tile URLs to every visitor.
+    // MAP-13: ski runs + lifts. Fetched per fixed z10 tile once zoomed in
+    // far enough to see them, and kept for the page's lifetime. Tiles
+    // around the curated resorts are static files built from OpenSkiData
+    // (scripts/build-ski-data.mjs): instant, and independent of anyone
+    // else's server. Anywhere else falls back to the live, CDN-cached
+    // Overpass route (runs only).
     if (showPistes) {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-      const tileFeatures = new Map<string, GeoJSON.Feature[]>();
+      const loaded = new Map<string, SkiTile>();
       const inFlight = new Set<string>();
+      let indexPromise: Promise<SkiIndex | null> | null = null;
+      const getIndex = () =>
+        (indexPromise ??= fetch("/ski/index.json")
+          .then((r) => (r.ok ? (r.json() as Promise<SkiIndex>) : null))
+          .catch(() => null));
 
-      const render = () => {
-        // A run crossing a tile edge comes back in both tiles; keep one copy per OSM way id.
-        const byId = new Map<string | number | undefined, GeoJSON.Feature>();
-        for (const f of [...tileFeatures.values()].flat()) byId.set(f.id, f);
-        const geojson: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [...byId.values()] };
-        const source = map.getSource("pistes") as GeoJSONSource | undefined;
-        if (source) {
-          source.setData(geojson);
-        } else if (styleReadyRef.current) {
-          map.addSource("pistes", { type: "geojson", data: geojson });
-          map.addLayer({
-            id: "pistes-line",
-            type: "line",
-            source: "pistes",
-            minzoom: PISTE_MIN_VIEW_ZOOM - 0.5,
-            paint: {
-              "line-color": [
-                "match",
-                ["get", "difficulty"],
-                ...Object.entries(DIFFICULTY_COLORS).flat(),
-                "#6b7280",
-              ] as unknown as DataDrivenPropertyValueSpecification<string>,
-              "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3] as unknown as DataDrivenPropertyValueSpecification<number>,
-            },
-          });
+      const fetchTile = async (key: string, index: SkiIndex | null): Promise<SkiTile | null> => {
+        if (index?.tiles.includes(key)) {
+          const res = await fetch(`/ski/${key}.json`);
+          return res.ok ? ((await res.json()) as SkiTile) : null;
         }
+        const res = await fetch(`/api/pistes?tile=${key}`);
+        if (!res.ok) return null; // not stored, so the next move retries it
+        const { pistes } = (await res.json()) as { pistes: PisteWay[] };
+        return { runs: pistes.map((p) => ({ id: p.id, difficulty: p.difficulty, lines: [p.coordinates] })), lifts: [] };
+      };
+
+      const render = (attribution: string | undefined) => {
+        // A run crossing a tile edge comes back in both tiles; keep one copy per id.
+        const runs = new Map<string | number, GeoJSON.Feature>();
+        const lifts = new Map<string | number, GeoJSON.Feature>();
+        for (const t of loaded.values()) {
+          for (const r of t.runs)
+            runs.set(r.id, { type: "Feature", properties: { difficulty: r.difficulty ?? "intermediate" }, geometry: { type: "MultiLineString", coordinates: r.lines } });
+          for (const l of t.lifts)
+            lifts.set(l.id, { type: "Feature", properties: { name: l.name ?? "" }, geometry: { type: "MultiLineString", coordinates: l.lines } });
+        }
+        const runsData: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [...runs.values()] };
+        const liftsData: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [...lifts.values()] };
+        const runSource = map.getSource("pistes") as GeoJSONSource | undefined;
+        if (runSource) {
+          runSource.setData(runsData);
+          (map.getSource("lifts") as GeoJSONSource | undefined)?.setData(liftsData);
+          return;
+        }
+        if (!styleReadyRef.current) return;
+        const dark = darkBackdropRef.current;
+        map.addSource("pistes", { type: "geojson", data: runsData, attribution });
+        map.addSource("lifts", { type: "geojson", data: liftsData });
+        map.addLayer({
+          id: "pistes-line",
+          type: "line",
+          source: "pistes",
+          minzoom: PISTE_MIN_VIEW_ZOOM - 0.5,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": runColorExpression(dark),
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3] as unknown as DataDrivenPropertyValueSpecification<number>,
+          },
+        });
+        map.addLayer({
+          id: "lifts-line",
+          type: "line",
+          source: "lifts",
+          minzoom: PISTE_MIN_VIEW_ZOOM - 0.5,
+          paint: {
+            "line-color": dark ? BLACK_ON_DARK : "#111827",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1, 14, 2] as unknown as DataDrivenPropertyValueSpecification<number>,
+            "line-dasharray": [3, 1.5],
+          },
+        });
       };
 
       const loadPistes = async () => {
         if (map.getZoom() < PISTE_MIN_VIEW_ZOOM) return;
         const b = map.getBounds();
-        const tiles = tilesForBbox([b.getSouth(), b.getWest(), b.getNorth(), b.getEast()], PISTE_TILE_ZOOM)
+        const keys = tilesForBbox([b.getSouth(), b.getWest(), b.getNorth(), b.getEast()], PISTE_TILE_ZOOM)
           .map((t) => `${t.z}/${t.x}/${t.y}`)
-          .filter((k) => !tileFeatures.has(k) && !inFlight.has(k))
+          .filter((k) => !loaded.has(k) && !inFlight.has(k))
           .slice(0, PISTE_MAX_TILES_PER_VIEW);
-        if (tiles.length === 0) return;
+        if (keys.length === 0) return;
+        const index = await getIndex();
         await Promise.all(
-          tiles.map(async (key) => {
+          keys.map(async (key) => {
             inFlight.add(key);
             try {
-              const res = await fetch(`/api/pistes?tile=${key}`);
-              if (!res.ok) return; // not stored, so the next move retries it
-              const { pistes } = (await res.json()) as { pistes: PisteWay[] };
-              tileFeatures.set(
-                key,
-                pistes.map((p) => ({
-                  type: "Feature",
-                  id: p.id,
-                  properties: { difficulty: p.difficulty ?? "intermediate" },
-                  geometry: { type: "LineString", coordinates: p.coordinates },
-                }))
-              );
+              const tile = await fetchTile(key, index);
+              if (tile) loaded.set(key, tile);
             } catch {
-              // Overpass can be slow/rate-limited — a missing piste overlay
-              // shouldn't break the rest of the map.
+              // A missing overlay shouldn't break the rest of the map.
             } finally {
               inFlight.delete(key);
             }
           })
         );
-        render();
+        render(index?.attribution);
       };
 
       map.on("load", loadPistes);
@@ -723,10 +770,15 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     // (inverting relief shading or a satellite photo produces a
     // false-color mess), so only the street map swaps by theme.
     const visible = visibleBaseLayerIds(baseLayer, isDark);
+    // Black runs/lifts would vanish on the dark street map; satellite is dark too.
+    const darkBackdrop = (baseLayer === "osm" && isDark) || baseLayer === "satellite";
+    darkBackdropRef.current = darkBackdrop;
     const apply = () => {
       for (const id of ALL_BASE_LAYER_IDS) {
         if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible.has(id) ? "visible" : "none");
       }
+      if (map.getLayer("pistes-line")) map.setPaintProperty("pistes-line", "line-color", runColorExpression(darkBackdrop));
+      if (map.getLayer("lifts-line")) map.setPaintProperty("lifts-line", "line-color", darkBackdrop ? BLACK_ON_DARK : "#111827");
     };
     // On mount this can fire before the initial style has finished loading
     // (setLayoutProperty throws on an unloaded style); everything after
