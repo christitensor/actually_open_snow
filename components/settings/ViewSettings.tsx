@@ -4,16 +4,13 @@ import Link from "next/link";
 import { usePreferences } from "@/lib/preferences/context";
 import { useAuth } from "@/lib/auth";
 import { DASHBOARD_SECTIONS, effectiveSectionOrder, type MapStyle } from "@/lib/preferences/schema";
+import ResortPicker from "@/components/onboarding/ResortPicker";
+import { openWelcome } from "@/components/onboarding/Welcome";
+import { useFavorites } from "@/lib/favorites";
 
 // PERS-08 settings page: My resorts, location-page layout, map style.
 // Every change saves immediately, to the account when signed in (so it
 // follows you to every device) or to this browser when not.
-
-interface ResortOption {
-  id: string;
-  name: string;
-  region: string;
-}
 
 const MAP_STYLES: { id: MapStyle; label: string; hint: string }[] = [
   { id: "osm", label: "Street", hint: "Roads and towns, with terrain shading" },
@@ -21,19 +18,11 @@ const MAP_STYLES: { id: MapStyle; label: string; hint: string }[] = [
   { id: "satellite", label: "Satellite", hint: "Aerial imagery" },
 ];
 
-export default function ViewSettings({ resorts }: { resorts: ResortOption[] }) {
+export default function ViewSettings() {
   const { prefs, update, reset, savedTo, ready } = usePreferences();
   const { status } = useAuth();
-
-  const chosen = prefs.myResorts;
-  const isChosen = (id: string) => chosen == null || chosen.includes(id);
-  const toggleResort = (id: string) => {
-    const current = chosen ?? resorts.map((r) => r.id);
-    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
-    // Everything selected = "all", so resorts added to the app later show up automatically.
-    update({ myResorts: next.length === resorts.length ? null : next });
-  };
-  const regions = [...new Set(resorts.map((r) => r.region))];
+  const { favorites } = useFavorites();
+  const starred = favorites.filter((f) => f.source === "resort").length;
 
   const order = effectiveSectionOrder(prefs.sectionOrder);
   const move = (index: number, delta: number) => {
@@ -61,36 +50,13 @@ export default function ViewSettings({ resorts }: { resorts: ResortOption[] }) {
       <section id="resorts" className="card scroll-mt-20 p-4">
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="font-bold tracking-tight">My resorts</h2>
-          <span className="text-xs text-muted-foreground">
-            {chosen == null ? `All ${resorts.length}` : `${chosen.length} of ${resorts.length}`} shown
-          </span>
+          <span className="text-xs text-muted-foreground">{starred === 0 ? "None starred" : `${starred} starred`}</span>
         </div>
-        <p className="mb-3 text-xs text-muted-foreground">Only checked resorts appear on the home page list and map.</p>
-        <div className="mb-3 flex gap-2">
-          <button className="btn-secondary !py-1 text-xs" onClick={() => update({ myResorts: null })}>
-            Select all
-          </button>
-          <button className="btn-ghost !py-1 text-xs" onClick={() => update({ myResorts: [] })}>
-            Clear
-          </button>
-        </div>
-        <div className="space-y-3">
-          {regions.map((region) => (
-            <fieldset key={region}>
-              <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{region}</legend>
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {resorts
-                  .filter((r) => r.region === region)
-                  .map((r) => (
-                    <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted">
-                      <input type="checkbox" checked={isChosen(r.id)} onChange={() => toggleResort(r.id)} className="h-4 w-4 accent-primary" />
-                      {r.name}
-                    </label>
-                  ))}
-              </div>
-            </fieldset>
-          ))}
-        </div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Your home page shows the resorts you star. With none starred it shows every resort. You can also star ☆ a resort from
+          its card or page.
+        </p>
+        <ResortPicker />
       </section>
 
       <section className="card p-4">
@@ -159,13 +125,18 @@ export default function ViewSettings({ resorts }: { resorts: ResortOption[] }) {
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href="/" className="text-sm font-medium text-primary hover:underline">
-          ← Back to resorts
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-sm font-medium text-primary hover:underline">
+            ← Back to resorts
+          </Link>
+          <button className="text-sm font-medium text-primary hover:underline" onClick={() => openWelcome("resorts")}>
+            Show the quick tour
+          </button>
+        </div>
         <button
           className="btn-ghost text-xs"
           onClick={() => {
-            if (window.confirm("Reset resorts, layout and map style to the defaults?")) reset();
+            if (window.confirm("Reset the page layout and map style to the defaults? (Your starred resorts and saved spots stay.)")) reset();
           }}
         >
           Reset to defaults

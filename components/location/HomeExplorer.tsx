@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 import SkiMap, { type SkiMapHandle } from "@/components/map/SkiMap";
 import ResortList from "@/components/location/ResortList";
 import FavoritesList from "@/components/location/FavoritesList";
 import { usePreferences } from "@/lib/preferences/context";
+import { useFavorites } from "@/lib/favorites";
+import { useAuth } from "@/lib/auth";
+import { FAVORITES_CHANGE_EVENT } from "@/lib/favorites-storage";
+import { openWelcome } from "@/components/onboarding/Welcome";
 import MyLocationButton from "@/components/location/MyLocationButton";
 import type { Webcam } from "@/lib/models/types";
 
@@ -48,22 +52,50 @@ function FilterPill({ active, onClick, children, href }: { active?: boolean; onC
 export default function HomeExplorer({
   resorts,
   webcams,
-  primaryIds,
   center,
   fetchedAt,
 }: {
   resorts: ResortRow[];
   webcams: Webcam[];
-  primaryIds: string[];
   center: [number, number];
   fetchedAt: string;
 }) {
   const skiMapRef = useRef<SkiMapHandle>(null);
-  // PERS-08 "My resorts": when chosen, only those resorts appear (list and map), all shown up top.
-  const { prefs } = usePreferences();
-  const chosen = prefs.myResorts;
-  const shownResorts = chosen ? resorts.filter((r) => chosen.includes(r.id)) : resorts;
-  const shownPrimaryIds = chosen ? shownResorts.map((r) => r.id) : primaryIds;
+  // PERS-08 "My resorts" = your starred resorts. Before you star any, every
+  // resort is shown. Once you star some, those are your home view (list
+  // and map) and the rest sit behind "Browse all resorts".
+  const { prefs, ready: prefsReady, accountLoaded, update: updatePrefs } = usePreferences();
+  const { favorites, isFavorite, toggleFavorite } = useFavorites();
+  const starredIds = favorites.flatMap((f) => (f.source === "resort" && f.resortId ? [f.resortId] : []));
+  const hasStarred = starredIds.length > 0;
+  const [browsingAll, setBrowsingAll] = useState(false);
+  const shownResorts = !hasStarred || browsingAll ? resorts : resorts.filter((r) => starredIds.includes(r.id));
+  // No stars: everything on top. Stars: they're on top (ResortList adds favorites itself), the rest collapsed.
+  const shownPrimaryIds = hasStarred ? [] : resorts.map((r) => r.id);
+
+  // One-time migration from v1's separate "My resorts" checklist: those become stars.
+  // Signed in, it uses the add-only import endpoint (never un-stars anything,
+  // even if the server's favorites haven't loaded into this page yet).
+  const { status } = useAuth();
+  useEffect(() => {
+    const legacy = prefs.myResorts;
+    if (!prefsReady || !legacy || status === "loading") return;
+    if (status === "signed-in" && !accountLoaded) return;
+    const locs = legacy.flatMap((id) => {
+      const r = resorts.find((x) => x.id === id);
+      return r ? [{ lat: r.lat, lon: r.lon, source: "resort" as const, resortId: r.id, name: r.name, savedAt: new Date().toISOString() }] : [];
+    });
+    updatePrefs({ myResorts: null });
+    if (status === "signed-in") {
+      fetch("/api/favorites/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorites: locs }) })
+        .then(() => window.dispatchEvent(new Event(FAVORITES_CHANGE_EVENT)))
+        .catch(() => {});
+    } else {
+      for (const loc of locs) if (!isFavorite(loc)) toggleFavorite(loc);
+    }
+    // Runs once per legacy value, not on every favorites change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefsReady, prefs.myResorts, status, accountLoaded]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"map" | "list">("list");
@@ -139,22 +171,19 @@ export default function HomeExplorer({
           <div className="space-y-6">
             <section>
               <div className="mb-2 flex items-baseline justify-between gap-2">
-                <h2 className="font-bold tracking-tight">{chosen ? "My resorts" : "Resorts"}</h2>
-                <Link href="/settings#resorts" className="text-xs font-medium text-primary hover:underline">
-                  {chosen ? `Showing ${shownResorts.length} of ${resorts.length} · Edit` : "Choose resorts"}
-                </Link>
-              </div>
-              {chosen && shownResorts.length === 0 ? (
-                <p className="card px-4 py-3 text-sm text-muted-foreground">
-                  No resorts selected.{" "}
-                  <Link href="/settings#resorts" className="font-medium text-primary hover:underline">
-                    Choose some
+                <h2 className="font-bold tracking-tight">{hasStarred ? "My resorts" : "Resorts"}</h2>
+                {hasStarred ? (
+                  <Link href="/settings#resorts" className="text-xs font-medium text-primary hover:underline">
+                    {starredIds.length} starred · Edit
                   </Link>
-                  .
-                </p>
-              ) : (
+                ) : (
+                  <span className="text-xs text-muted-foreground">Star ☆ a resort to make it yours</span>
+                )}
+              </div>
               <ResortList
-                resorts={shownResorts}
+                onExpandedChange={setBrowsingAll}
+                expandLabel={hasStarred ? `Browse all ${resorts.length} resorts` : undefined}
+                resorts={resorts}
                 primaryIds={shownPrimaryIds}
                 favoritesOnly={favoritesOnly}
                 hoveredId={hoveredId}
@@ -162,11 +191,15 @@ export default function HomeExplorer({
                 onHover={handleResortHover}
                 fetchedAt={fetchedAt}
               />
-              )}
             </section>
 
             <section>
-              <h2 className="mb-2 font-bold tracking-tight">Your backcountry spots</h2>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <h2 className="font-bold tracking-tight">Your backcountry spots</h2>
+                <button onClick={() => openWelcome("spots")} className="text-xs font-medium text-primary hover:underline">
+                  How it works
+                </button>
+              </div>
               <FavoritesList onGoToMap={() => setMobileView("map")} />
             </section>
           </div>

@@ -159,6 +159,8 @@ export default function ResortList({
   selectedId = null,
   onHover,
   fetchedAt,
+  onExpandedChange,
+  expandLabel,
 }: {
   resorts: ResortRow[];
   primaryIds: string[];
@@ -167,6 +169,10 @@ export default function ResortList({
   selectedId?: string | null;
   onHover?: (id: string | null) => void;
   fetchedAt?: string;
+  /** Told when the collapsed remainder is opened/closed (the home map shows those pins only while open). */
+  onExpandedChange?: (expanded: boolean) => void;
+  /** Label for the collapsed-remainder button (default "Show all N resorts"). */
+  expandLabel?: string;
 }) {
   const { favorites, isFavorite, reorderFavorites } = useFavorites();
   const [showAll, setShowAll] = useState(false);
@@ -192,6 +198,10 @@ export default function ResortList({
   // "Show all" — derived (not stored) so selecting one expands the list
   // without needing an effect just to flip a boolean in response to a prop.
   const expanded = showAll || (selectedId != null && rest.some((r) => r.id === selectedId));
+
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+  }, [expanded, onExpandedChange]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -238,7 +248,7 @@ export default function ResortList({
       {rest.length > 0 && (
         <>
           <button onClick={() => setShowAll((v) => !v)} className="btn-ghost mt-3 !px-0">
-            {expanded ? "Hide" : `Show all ${resorts.length} resorts`} {expanded ? "▲" : "▼"}
+            {expanded ? "Hide" : (expandLabel ?? `Show all ${resorts.length} resorts`)} {expanded ? "▲" : "▼"}
           </button>
           {/* grid-rows 0fr→1fr is a CSS-only way to animate to "however tall
               the content turns out to be" without measuring pixel heights

@@ -53,14 +53,32 @@ function sortByKeys(list: FavoriteLocation[], keys: string[]): FavoriteLocation[
 }
 
 /** POSTs to a favorites endpoint; resolves to the server's updated list, or null on any failure (the next load() reconciles). */
-async function postFavorites(url: string, body: unknown): Promise<FavoriteLocation[] | null> {
-  try {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!res.ok) return null;
-    return ((await res.json()) as { favorites: FavoriteLocation[] }).favorites;
-  } catch {
-    return null;
-  }
+// Signed in, every component calling useFavorites() keeps its own copy of
+// the server list, so a star in one place (e.g. the welcome dialog) has to
+// be broadcast for the others (the home list and map) to update without a reload.
+const SERVER_SYNC_EVENT = "aos:favorites-server-sync";
+function shareServerFavorites(list: FavoriteLocation[]) {
+  window.dispatchEvent(new CustomEvent<FavoriteLocation[]>(SERVER_SYNC_EVENT, { detail: list }));
+}
+
+// Writes go out one at a time: each response is the full list after that
+// write, so with overlapping requests an earlier response arriving last
+// would drop a later change (e.g. starring several resorts quickly).
+let writeChain: Promise<unknown> = Promise.resolve();
+
+function postFavorites(url: string, body: unknown): Promise<FavoriteLocation[] | null> {
+  const run = async () => {
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) return null;
+      return ((await res.json()) as { favorites: FavoriteLocation[] }).favorites;
+    } catch {
+      return null;
+    }
+  };
+  const result = writeChain.then(run, run);
+  writeChain = result;
+  return result;
 }
 
 async function fetchServerFavorites(): Promise<FavoriteLocation[] | null> {
@@ -100,9 +118,14 @@ export function useFavorites() {
     // Also reload after the post-sign-in localStorage import (lib/auth.tsx)
     // merges in favorites saved before the user had an account.
     window.addEventListener(FAVORITES_CHANGE_EVENT, load);
+    const onSync = (e: Event) => {
+      if (!cancelled) setServerFavorites((e as CustomEvent<FavoriteLocation[]>).detail);
+    };
+    window.addEventListener(SERVER_SYNC_EVENT, onSync);
     return () => {
       cancelled = true;
       window.removeEventListener(FAVORITES_CHANGE_EVENT, load);
+      window.removeEventListener(SERVER_SYNC_EVENT, onSync);
     };
   }, [signedIn]);
 
@@ -122,7 +145,7 @@ export function useFavorites() {
           const added = await postFavorites("/api/favorites/toggle", { location: fav });
           if (!added) return;
           const next = await postFavorites("/api/favorites/reorder", { keys: sortByKeys(added, prevKeys).map(favoriteKey) });
-          setServerFavorites(next ?? added);
+          shareServerFavorites(next ?? added);
         })();
         return;
       }
@@ -140,13 +163,11 @@ export function useFavorites() {
       const prevKeys = favorites.map(favoriteKey);
 
       if (signedIn) {
-        // Optimistic update — reconciled with the server's response below.
-        setServerFavorites((current) =>
-          current.some((f) => favoriteKey(f) === key)
-            ? current.filter((f) => favoriteKey(f) !== key)
-            : [...current, { ...loc, savedAt: new Date().toISOString() }]
+        // Optimistic update (shared with every useFavorites() on the page), reconciled with the server's response below.
+        shareServerFavorites(
+          removed ? favorites.filter((f) => favoriteKey(f) !== key) : [...favorites, { ...loc, savedAt: new Date().toISOString() }]
         );
-        postFavorites("/api/favorites/toggle", { location: loc }).then((next) => next && setServerFavorites(next));
+        postFavorites("/api/favorites/toggle", { location: loc }).then((next) => next && shareServerFavorites(next));
       } else {
         const current: FavoriteLocation[] = JSON.parse(readRaw());
         const exists = current.some((f) => favoriteKey(f) === key);
@@ -177,8 +198,8 @@ export function useFavorites() {
 
       if (signedIn) {
         const next = merge(serverFavorites);
-        setServerFavorites(next);
-        postFavorites("/api/favorites/reorder", { keys: next.map(favoriteKey) }).then((saved) => saved && setServerFavorites(saved));
+        shareServerFavorites(next);
+        postFavorites("/api/favorites/reorder", { keys: next.map(favoriteKey) }).then((saved) => saved && shareServerFavorites(saved));
         return;
       }
 

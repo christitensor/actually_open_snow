@@ -7,6 +7,7 @@ import BottomNav from "@/components/BottomNav";
 import UndoToast from "@/components/UndoToast";
 import { AuthProvider } from "@/lib/auth";
 import { PreferencesProvider } from "@/lib/preferences/context";
+import Welcome from "@/components/onboarding/Welcome";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
           <BottomNav />
           <UndoToast />
+          <Welcome />
           </PreferencesProvider>
         </AuthProvider>
       </body>

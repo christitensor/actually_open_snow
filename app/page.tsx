@@ -1,5 +1,5 @@
 import HomeExplorer from "@/components/location/HomeExplorer";
-import { primaryResortIds, resorts } from "@/data/resorts";
+import { resorts } from "@/data/resorts";
 import { webcams } from "@/data/webcams";
 import { getGridDailySnowfallIn, getGridPastDailySnowfallIn, getGridRecentSnowfallIn } from "@/lib/data-sources/open-meteo";
 import { getMeasuredSnowNearPoints } from "@/lib/data-sources/snotel";
@@ -37,7 +37,7 @@ export default async function Home() {
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-      <HomeExplorer resorts={resortsWithSnow} webcams={webcams} primaryIds={primaryResortIds} center={REGION_CENTER} fetchedAt={new Date().toISOString()} />
+      <HomeExplorer resorts={resortsWithSnow} webcams={webcams} center={REGION_CENTER} fetchedAt={new Date().toISOString()} />
     </div>
   );
 }

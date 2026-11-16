@@ -47,7 +47,7 @@ Sessions are rows in Postgres (`lib/auth/sessions.ts`) behind an HMAC-signed coo
 
 ## Personal settings
 
-`/settings` lets each person pick **My resorts** (only those show on the home list and map), arrange the **location page** (section order and which sections start open), and choose the **map style**. Signed in, settings are saved to the account (`user_preferences` table, `/api/preferences`) and follow you to every device; signed out, they're kept in the browser and carried into the account on first sign-in.
+A first visit shows every resort. **My resorts** are the ones you star (☆): once you star any, the home list and map show just those, with "Browse all" for the rest. The first time someone signs in, a short welcome asks them to pick resorts and shows how to save a backcountry spot. `/settings` lets each person manage their resorts, arrange the **location page** (section order and which sections start open), and choose the **map style**. Signed in, settings are saved to the account (`user_preferences` table, `/api/preferences`) and follow you to every device; signed out, they're kept in the browser and carried into the account on first sign-in.
 
 ## Project layout
 

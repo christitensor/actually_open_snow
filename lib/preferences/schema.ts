@@ -8,7 +8,11 @@ export type MapStyle = "osm" | "topo" | "satellite";
 export type ResortSort = "snow" | "mine";
 
 export interface Preferences {
-  /** Resort ids to show on the home list and map. null = all resorts. */
+  /**
+   * Deprecated (PERS-08 v1's separate checklist). "My resorts" is now just
+   * your starred resorts. Any ids here are converted to favorites once and
+   * this is cleared (see components/location/HomeExplorer.tsx).
+   */
   myResorts: string[] | null;
   /** Location-page section ids, in display order. Unknown/missing ids fall back to the default order. */
   sectionOrder: string[];
@@ -16,6 +20,8 @@ export interface Preferences {
   sectionOpen: Record<string, boolean>;
   resortSort: ResortSort;
   mapStyle: MapStyle;
+  /** Has finished (or skipped) the first-sign-in welcome: pick resorts + how to save spots. */
+  onboarded: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -24,6 +30,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sectionOpen: {},
   resortSort: "snow",
   mapStyle: "osm",
+  onboarded: false,
 };
 
 /** Every location-page section, in default order, with its label and default open state. */
@@ -79,6 +86,7 @@ export function sanitize(input: unknown): Preferences {
   }
   if (v.resortSort === "snow" || v.resortSort === "mine") out.resortSort = v.resortSort;
   if (v.mapStyle === "osm" || v.mapStyle === "topo" || v.mapStyle === "satellite") out.mapStyle = v.mapStyle;
+  if (typeof v.onboarded === "boolean") out.onboarded = v.onboarded;
   return out;
 }
 

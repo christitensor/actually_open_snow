@@ -27,6 +27,8 @@ interface PreferencesContextValue {
   ready: boolean;
   /** Where settings are being saved. */
   savedTo: "account" | "device";
+  /** Signed in and the account's own settings have been loaded (not just the local cache). */
+  accountLoaded: boolean;
   update: (patch: Partial<Preferences>) => void;
   reset: () => void;
 }
@@ -64,9 +66,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [ready, setReady] = useState(false);
+  const [accountLoaded, setAccountLoaded] = useState(false);
   const pending = useRef<Partial<Preferences> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusRef = useRef(status);
+  const prefsRef = useRef(prefs);
+  useEffect(() => {
+    prefsRef.current = prefs;
+  }, [prefs]);
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
@@ -81,7 +88,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   // Signed in: load the account's settings (or seed the account from this browser's).
   useEffect(() => {
-    if (status !== "signed-in") return;
+    if (status !== "signed-in") {
+      (async () => setAccountLoaded(false))();
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -101,6 +111,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setPrefs(next);
         writeLocal(next);
+        setAccountLoaded(true);
       } catch {
         // Offline: keep the cached copy.
       }
@@ -150,18 +161,20 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   );
 
   const reset = useCallback(() => {
-    setPrefs(DEFAULT_PREFERENCES);
-    writeLocal(DEFAULT_PREFERENCES);
+    // Back to defaults, except "has seen the welcome" (a reset shouldn't replay onboarding).
+    const next = { ...DEFAULT_PREFERENCES, onboarded: prefsRef.current.onboarded };
+    setPrefs(next);
+    writeLocal(next);
     pending.current = null;
     if (timer.current) clearTimeout(timer.current);
     // PUT replaces the whole document (PATCH merges sectionOpen key by key, so it can't clear it).
     if (statusRef.current === "signed-in") {
-      fetch("/api/preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(DEFAULT_PREFERENCES) }).catch(() => {});
+      fetch("/api/preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) }).catch(() => {});
     }
   }, []);
 
   return (
-    <PreferencesContext.Provider value={{ prefs, ready, savedTo: status === "signed-in" ? "account" : "device", update, reset }}>
+    <PreferencesContext.Provider value={{ prefs, ready, savedTo: status === "signed-in" ? "account" : "device", accountLoaded, update, reset }}>
       {children}
     </PreferencesContext.Provider>
   );
