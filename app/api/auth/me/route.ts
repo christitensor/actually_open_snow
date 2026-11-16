@@ -1,13 +1,28 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getUserBySessionToken } from "@/lib/db/users";
+import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
+import { resolveSession, setSessionCookie } from "@/lib/auth/sessions";
+import { getSql } from "@/lib/db/postgres";
 
-// PERS-04: whether the current browser has a valid session — polled once
-// by lib/auth.tsx on mount to decide whether favorites should read/write
-// localStorage or the server.
-export async function GET() {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const user = token ? getUserBySessionToken(token) : null;
-  return NextResponse.json({ email: user?.email ?? null });
+// Who's signed in on this browser. Called by lib/auth.tsx on load; also
+// where a session rolls forward (cookie re-sent with a later expiry) and an
+// old-style token gets upgraded, so simply opening the app keeps you signed in.
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  if (!token) return NextResponse.json({ email: null });
+  try {
+    const resolved = await resolveSession(token, req.headers.get("user-agent"));
+    if (!resolved) {
+      const res = NextResponse.json({ email: null });
+      res.cookies.delete(SESSION_COOKIE);
+      return res;
+    }
+    const sql = await getSql();
+    const [{ n }] = (await sql`SELECT count(*)::int AS n FROM passkeys WHERE user_id = ${resolved.user.id}`) as { n: number }[];
+    const res = NextResponse.json({ email: resolved.user.email, hasPasskey: n > 0 });
+    if (resolved.refresh) setSessionCookie(res, resolved.refresh.token, resolved.refresh.expiresAt);
+    return res;
+  } catch {
+    // DB hiccup: don't clear the cookie, just report unknown-as-signed-out for now.
+    return NextResponse.json({ email: null, error: "unavailable" }, { status: 503 });
+  }
 }
