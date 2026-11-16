@@ -149,6 +149,9 @@ export default function AuthControl() {
             <Link href="/account" role="menuitem" onClick={() => setMenuOpen(false)} className="block rounded-lg px-2 py-1.5 hover:bg-muted">
               Account &amp; sign-in methods
             </Link>
+            <Link href="/settings" role="menuitem" onClick={() => setMenuOpen(false)} className="block rounded-lg px-2 py-1.5 hover:bg-muted">
+              Settings: my resorts &amp; layout
+            </Link>
             <button
               role="menuitem"
               onClick={() => {

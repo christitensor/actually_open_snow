@@ -73,9 +73,12 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             {location.source === "pin" ? " · Backcountry pin" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Wraps on phones: the favorite button gets its own line instead of squeezing into three. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <SectionControls />
-          <FavoriteButton location={location} />
+          <div className="whitespace-nowrap">
+            <FavoriteButton location={location} />
+          </div>
         </div>
       </header>
 
@@ -96,7 +99,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           very bottom of a stretched single column. */}
       <div className="md:flex md:items-start md:gap-6">
         <ElevationProvider location={location} elevationFt={elevationFt} elevationModel={data.elevationModel}>
-        <div className="space-y-5 md:min-w-0 md:flex-1">
+        {/* flex column (not space-y) so each Section can position itself with CSS order from the person's saved layout. */}
+        <div className="flex flex-col gap-5 md:min-w-0 md:flex-1">
           <Section id="conditions-summary" title="Conditions summary" summary={conditionsSummary.narrative}>
             <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
             <div className="mt-3 flex flex-wrap gap-2">

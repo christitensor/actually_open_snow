@@ -1,20 +1,19 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { usePreferences } from "@/lib/preferences/context";
+import { effectiveSectionOrder, sectionDefaultOpen } from "@/lib/preferences/schema";
 
 // A dashboard card whose body can be collapsed. Built on <details> so it
-// works before (and without) JavaScript; the open/closed choice is
-// remembered per section id in localStorage, across every location page —
-// if you never look at webcams, they stay closed everywhere.
+// works before (and without) JavaScript. The open/closed choice and the
+// section's position on the page come from the person's view settings
+// (lib/preferences/), which follow their account across devices: close
+// webcams once and it stays closed on every location page, everywhere.
+// Position uses CSS `order` inside the dashboard's flex column, so the
+// server-rendered markup doesn't change.
 //
 // `summary` is shown in the header only while the section is collapsed, so
 // a closed card still answers its headline question in one line.
-
-const STORAGE_PREFIX = "aos:section:";
-
-export function storageKey(id: string) {
-  return STORAGE_PREFIX + id;
-}
 
 export default function Section({
   id,
@@ -34,28 +33,28 @@ export default function Section({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const { prefs, ready, update } = usePreferences();
+  const baseOpen = sectionDefaultOpen(id) ?? defaultOpen;
+  const savedOpen = prefs.sectionOpen[id];
+  const wantOpen = savedOpen ?? baseOpen;
+  const order = effectiveSectionOrder(prefs.sectionOrder).indexOf(id);
 
+  // Apply the saved open/closed state once settings are loaded (and whenever they change on another device's load).
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey(id));
-      if (saved != null && ref.current) ref.current.open = saved === "1";
-    } catch {
-      // storage blocked (private mode etc.) — keep the default
-    }
-  }, [id]);
+    if (ready && ref.current && ref.current.open !== wantOpen) ref.current.open = wantOpen;
+  }, [ready, wantOpen]);
 
   return (
     <details
       ref={ref}
       id={id}
       data-section={id}
-      open={defaultOpen}
+      open={baseOpen}
+      style={order >= 0 ? { order } : undefined}
       onToggle={(e) => {
-        try {
-          localStorage.setItem(storageKey(id), e.currentTarget.open ? "1" : "0");
-        } catch {
-          // ignore
-        }
+        const open = e.currentTarget.open;
+        // Ignore toggles we caused by applying the saved state.
+        if (ready && open !== wantOpen) update({ sectionOpen: { [id]: open } });
       }}
       className="card group scroll-mt-20"
     >
@@ -96,6 +95,9 @@ export function SectionControls() {
       <button type="button" className="btn-ghost whitespace-nowrap px-2.5 text-xs" onClick={() => setAll(false)}>
         Collapse all
       </button>
+      <a href="/settings" className="btn-ghost whitespace-nowrap px-2.5 text-xs">
+        Customize
+      </a>
     </div>
   );
 }

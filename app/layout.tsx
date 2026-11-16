@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import UndoToast from "@/components/UndoToast";
 import { AuthProvider } from "@/lib/auth";
+import { PreferencesProvider } from "@/lib/preferences/context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
         <AuthProvider>
+          <PreferencesProvider>
           <AppHeader />
           {/* min-w-0, not flex/flex-col: main only ever wraps one child, and
               making main itself a flex container turned that child into a
@@ -76,6 +78,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
           <BottomNav />
           <UndoToast />
+          </PreferencesProvider>
         </AuthProvider>
       </body>
     </html>
