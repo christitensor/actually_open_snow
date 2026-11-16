@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 import { useFavorites } from "@/lib/favorites";
@@ -8,6 +8,8 @@ import { useDragReorder } from "@/lib/use-drag-reorder";
 import DragGrip from "@/components/DragGrip";
 import MeasuredSnow from "@/components/location/MeasuredSnow";
 import type { Location } from "@/lib/models/types";
+import { usePreferences } from "@/lib/preferences/context";
+import type { ResortSort } from "@/lib/preferences/schema";
 
 interface ResortRow {
   id: string;
@@ -31,41 +33,13 @@ function bySnowDesc(a: ResortRow, b: ResortRow) {
 
 // PERS-07: "Most snow" (default — the list's job is "where's it dumping")
 // vs "My order" (starred resorts first, in the order you dragged them).
-// A per-device display preference, so plain localStorage.
-type SortMode = "snow" | "mine";
-const SORT_STORAGE_KEY = "actually-open-snow:resort-sort";
-const SORT_CHANGE_EVENT = "actually-open-snow:resort-sort-changed";
+// Saved with the account's view settings (PERS-08), so it follows you.
+type SortMode = ResortSort;
 
-function readSortMode(): SortMode {
-  try {
-    return window.localStorage.getItem(SORT_STORAGE_KEY) === "mine" ? "mine" : "snow";
-  } catch {
-    return "snow";
-  }
-}
-
-function writeSortMode(mode: SortMode) {
-  try {
-    window.localStorage.setItem(SORT_STORAGE_KEY, mode);
-  } catch {
-    // Private mode etc. — the choice just won't stick past this page.
-  }
-  window.dispatchEvent(new Event(SORT_CHANGE_EVENT));
-}
-
-function subscribeSortMode(callback: () => void) {
-  window.addEventListener(SORT_CHANGE_EVENT, callback);
-  window.addEventListener("storage", callback);
-  return () => {
-    window.removeEventListener(SORT_CHANGE_EVENT, callback);
-    window.removeEventListener("storage", callback);
-  };
-}
-
-function SortToggle({ mode }: { mode: SortMode }) {
+function SortToggle({ mode, onChange }: { mode: SortMode; onChange: (m: SortMode) => void }) {
   const option = (value: SortMode, label: string) => (
     <button
-      onClick={() => writeSortMode(value)}
+      onClick={() => onChange(value)}
       aria-pressed={mode === value}
       className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
         mode === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -197,7 +171,8 @@ export default function ResortList({
   const { favorites, isFavorite, reorderFavorites } = useFavorites();
   const [showAll, setShowAll] = useState(false);
   const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
-  const sortMode = useSyncExternalStore(subscribeSortMode, readSortMode, () => "snow" as SortMode);
+  const { prefs, update } = usePreferences();
+  const sortMode = prefs.resortSort;
 
   const visible = favoritesOnly ? resorts.filter((r) => isFavorite(toLocation(r))) : resorts;
   const topBySnow = visible.filter((r) => primaryIds.includes(r.id) || isFavorite(toLocation(r))).sort(bySnowDesc);
@@ -239,7 +214,7 @@ export default function ResortList({
         <UpdatedLabel fetchedAt={fetchedAt} />
         {canReorder && (
           <div className="ml-auto">
-            <SortToggle mode={sortMode} />
+            <SortToggle mode={sortMode} onChange={(m) => update({ resortSort: m })} />
           </div>
         )}
       </div>

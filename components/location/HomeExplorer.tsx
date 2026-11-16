@@ -6,6 +6,7 @@ import type { MeasuredSnowNearby } from "@/lib/data-sources/snotel";
 import SkiMap, { type SkiMapHandle } from "@/components/map/SkiMap";
 import ResortList from "@/components/location/ResortList";
 import FavoritesList from "@/components/location/FavoritesList";
+import { usePreferences } from "@/lib/preferences/context";
 import MyLocationButton from "@/components/location/MyLocationButton";
 import type { Webcam } from "@/lib/models/types";
 
@@ -58,6 +59,11 @@ export default function HomeExplorer({
   fetchedAt: string;
 }) {
   const skiMapRef = useRef<SkiMapHandle>(null);
+  // PERS-08 "My resorts": when chosen, only those resorts appear (list and map), all shown up top.
+  const { prefs } = usePreferences();
+  const chosen = prefs.myResorts;
+  const shownResorts = chosen ? resorts.filter((r) => chosen.includes(r.id)) : resorts;
+  const shownPrimaryIds = chosen ? shownResorts.map((r) => r.id) : primaryIds;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"map" | "list">("list");
@@ -132,16 +138,31 @@ export default function HomeExplorer({
         <div className={`md:min-w-0 md:flex-1 ${mobileView === "map" ? "hidden md:block" : ""}`}>
           <div className="space-y-6">
             <section>
-              <h2 className="mb-2 font-bold tracking-tight">Resorts</h2>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <h2 className="font-bold tracking-tight">{chosen ? "My resorts" : "Resorts"}</h2>
+                <Link href="/settings#resorts" className="text-xs font-medium text-primary hover:underline">
+                  {chosen ? `Showing ${shownResorts.length} of ${resorts.length} · Edit` : "Choose resorts"}
+                </Link>
+              </div>
+              {chosen && shownResorts.length === 0 ? (
+                <p className="card px-4 py-3 text-sm text-muted-foreground">
+                  No resorts selected.{" "}
+                  <Link href="/settings#resorts" className="font-medium text-primary hover:underline">
+                    Choose some
+                  </Link>
+                  .
+                </p>
+              ) : (
               <ResortList
-                resorts={resorts}
-                primaryIds={primaryIds}
+                resorts={shownResorts}
+                primaryIds={shownPrimaryIds}
                 favoritesOnly={favoritesOnly}
                 hoveredId={hoveredId}
                 selectedId={selectedId}
                 onHover={handleResortHover}
                 fetchedAt={fetchedAt}
               />
+              )}
             </section>
 
             <section>
@@ -155,7 +176,7 @@ export default function HomeExplorer({
           <section className="card h-[38dvh] min-h-[280px] overflow-hidden sm:h-[55dvh] md:sticky md:top-20 md:h-[calc(100dvh-7rem)]">
             <SkiMap
               ref={skiMapRef}
-              resorts={resorts}
+              resorts={shownResorts}
               webcams={webcams}
               center={center}
               zoom={8}

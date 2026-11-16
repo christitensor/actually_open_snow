@@ -95,6 +95,14 @@ async function ensureSchema(sql: Sql): Promise<void> {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS passkeys_user_idx ON passkeys (user_id)`;
+  // PERS-08: per-account view settings (lib/preferences/), one JSON document per user.
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      user_id INTEGER PRIMARY KEY,
+      prefs TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    )
+  `;
   // Rate limits for email codes (sends and guesses), keyed per email per 15-min bucket.
   await sql`
     CREATE TABLE IF NOT EXISTS auth_rate (

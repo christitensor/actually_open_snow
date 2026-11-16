@@ -45,6 +45,10 @@ New people use **Create account** in the sign-in panel: step 1 confirms their em
 
 Sessions are rows in Postgres (`lib/auth/sessions.ts`) behind an HMAC-signed cookie. They last 180 days from last use, so you stay signed in on any device you keep using. Email codes are single-use and rate-limited (sends and guesses) per address.
 
+## Personal settings
+
+`/settings` lets each person pick **My resorts** (only those show on the home list and map), arrange the **location page** (section order and which sections start open), and choose the **map style**. Signed in, settings are saved to the account (`user_preferences` table, `/api/preferences`) and follow you to every device; signed out, they're kept in the browser and carried into the account on first sign-in.
+
 ## Project layout
 
 - `app/` — pages (`/`, `/location/[slug]`, `/location/pin`, `/webcams`) and API routes (`app/api/*`)

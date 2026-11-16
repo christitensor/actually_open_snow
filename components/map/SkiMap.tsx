@@ -18,6 +18,7 @@ import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
 import { ALL_BASE_LAYER_IDS, BASE_STYLE, type BaseLayerId, visibleBaseLayerIds } from "@/lib/map/base-style";
+import { usePreferences } from "@/lib/preferences/context";
 import { PISTE_MAX_TILES_PER_VIEW, PISTE_MIN_VIEW_ZOOM, PISTE_TILE_ZOOM, tilesForBbox } from "@/lib/util/tiles";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
 
@@ -190,7 +191,17 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // mount. A coarse "last N days" filter doesn't need to stay live-accurate
   // to the millisecond for however long this map instance stays mounted.
   const [obsFilterNowMs] = useState(() => Date.now());
-  const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
+  // Map style follows the account's view settings (PERS-08): start on the saved one, save when changed.
+  const { prefs, ready: prefsReady, update: updatePrefs } = usePreferences();
+  const [baseLayer, setBaseLayerState] = useState<BaseLayerId>("osm");
+  const setBaseLayer = (id: BaseLayerId) => {
+    setBaseLayerState(id);
+    updatePrefs({ mapStyle: id });
+  };
+  useEffect(() => {
+    if (prefsReady) setBaseLayerState(prefs.mapStyle);
+  }, [prefsReady, prefs.mapStyle]);
+
   // Full-screen mode: a CSS fixed-position overlay rather than the native
   // Fullscreen API, since Element.requestFullscreen() is unreliable in an
   // iOS home-screen PWA (this app's primary use case, per the sign-in
@@ -355,37 +366,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       });
     }
 
-    // Resort pins — colored by today's forecast snowfall when known (MAP-10 Powder Finder).
-    for (const resort of resorts) {
-      // MapLibre's Marker sets `transform` on the element it's given, to
-      // position it on the map — scaling that same element for a hover/
-      // selected highlight would fight that positioning transform every
-      // time the map moves. An inner wrapper div carries the visual
-      // styling instead; the outer `el` stays untouched by anything but
-      // MapLibre itself.
-      const el = document.createElement("div");
-      const inner = document.createElement("div");
-      const color = powderColor(resort.snowfallTodayIn);
-      // z-index above webcam pins: a few resorts (Alta, Brighton, Park City,
-      // Powder Mountain) have a webcam sitting at effectively the same
-      // coordinates, and without this the webcam pin — added after, so
-      // painted on top by default — silently ate the click (its own handler
-      // only stops propagation, no navigation), live-verified as the actual
-      // cause of "clicking the map does nothing" for those resorts.
-      inner.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s,box-shadow .15s;`;
-      inner.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
-      el.style.zIndex = "2";
-      el.appendChild(inner);
-      inner.addEventListener("click", (ev) => {
-        ev.stopPropagation(); // don't also trigger the map's pin-drop handler
-        if (onResortSelect) onResortSelect(resort.id);
-        else router.push(`/location/${resort.id}`);
-      });
-      inner.addEventListener("mouseenter", () => onResortHover?.(resort.id));
-      inner.addEventListener("mouseleave", () => onResortHover?.(null));
-      resortMarkerElsRef.current.set(resort.id, { wrapper: el, inner });
-      new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
-    }
+    // Resort pins are created by the sync effect below, so they follow changes to `resorts`.
+
 
     // "You are here" — distinct from the clickable resort pins above, and
     // deliberately not wired to navigate anywhere (you're already on this
@@ -731,6 +713,50 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map is initialized once; props are read at mount time
   }, []);
+
+  // Resort pins — colored by today's forecast snowfall when known (MAP-10
+  // Powder Finder). Kept in sync with `resorts`, which "My resorts"
+  // (PERS-08) can change after the map exists: missing pins are created,
+  // and pins for resorts no longer in the list are hidden (not removed, so
+  // re-adding a resort is instant).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const resort of resorts) {
+      if (resortMarkerElsRef.current.has(resort.id)) continue;
+      // MapLibre's Marker sets `transform` on the element it's given, to
+      // position it on the map — scaling that same element for a hover/
+      // selected highlight would fight that positioning transform every
+      // time the map moves. An inner wrapper div carries the visual
+      // styling instead; the outer `el` stays untouched by anything but
+      // MapLibre itself.
+      const el = document.createElement("div");
+      const inner = document.createElement("div");
+      const color = powderColor(resort.snowfallTodayIn);
+      // z-index above webcam pins: a few resorts (Alta, Brighton, Park City,
+      // Powder Mountain) have a webcam sitting at effectively the same
+      // coordinates, and without this the webcam pin — added after, so
+      // painted on top by default — silently ate the click (its own handler
+      // only stops propagation, no navigation), live-verified as the actual
+      // cause of "clicking the map does nothing" for those resorts.
+      inner.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s,box-shadow .15s;`;
+      inner.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
+      el.style.zIndex = "2";
+      el.appendChild(inner);
+      inner.addEventListener("click", (ev) => {
+        ev.stopPropagation(); // don't also trigger the map's pin-drop handler
+        if (onResortSelect) onResortSelect(resort.id);
+        else router.push(`/location/${resort.id}`);
+      });
+      inner.addEventListener("mouseenter", () => onResortHover?.(resort.id));
+      inner.addEventListener("mouseleave", () => onResortHover?.(null));
+      resortMarkerElsRef.current.set(resort.id, { wrapper: el, inner });
+      new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
+    }
+    const ids = new Set(resorts.map((r) => r.id));
+    for (const [id, { wrapper }] of resortMarkerElsRef.current) wrapper.style.display = ids.has(id) ? "" : "none";
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- click/hover handlers are stable callbacks from the parent
+  }, [resorts]);
 
   // Highlight the hovered/selected resort pin — separate from the mount
   // effect above so it can react to prop changes without recreating every
