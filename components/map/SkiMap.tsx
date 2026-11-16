@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
+import { safeHttpUrl } from "@/lib/util/url";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
 
 interface MapPin {
@@ -38,15 +39,6 @@ function escapeHtml(value: unknown): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function safeHttpUrl(value: unknown, fallback: string): string {
-  try {
-    const url = new URL(String(value));
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 function powderColor(inches: number | undefined): string {
