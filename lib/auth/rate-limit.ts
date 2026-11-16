@@ -28,3 +28,11 @@ export async function peek(key: string): Promise<number> {
   const rows = (await sql`SELECT COALESCE(SUM(count), 0)::int AS n FROM auth_rate WHERE key = ${key} AND bucket >= ${bucket - 1}`) as { n: number }[];
   return rows[0]?.n ?? 0;
 }
+
+/** Per-window counts for `key` in this window and the previous one. */
+export async function counts(key: string): Promise<{ bucket: number; count: number }[]> {
+  const sql = await getSql();
+  const bucket = Math.floor(Date.now() / WINDOW_MS);
+  const rows = (await sql`SELECT bucket, count FROM auth_rate WHERE key = ${key} AND bucket >= ${bucket - 1}`) as { bucket: string | number; count: number }[];
+  return rows.map((r) => ({ bucket: Number(r.bucket), count: r.count }));
+}

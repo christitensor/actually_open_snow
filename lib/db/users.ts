@@ -24,19 +24,20 @@ interface UserRow {
 // favorites actually durable across Vercel's separate serverless instances,
 // unlike the ephemeral per-instance SQLite this used before.
 
-export async function getOrCreateUser(email: string): Promise<User> {
+/** Finds the account for an email, creating it on first sign-in. `created` is true for a brand-new account. */
+export async function getOrCreateUser(email: string): Promise<User & { created: boolean }> {
   const sql = await getSql();
   email = email.trim().toLowerCase();
   // Case-insensitive: older rows may have been stored with the casing someone typed.
   const existing = (await sql`SELECT id, email FROM users WHERE lower(email) = ${email} ORDER BY id LIMIT 1`) as UserRow[];
-  if (existing[0]) return existing[0];
+  if (existing[0]) return { ...existing[0], created: false };
 
   const inserted = (await sql`
     INSERT INTO users (email, created_at) VALUES (${email}, ${new Date().toISOString()})
     ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
     RETURNING id, email
   `) as UserRow[];
-  return inserted[0];
+  return { ...inserted[0], created: true };
 }
 
 // --- Favorites -----------------------------------------------------------

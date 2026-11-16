@@ -57,25 +57,39 @@ export function consumeMagicLinkToken(token: string): string | null {
   }
 }
 
-// --- 6-digit code (typed into a saved-to-home-screen app) -----------------
+// --- 6-digit code (typed into the app) -----------------------------------
 //
-// A 6-digit code has no room to carry its own expiry, so instead of an
-// exact timestamp this derives from a rolling TTL-sized time bucket (the
-// same trick TOTP apps use) and accepts the current or previous bucket —
-// tolerates the window boundary without ever needing to remember which
-// bucket a given code was issued in.
+// A 6-digit code has no room to carry its own expiry, so it's derived from
+// a rolling TTL-sized time bucket (the same trick TOTP apps use) plus which
+// send this is within that bucket (`n`, from the per-email send counter in
+// lib/auth/rate-limit.ts). Including `n` makes every emailed code
+// different. Without it, every code in a window was identical, so once one
+// was used (codes are single-use) the email couldn't sign in again until
+// the window rolled over. Verification accepts any code actually sent in
+// the current or previous bucket.
 
-function codeForBucket(email: string, bucket: number): string {
-  const digest = hmac("ml-code", `${email.toLowerCase()}.${bucket}`);
-  const n = Buffer.from(digest, "base64url").readUInt32BE(0) % 1_000_000;
-  return String(n).padStart(6, "0");
+function codeFor(email: string, bucket: number, n: number): string {
+  const digest = hmac("ml-code", `${email.toLowerCase()}.${bucket}.${n}`);
+  const num = Buffer.from(digest, "base64url").readUInt32BE(0) % 1_000_000;
+  return String(num).padStart(6, "0");
 }
 
-export function currentMagicLinkCode(email: string): string {
-  return codeForBucket(email, Math.floor(Date.now() / TTL_MS));
+export function currentBucket(): number {
+  return Math.floor(Date.now() / TTL_MS);
 }
 
-export function verifyMagicLinkCode(email: string, code: string): boolean {
-  const bucket = Math.floor(Date.now() / TTL_MS);
-  return timingSafeStringEqual(code, codeForBucket(email, bucket)) || timingSafeStringEqual(code, codeForBucket(email, bucket - 1));
+/** The code for the `n`th send (1-based) to this email in the current bucket. */
+export function magicLinkCode(email: string, n: number): string {
+  return codeFor(email, currentBucket(), n);
+}
+
+/** True if `code` matches any code sent to `email`; `sent` gives the send count per bucket (current and previous). */
+export function verifyMagicLinkCode(email: string, code: string, sent: { bucket: number; count: number }[]): boolean {
+  const now = currentBucket();
+  let match = false;
+  for (const { bucket, count } of sent) {
+    if (bucket !== now && bucket !== now - 1) continue;
+    for (let n = 1; n <= count; n++) if (timingSafeStringEqual(code, codeFor(email, bucket, n))) match = true;
+  }
+  return match;
 }

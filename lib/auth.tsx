@@ -25,6 +25,8 @@ interface AuthContextValue {
   hasPasskey: boolean;
   /** True right after an email sign-in on an account with no passkey: the moment to suggest adding one. */
   offerPasskey: boolean;
+  /** The account was created by this sign-in (first time this email signed in). */
+  justCreated: boolean;
   dismissPasskeyOffer: () => void;
   signInWithPasskey: () => Promise<{ ok: boolean; message?: string }>;
   addPasskey: (name?: string) => Promise<{ ok: boolean; message?: string }>;
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [signInError, setSignInError] = useState(false);
   const [hasPasskey, setHasPasskey] = useState(false);
   const [offerPasskey, setOfferPasskey] = useState(false);
+  const [justCreated, setJustCreated] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
 
   useEffect(() => {
@@ -96,7 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmail(body.email);
         setHasPasskey(Boolean(body.hasPasskey));
         // Arrived from the emailed link: same moment as a code sign-in to suggest a passkey.
-        if (body.email && !body.hasPasskey && new URLSearchParams(window.location.search).get("signedIn") === "1") setOfferPasskey(true);
+        const qs = new URLSearchParams(window.location.search);
+        if (body.email && !body.hasPasskey && qs.get("signedIn") === "1") setOfferPasskey(true);
+        if (body.email && qs.get("accountCreated") === "1") setJustCreated(true);
         setStatus(body.email ? "signed-in" : "signed-out");
       } catch {
         if (!cancelled) setStatus("signed-out");
@@ -120,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await importLocalFavorites();
       } finally {
         params.delete("signedIn");
+        params.delete("accountCreated");
         const qs = params.toString();
         window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
       }
@@ -147,9 +153,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailInput, code }),
       });
-      const body = (await res.json()) as { email?: string; error?: string };
+      const body = (await res.json()) as { email?: string; created?: boolean; error?: string };
       if (!res.ok || !body.email) return { ok: false, message: body.error ?? "That code didn't work." };
 
+      setJustCreated(Boolean(body.created));
       setEmail(body.email);
       setStatus("signed-in");
       await importLocalFavorites();
@@ -225,7 +232,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         passkeySupported,
         hasPasskey,
         offerPasskey,
-        dismissPasskeyOffer: () => setOfferPasskey(false),
+        justCreated,
+        dismissPasskeyOffer: () => {
+          setOfferPasskey(false);
+          setJustCreated(false);
+        },
         signInWithPasskey,
         addPasskey,
       }}

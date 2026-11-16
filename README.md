@@ -41,7 +41,7 @@ npx eslint .                      # lint
 
 ## Accounts and sign-in
 
-People sign in with a **passkey** (Face ID / Touch ID / device PIN; synced across their devices by iCloud Keychain or Google Password Manager) or a **6-digit email code**, which is always available as the backup. Both happen inside the page, so they work in an iOS home-screen app too. The account page (`/account`) lets each person add, rename and remove passkeys, and see and sign out their signed-in devices.
+New people use **Create account** in the sign-in panel: step 1 confirms their email with a 6-digit code (this also creates the account, and the email is the recovery method); step 2 creates a passkey right away (skippable). After that, people sign in with a **passkey** (Face ID / Touch ID / device PIN; synced across their devices by iCloud Keychain or Google Password Manager) or a **6-digit email code**, which is always available as the backup. Both happen inside the page, so they work in an iOS home-screen app too. The account page (`/account`) lets each person add, rename and remove passkeys, and see and sign out their signed-in devices.
 
 Sessions are rows in Postgres (`lib/auth/sessions.ts`) behind an HMAC-signed cookie. They last 180 days from last use, so you stay signed in on any device you keep using. Email codes are single-use and rate-limited (sends and guesses) per address.
 
