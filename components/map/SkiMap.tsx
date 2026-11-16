@@ -47,14 +47,16 @@ function powderColor(inches: number | undefined): string {
 // whole style — that would blow away the pistes/radar/snow-grid layers
 // added at runtime.
 //
-// "Street" is CARTO's free Voyager/Dark Matter basemaps, not raw OSM
-// tiles: both are CORS-open with no key required (confirmed live), and
-// requesting the "@2x" filename at the same tileSize:256 pulls a
-// double-resolution image into the same on-screen tile slot — sharper on
-// any HiDPI display, the same trick as an <img srcset> 2x variant. Dark
-// mode swaps to CARTO's actual dark cartography (osm-dark) instead of the
-// previous CSS invert-filter hack, which also inverted markers/popups and
-// produced a flatter, muddier result than a real dark basemap.
+// "Street" is Esri's public World Street Map (light, with terrain shading)
+// and World Dark Gray Canvas + its labels layer (dark) — the same public
+// Esri tile service as the satellite layer, CORS-open, no key. It used to
+// be CARTO's Voyager/Dark Matter, but CARTO started requiring an API key
+// (Nov 2026: every tile came back as an "API KEY REQUIRED" placeholder
+// image with a 200 status, so nothing errored — the map just went blank).
+// Dark mode swaps to a real dark basemap rather than a CSS invert filter,
+// which also inverted markers/popups. If a crisper or self-sufficient
+// street map is wanted later, OpenFreeMap (free vector tiles, no key)
+// would need its style's sources/layers merged into this one.
 type BaseLayerId = "osm" | "topo" | "satellite";
 const BASE_LAYER_IDS: BaseLayerId[] = ["osm", "topo", "satellite"];
 const BASE_LAYER_LABELS: Record<BaseLayerId, string> = { osm: "Street", topo: "Topo", satellite: "Satellite" };
@@ -64,17 +66,23 @@ const BASE_STYLE: StyleSpecification = {
   sources: {
     osm: {
       type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"],
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"],
       tileSize: 256,
-      maxzoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      maxzoom: 19,
+      attribution: "Tiles &copy; Esri — Source: Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS, OpenStreetMap contributors",
     },
     "osm-dark": {
       type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"],
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
       tileSize: 256,
-      maxzoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      maxzoom: 16,
+      attribution: "Tiles &copy; Esri — Esri, HERE, Garmin, OpenStreetMap contributors",
+    },
+    "osm-dark-labels": {
+      type: "raster",
+      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      maxzoom: 16,
     },
     topo: {
       type: "raster",
@@ -99,6 +107,7 @@ const BASE_STYLE: StyleSpecification = {
   layers: [
     { id: "osm", type: "raster", source: "osm" },
     { id: "osm-dark", type: "raster", source: "osm-dark", layout: { visibility: "none" } },
+    { id: "osm-dark-labels", type: "raster", source: "osm-dark-labels", layout: { visibility: "none" } },
     { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
     { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
   ],
@@ -759,8 +768,9 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     // false-color mess), so only the street layer swaps by theme.
     const visibleId = baseLayer === "osm" && isDark ? "osm-dark" : baseLayer;
     const apply = () => {
-      for (const id of ["osm", "osm-dark", "topo", "satellite"]) {
-        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", id === visibleId ? "visible" : "none");
+      for (const id of ["osm", "osm-dark", "osm-dark-labels", "topo", "satellite"]) {
+        const on = id === visibleId || (id === "osm-dark-labels" && visibleId === "osm-dark");
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
       }
     };
     // On mount this can fire before the initial style has finished loading
