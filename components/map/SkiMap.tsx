@@ -8,15 +8,16 @@ import {
   type DataDrivenPropertyValueSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
-  type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "@/components/map/maplibre-worker";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
+import { ALL_BASE_LAYER_IDS, BASE_STYLE, type BaseLayerId, visibleBaseLayerIds } from "@/lib/map/base-style";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
 
 interface MapPin {
@@ -37,72 +38,10 @@ function powderColor(inches: number | undefined): string {
   return "#9ca3af";
 }
 
-// No MapTiler/vector-tile API key configured anywhere in this build, so
-// the base map is plain raster tiles — free, no key, always works. Three
-// swappable base layers, all free/open, no key: street, OpenTopoMap
-// (topo, built from OSM + SRTM elevation), and Esri World Imagery
-// (satellite, Esri's public tile service). All three are added as
-// sources/layers up front with only one visible at a time (same pattern
-// as the radar/snow-forecast toggles below) rather than swapping the
-// whole style — that would blow away the pistes/radar/snow-grid layers
-// added at runtime.
-//
-// "Street" is CARTO's free Voyager/Dark Matter basemaps, not raw OSM
-// tiles: both are CORS-open with no key required (confirmed live), and
-// requesting the "@2x" filename at the same tileSize:256 pulls a
-// double-resolution image into the same on-screen tile slot — sharper on
-// any HiDPI display, the same trick as an <img srcset> 2x variant. Dark
-// mode swaps to CARTO's actual dark cartography (osm-dark) instead of the
-// previous CSS invert-filter hack, which also inverted markers/popups and
-// produced a flatter, muddier result than a real dark basemap.
-type BaseLayerId = "osm" | "topo" | "satellite";
+// Base maps (street / topo / satellite) and why each was chosen: see
+// lib/map/base-style.ts.
 const BASE_LAYER_IDS: BaseLayerId[] = ["osm", "topo", "satellite"];
 const BASE_LAYER_LABELS: Record<BaseLayerId, string> = { osm: "Street", topo: "Topo", satellite: "Satellite" };
-
-const BASE_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    },
-    "osm-dark": {
-      type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    },
-    topo: {
-      type: "raster",
-      tiles: [
-        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      maxzoom: 17,
-      attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)",
-    },
-    satellite: {
-      type: "raster",
-      // Esri's public World Imagery tile service — free, no key, {z}/{y}/{x} order (not the usual {z}/{x}/{y}).
-      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-    },
-  },
-  layers: [
-    { id: "osm", type: "raster", source: "osm" },
-    { id: "osm-dark", type: "raster", source: "osm-dark", layout: { visibility: "none" } },
-    { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
-    { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
-  ],
-};
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   novice: "#22c55e",
@@ -754,13 +693,13 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    // "osm" has a real dark counterpart (osm-dark); topo/satellite don't
+    // The street map has a real dark style; topo/satellite don't
     // (inverting relief shading or a satellite photo produces a
-    // false-color mess), so only the street layer swaps by theme.
-    const visibleId = baseLayer === "osm" && isDark ? "osm-dark" : baseLayer;
+    // false-color mess), so only the street map swaps by theme.
+    const visible = visibleBaseLayerIds(baseLayer, isDark);
     const apply = () => {
-      for (const id of ["osm", "osm-dark", "topo", "satellite"]) {
-        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", id === visibleId ? "visible" : "none");
+      for (const id of ALL_BASE_LAYER_IDS) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible.has(id) ? "visible" : "none");
       }
     };
     // On mount this can fire before the initial style has finished loading
