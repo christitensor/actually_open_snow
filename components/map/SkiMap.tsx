@@ -18,6 +18,7 @@ import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
 import { ALL_BASE_LAYER_IDS, BASE_STYLE, type BaseLayerId, visibleBaseLayerIds } from "@/lib/map/base-style";
+import { PISTE_MAX_TILES_PER_VIEW, PISTE_MIN_VIEW_ZOOM, PISTE_TILE_ZOOM, tilesForBbox } from "@/lib/util/tiles";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
 
 interface MapPin {
@@ -403,57 +404,82 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       new Marker({ element: el }).setLngLat([cam.lon, cam.lat]).setPopup(popup).addTo(map);
     }
 
-    // MAP-13: piste overlay, refetched (debounced) as the user pans/zooms.
+    // MAP-13: piste overlay. Runs are fetched per fixed z10 tile (see
+    // app/api/pistes/route.ts) once zoomed in far enough to see them. Each
+    // tile is fetched once per page and kept, so panning back is free and
+    // the CDN serves the same tile URLs to every visitor.
     if (showPistes) {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+      const tileFeatures = new Map<string, GeoJSON.Feature[]>();
+      const inFlight = new Set<string>();
+
+      const render = () => {
+        // A run crossing a tile edge comes back in both tiles; keep one copy per OSM way id.
+        const byId = new Map<string | number | undefined, GeoJSON.Feature>();
+        for (const f of [...tileFeatures.values()].flat()) byId.set(f.id, f);
+        const geojson: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [...byId.values()] };
+        const source = map.getSource("pistes") as GeoJSONSource | undefined;
+        if (source) {
+          source.setData(geojson);
+        } else if (styleReadyRef.current) {
+          map.addSource("pistes", { type: "geojson", data: geojson });
+          map.addLayer({
+            id: "pistes-line",
+            type: "line",
+            source: "pistes",
+            minzoom: PISTE_MIN_VIEW_ZOOM - 0.5,
+            paint: {
+              "line-color": [
+                "match",
+                ["get", "difficulty"],
+                ...Object.entries(DIFFICULTY_COLORS).flat(),
+                "#6b7280",
+              ] as unknown as DataDrivenPropertyValueSpecification<string>,
+              "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3] as unknown as DataDrivenPropertyValueSpecification<number>,
+            },
+          });
+        }
+      };
 
       const loadPistes = async () => {
-        const bounds = map.getBounds();
-        const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(",");
-        try {
-          const res = await fetch(`/api/pistes?bbox=${bbox}`);
-          if (!res.ok) return;
-          const { pistes } = (await res.json()) as { pistes: PisteWay[] };
-
-          const geojson: GeoJSON.FeatureCollection = {
-            type: "FeatureCollection",
-            features: pistes.map((p) => ({
-              type: "Feature",
-              properties: { difficulty: p.difficulty ?? "intermediate" },
-              geometry: { type: "LineString", coordinates: p.coordinates },
-            })),
-          };
-
-          const source = map.getSource("pistes") as GeoJSONSource | undefined;
-          if (source) {
-            source.setData(geojson);
-          } else if (styleReadyRef.current) {
-            map.addSource("pistes", { type: "geojson", data: geojson });
-            map.addLayer({
-              id: "pistes-line",
-              type: "line",
-              source: "pistes",
-              paint: {
-                "line-color": [
-                  "match",
-                  ["get", "difficulty"],
-                  ...Object.entries(DIFFICULTY_COLORS).flat(),
-                  "#6b7280",
-                ] as unknown as DataDrivenPropertyValueSpecification<string>,
-                "line-width": 2,
-              },
-            });
-          }
-        } catch {
-          // Overpass can be slow/rate-limited — a missing piste overlay
-          // shouldn't break the rest of the map.
-        }
+        if (map.getZoom() < PISTE_MIN_VIEW_ZOOM) return;
+        const b = map.getBounds();
+        const tiles = tilesForBbox([b.getSouth(), b.getWest(), b.getNorth(), b.getEast()], PISTE_TILE_ZOOM)
+          .map((t) => `${t.z}/${t.x}/${t.y}`)
+          .filter((k) => !tileFeatures.has(k) && !inFlight.has(k))
+          .slice(0, PISTE_MAX_TILES_PER_VIEW);
+        if (tiles.length === 0) return;
+        await Promise.all(
+          tiles.map(async (key) => {
+            inFlight.add(key);
+            try {
+              const res = await fetch(`/api/pistes?tile=${key}`);
+              if (!res.ok) return; // not stored, so the next move retries it
+              const { pistes } = (await res.json()) as { pistes: PisteWay[] };
+              tileFeatures.set(
+                key,
+                pistes.map((p) => ({
+                  type: "Feature",
+                  id: p.id,
+                  properties: { difficulty: p.difficulty ?? "intermediate" },
+                  geometry: { type: "LineString", coordinates: p.coordinates },
+                }))
+              );
+            } catch {
+              // Overpass can be slow/rate-limited — a missing piste overlay
+              // shouldn't break the rest of the map.
+            } finally {
+              inFlight.delete(key);
+            }
+          })
+        );
+        render();
       };
 
       map.on("load", loadPistes);
       map.on("moveend", () => {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(loadPistes, 500);
+        debounceTimer = setTimeout(loadPistes, 400);
       });
     }
 
