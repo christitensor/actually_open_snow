@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
+import { safeHttpUrl } from "@/lib/util/url";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
 
 interface MapPin {
@@ -26,6 +27,18 @@ interface MapPin {
   lon: number;
   /** MAP-10 Powder Finder: today's forecast snowfall (inches) for this resort, if known — colors the pin */
   snowfallTodayIn?: number;
+}
+
+// Popup HTML is built from third-party feed text (UAC observations are
+// public user submissions; station names come from NWS/NRCS), so every
+// interpolated value is escaped and links are restricted to http(s).
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function powderColor(inches: number | undefined): string {
@@ -636,12 +649,12 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
           if (!feature || feature.geometry.type !== "Point") return;
           const p = feature.properties as Record<string, string>;
           const html =
-            `<strong>${p.title}</strong><br/>` +
-            `<span style="font-size:11px;color:#666">${p.type === "avalanche" ? "Avalanche" : "Observation"} · ${p.date}${p.region ? ` · ${p.region}` : ""}</span><br/>` +
-            (p.locationName ? `${p.locationName}<br/>` : "") +
-            (p.aspect || p.elevationFt ? `${p.aspect ? `Aspect: ${p.aspect}` : ""}${p.aspect && p.elevationFt ? " · " : ""}${p.elevationFt ? `${p.elevationFt} ft` : ""}<br/>` : "") +
-            (p.details ? `<p style="margin:4px 0;font-size:12px;max-width:220px">${p.details}</p>` : "") +
-            `<a href="${p.detailsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full report ↗</a>`;
+            `<strong>${escapeHtml(p.title)}</strong><br/>` +
+            `<span style="font-size:11px;color:#666">${p.type === "avalanche" ? "Avalanche" : "Observation"} · ${escapeHtml(p.date)}${p.region ? ` · ${escapeHtml(p.region)}` : ""}</span><br/>` +
+            (p.locationName ? `${escapeHtml(p.locationName)}<br/>` : "") +
+            (p.aspect || p.elevationFt ? `${p.aspect ? `Aspect: ${escapeHtml(p.aspect)}` : ""}${p.aspect && p.elevationFt ? " · " : ""}${p.elevationFt ? `${escapeHtml(p.elevationFt)} ft` : ""}<br/>` : "") +
+            (p.details ? `<p style="margin:4px 0;font-size:12px;max-width:220px">${escapeHtml(p.details)}</p>` : "") +
+            `<a href="${escapeHtml(safeHttpUrl(p.detailsUrl, "https://utahavalanchecenter.org/observations"))}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full report ↗</a>`;
           new Popup({ offset: 8 })
             .setLngLat(feature.geometry.coordinates as [number, number])
             .setHTML(html)
@@ -689,16 +702,16 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
           const elevation = p.elevationFt ? `${p.elevationFt} ft` : "";
           const html =
             p.kind === "key"
-              ? `<strong>${p.name}</strong><br/>` +
-                `<span style="font-size:11px;color:#666">${elevation}</span><br/>` +
+              ? `<strong>${escapeHtml(p.name)}</strong><br/>` +
+                `<span style="font-size:11px;color:#666">${escapeHtml(elevation)}</span><br/>` +
                 `${p.tempF ? `${Math.round(Number(p.tempF))}°F` : "No temp reading"}` +
                 `${p.windSpeedMph ? ` · ${Math.round(Number(p.windSpeedMph))} mph` : ""}<br/>` +
                 `<span style="font-size:11px;color:#666">NWS · ${p.observedAt ? new Date(p.observedAt).toLocaleString() : "no timestamp"}</span>`
-              : `<strong>${p.name}</strong><br/>` +
-                `<span style="font-size:11px;color:#666">${elevation}</span><br/>` +
-                `${p.snowDepthIn ? `${p.snowDepthIn}" snow depth` : "No depth reading"}` +
-                `${p.sweIn ? ` · ${p.sweIn}" SWE` : ""}<br/>` +
-                `<span style="font-size:11px;color:#666">SNOTEL · ${p.date}</span>`;
+              : `<strong>${escapeHtml(p.name)}</strong><br/>` +
+                `<span style="font-size:11px;color:#666">${escapeHtml(elevation)}</span><br/>` +
+                `${p.snowDepthIn ? `${escapeHtml(p.snowDepthIn)}" snow depth` : "No depth reading"}` +
+                `${p.sweIn ? ` · ${escapeHtml(p.sweIn)}" SWE` : ""}<br/>` +
+                `<span style="font-size:11px;color:#666">SNOTEL · ${escapeHtml(p.date)}</span>`;
           new Popup({ offset: 8 }).setLngLat(feature.geometry.coordinates as [number, number]).setHTML(html).addTo(map);
         });
         map.on("mouseenter", "weather-stations-circles", () => {

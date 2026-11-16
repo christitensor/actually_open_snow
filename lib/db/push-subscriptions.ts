@@ -107,10 +107,38 @@ export async function markPushNotified(id: number, localDate: string): Promise<v
   await sql`UPDATE push_subscriptions SET last_notified_date = ${localDate} WHERE id = ${id}`;
 }
 
+// Web Push endpoints are URLs the browser's push service hands out; the
+// server POSTs to them (lib/push.ts). Accepting any https URL would let a
+// caller point that POST at an arbitrary host (SSRF), so only the real push
+// services are allowed:
+//   Chrome / Edge-Chromium / Android / Opera / Brave / Samsung → fcm.googleapis.com
+//   Firefox → updates.push.services.mozilla.com
+//   Safari (macOS 13+, iOS/iPadOS 16.4+ home-screen apps) → web.push.apple.com (*.push.apple.com)
+//   Legacy Edge / Windows (WNS) → *.notify.windows.com (e.g. wns2-*.notify.windows.com)
+const PUSH_HOSTS_EXACT = new Set(["fcm.googleapis.com", "android.googleapis.com", "updates.push.services.mozilla.com"]);
+const PUSH_HOST_SUFFIXES = [".push.apple.com", ".notify.windows.com"];
+const MAX_ENDPOINT_LENGTH = 2048;
+const MAX_KEY_LENGTH = 256;
+
+/** True if `endpoint` is an https URL on a known Web Push service (default port, no credentials). */
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  if (endpoint.length > MAX_ENDPOINT_LENGTH) return false;
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.port !== "" || url.username !== "" || url.password !== "") return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_HOSTS_EXACT.has(host) || PUSH_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
 /** Validates the `subscription.toJSON()` shape a browser's PushManager hands back. */
 export function parsePushKeys(value: unknown): PushKeys | null {
   const v = value as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } } | null;
-  if (!v || typeof v.endpoint !== "string" || !v.endpoint.startsWith("https://")) return null;
+  if (!v || typeof v.endpoint !== "string" || !isAllowedPushEndpoint(v.endpoint)) return null;
   if (typeof v.keys?.p256dh !== "string" || typeof v.keys?.auth !== "string") return null;
+  if (v.keys.p256dh.length > MAX_KEY_LENGTH || v.keys.auth.length > MAX_KEY_LENGTH) return null;
   return { endpoint: v.endpoint, p256dh: v.keys.p256dh, auth: v.keys.auth };
 }

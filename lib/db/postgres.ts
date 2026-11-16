@@ -62,6 +62,30 @@ async function ensureSchema(sql: Sql): Promise<void> {
       UNIQUE(endpoint, location_name)
     )
   `;
+  // Emails are now stored lowercased (lib/auth/email.ts), but rows created
+  // before that may be mixed-case; lookups go through lower(email), so index it.
+  // Not UNIQUE: pre-existing case-variant duplicates would make that fail.
+  await sql`CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users (lower(email))`;
+  // 6-digit sign-in codes: hashed, single-use, expiring, attempt-limited — see lib/db/auth-codes.ts.
+  await sql`
+    CREATE TABLE IF NOT EXISTS auth_codes (
+      email TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      consumed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL
+    )
+  `;
+  // Per-IP / per-email throttles for the sign-in endpoints — see lib/db/rate-limit.ts.
+  await sql`
+    CREATE TABLE IF NOT EXISTS auth_rate_limits (
+      key TEXT NOT NULL,
+      window_start TIMESTAMPTZ NOT NULL,
+      count INTEGER NOT NULL,
+      PRIMARY KEY (key, window_start)
+    )
+  `;
 }
 
 /** Resolves to a ready-to-query client; table creation only actually runs once per warm instance. */

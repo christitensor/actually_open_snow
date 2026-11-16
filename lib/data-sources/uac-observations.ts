@@ -39,8 +39,19 @@ interface RawObservationsResponse {
   observations: { observation: RawObservation }[];
 }
 
+// Plain text out: tags dropped, common entities decoded (the feed uses
+// &nbsp; heavily). The map popup escapes this text again before rendering.
 function stripHtml(s: string): string {
-  return s.replace(/<[^>]*>/g, "").trim();
+  return s
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d{1,6});/g, (m, n: string) => (Number(n) <= 0x10ffff ? String.fromCodePoint(Number(n)) : m))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .trim();
 }
 
 // Coordinates arrive as a GML-ish string, e.g.

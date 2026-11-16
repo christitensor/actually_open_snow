@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireCronSecret } from "@/lib/auth/cron";
 
 // PERS-04 support: with no tool available to read/set Vercel project env
 // vars directly, this is the only way to tell "RESEND_API_KEY was never
 // set" apart from "it's set" without guessing. Never returns the key
-// itself — only booleans.
+// itself — only booleans. Operator-only: requires
+// `Authorization: Bearer <CRON_SECRET>`.
 //
 // Deliberately does NOT probe Resend's API (e.g. GET /domains) to verify
 // the key works: Resend API keys can be scoped to "Sending access" only,
@@ -13,7 +15,10 @@ import { NextResponse } from "next/server";
 // live: this app's key produced 401 from /domains while Resend's own
 // dashboard showed those same emails as "Delivered". The Resend dashboard
 // (resend.com → Emails) is the only reliable way to confirm delivery.
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = requireCronSecret(req);
+  if (unauthorized) return unauthorized;
+
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.ALERTS_FROM_EMAIL;
 

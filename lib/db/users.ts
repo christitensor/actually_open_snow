@@ -7,6 +7,7 @@
 import { getSql } from "./postgres";
 import { createSessionToken, verifySessionToken } from "@/lib/auth/session-token";
 import { favoriteKey } from "@/lib/util/favorite-key";
+import { normalizeEmail } from "@/lib/auth/email";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -27,9 +28,16 @@ interface UserRow {
 // favorites actually durable across Vercel's separate serverless instances,
 // unlike the ephemeral per-instance SQLite this used before.
 
-export async function getOrCreateUser(email: string): Promise<User> {
+export async function getOrCreateUser(rawEmail: string): Promise<User> {
+  const email = normalizeEmail(rawEmail);
   const sql = await getSql();
-  const existing = (await sql`SELECT id, email FROM users WHERE email = ${email}`) as UserRow[];
+  // Case-insensitive: accounts created before emails were normalized may be
+  // stored mixed-case. If case-variant duplicates exist, prefer an exact
+  // (already-lowercase) match, then the oldest account.
+  const existing = (await sql`
+    SELECT id, email FROM users WHERE lower(email) = ${email}
+    ORDER BY (email = ${email}) DESC, id ASC LIMIT 1
+  `) as UserRow[];
   if (existing[0]) return existing[0];
 
   const inserted = (await sql`
