@@ -13,11 +13,14 @@ import { FAVORITES_CHANGE_EVENT } from "@/lib/favorites-storage";
 import { openWelcome } from "@/components/onboarding/Welcome";
 import MyLocationButton from "@/components/location/MyLocationButton";
 import type { Webcam } from "@/lib/models/types";
+import { ALL_STATES, FALLBACK_ORIGIN, stateName, type Origin } from "@/lib/resort-states";
+import { readDeviceOrigin, requestDeviceOrigin } from "@/lib/device-origin";
 
 interface ResortRow {
   id: string;
   name: string;
   region: string;
+  state: string;
   lat: number;
   lon: number;
   snowfallTodayIn?: number;
@@ -44,6 +47,39 @@ function FilterPill({ active, onClick, children, href }: { active?: boolean; onC
   );
 }
 
+function StateSelect({
+  value,
+  counts,
+  total,
+  onChange,
+}: {
+  value: string;
+  counts: [string, number][];
+  total: number;
+  onChange: (state: string) => void;
+}) {
+  return (
+    <label className="relative inline-flex items-center">
+      <span className="sr-only">Show resorts in</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none rounded-full border border-border bg-card py-1.5 pr-8 pl-3.5 text-sm font-semibold text-foreground transition hover:border-primary focus:border-primary focus:outline-none"
+      >
+        {counts.map(([code, n]) => (
+          <option key={code} value={code}>
+            {stateName(code)} ({n})
+          </option>
+        ))}
+        <option value={ALL_STATES}>All states ({total})</option>
+      </select>
+      <span aria-hidden className="pointer-events-none absolute right-3 text-xs text-muted-foreground">
+        ▼
+      </span>
+    </label>
+  );
+}
+
 // Split-screen "Airbnb pattern" home explorer: resort list is the primary,
 // independently-scrolling surface (left on desktop); the map is a pinned
 // companion (right), not the thing you have to scroll past to reach data.
@@ -54,11 +90,17 @@ export default function HomeExplorer({
   webcams,
   center,
   fetchedAt,
+  defaultState,
+  ipOrigin,
 }: {
   resorts: ResortRow[];
   webcams: Webcam[];
   center: [number, number];
   fetchedAt: string;
+  /** The viewer's state, from their IP on the server (see app/page.tsx) — the list's starting filter. */
+  defaultState: string;
+  /** Approximate viewer location from their IP, when the host provides it. */
+  ipOrigin: { lat: number; lon: number } | null;
 }) {
   const skiMapRef = useRef<SkiMapHandle>(null);
   // PERS-08 "My resorts" = your starred resorts. Before you star any, every
@@ -69,9 +111,60 @@ export default function HomeExplorer({
   const starredIds = favorites.flatMap((f) => (f.source === "resort" && f.resortId ? [f.resortId] : []));
   const hasStarred = starredIds.length > 0;
   const [browsingAll, setBrowsingAll] = useState(false);
-  const shownResorts = !hasStarred || browsingAll ? resorts : resorts.filter((r) => starredIds.includes(r.id));
-  // No stars: everything on top. Stars: they're on top (ResortList adds favorites itself), the rest collapsed.
-  const shownPrimaryIds = hasStarred ? [] : resorts.map((r) => r.id);
+
+  // By state: the dropdown starts on the viewer's own state (or the one
+  // nearest them) until they pick one, and that pick is saved.
+  const selectedState = prefs.resortState ?? defaultState;
+  const stateResorts = selectedState === ALL_STATES ? resorts : resorts.filter((r) => r.state === selectedState);
+  const stateCounts = Object.entries(
+    resorts.reduce<Record<string, number>>((acc, r) => ((acc[r.state] = (acc[r.state] ?? 0) + 1), acc), {})
+  ).sort(([a], [b]) => stateName(a).localeCompare(stateName(b)));
+  const starredResorts = resorts.filter((r) => starredIds.includes(r.id));
+  // No stars: the picked state's resorts, all on top. Stars: they're on top
+  // (from any state; ResortList adds favorites itself), with the picked
+  // state's other resorts collapsed behind "Browse".
+  const listResorts = hasStarred ? [...starredResorts, ...stateResorts.filter((r) => !starredIds.includes(r.id))] : stateResorts;
+  const shownPrimaryIds = hasStarred ? [] : stateResorts.map((r) => r.id);
+  const shownResorts = !hasStarred ? stateResorts : browsingAll ? listResorts : starredResorts;
+  const browseCount = listResorts.length - starredResorts.length;
+
+  // Distances: the device's precise location once shared, else the IP's
+  // rough one, else Salt Lake City. Read after mount (localStorage), so the
+  // server-rendered list and the first client render agree.
+  const [deviceOrigin, setDeviceOrigin] = useState<{ lat: number; lon: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  useEffect(() => {
+    const cached = readDeviceOrigin();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a device-only value
+    if (cached) setDeviceOrigin(cached);
+    // Already allowed (e.g. via "My location"): refresh quietly, no prompt.
+    navigator.permissions
+      ?.query({ name: "geolocation" })
+      .then((p) => (p.state === "granted" ? requestDeviceOrigin() : null))
+      .then((o) => o && setDeviceOrigin(o))
+      .catch(() => {});
+  }, []);
+  const origin: Origin = deviceOrigin
+    ? { ...deviceOrigin, source: "gps" }
+    : ipOrigin
+      ? { ...ipOrigin, source: "ip" }
+      : { lat: FALLBACK_ORIGIN.lat, lon: FALLBACK_ORIGIN.lon, source: "fallback" };
+  const usePreciseLocation = async () => {
+    setLocating(true);
+    const o = await requestDeviceOrigin();
+    setLocating(false);
+    if (o) setDeviceOrigin(o);
+  };
+
+  // Frame the map on the picked state (instantly on first load, animated after).
+  const firstFit = useRef(true);
+  const fitKey = hasStarred && !browsingAll ? `starred:${starredIds.join(",")}` : `state:${selectedState}`;
+  useEffect(() => {
+    skiMapRef.current?.fitToPoints(shownResorts, { animate: !firstFit.current });
+    firstFit.current = false;
+    // Re-frame only when the state or starred set changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey]);
 
   // One-time migration from v1's separate "My resorts" checklist: those become stars.
   // Signed in, it uses the add-only import endpoint (never un-stars anything,
@@ -182,8 +275,38 @@ export default function HomeExplorer({
               </div>
               <ResortList
                 onExpandedChange={setBrowsingAll}
-                expandLabel={hasStarred ? `Browse all ${resorts.length} resorts` : undefined}
-                resorts={resorts}
+                expandLabel={
+                  hasStarred
+                    ? `Browse ${browseCount} more ${selectedState === ALL_STATES ? "resorts" : `in ${stateName(selectedState)}`}`
+                    : undefined
+                }
+                origin={origin}
+                controls={
+                  <StateSelect
+                    value={selectedState}
+                    counts={stateCounts}
+                    total={resorts.length}
+                    onChange={(s) => updatePrefs({ resortState: s })}
+                  />
+                }
+                footnote={
+                  <span>
+                    {origin.source === "gps"
+                      ? "Distances from your location"
+                      : origin.source === "ip"
+                        ? "Distances from your approximate area"
+                        : `Distances from ${FALLBACK_ORIGIN.label}`}
+                    {origin.source !== "gps" && (
+                      <>
+                        {" · "}
+                        <button onClick={usePreciseLocation} disabled={locating} className="font-medium text-primary hover:underline disabled:opacity-60">
+                          {locating ? "Locating…" : "Use precise location"}
+                        </button>
+                      </>
+                    )}
+                  </span>
+                }
+                resorts={listResorts}
                 primaryIds={shownPrimaryIds}
                 favoritesOnly={favoritesOnly}
                 hoveredId={hoveredId}

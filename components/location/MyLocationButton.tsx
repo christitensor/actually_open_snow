@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveDeviceOrigin } from "@/lib/device-origin";
 
 // PERS-02: personalized "my location" — uses the browser Geolocation API
 // and routes into the same backcountry-pin pipeline as MAP-17, since a
@@ -19,6 +20,7 @@ export default function MyLocationButton() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        saveDeviceOrigin(latitude, longitude);
         router.push(`/location/pin?lat=${latitude.toFixed(5)}&lon=${longitude.toFixed(5)}`);
       },
       () => setStatus("error"),

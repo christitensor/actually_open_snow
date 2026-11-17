@@ -46,7 +46,7 @@ function readLocal(): Preferences {
       if (k?.startsWith(LEGACY_SECTION_PREFIX)) sectionOpen[k.slice(LEGACY_SECTION_PREFIX.length)] = localStorage.getItem(k) === "1";
     }
     const sort = localStorage.getItem(LEGACY_SORT_KEY);
-    return sanitize({ ...DEFAULT_PREFERENCES, sectionOpen, resortSort: sort === "mine" ? "mine" : "snow" });
+    return sanitize({ ...DEFAULT_PREFERENCES, sectionOpen, resortOrder: sort === "mine" ? "mine" : "near" });
   } catch {
     return DEFAULT_PREFERENCES;
   }

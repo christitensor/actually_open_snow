@@ -5,7 +5,7 @@
 // localStorage alike.
 
 export type MapStyle = "osm" | "topo" | "satellite";
-export type ResortSort = "snow" | "mine";
+export type ResortSort = "near" | "snow" | "mine";
 
 export interface Preferences {
   /**
@@ -18,7 +18,15 @@ export interface Preferences {
   sectionOrder: string[];
   /** Open (true) / closed (false) per section id. Missing = the section's default. */
   sectionOpen: Record<string, boolean>;
-  resortSort: ResortSort;
+  /**
+   * Home list order: nearest first (default), most snow, or your starred
+   * order. Replaces the older `resortSort` key, which held "snow" for
+   * nearly everyone just as the then-default, so only its "mine" is
+   * carried over (see sanitize).
+   */
+  resortOrder: ResortSort;
+  /** Home list's state dropdown: a two-letter code, "ALL", or null = pick from the viewer's location. */
+  resortState: string | null;
   mapStyle: MapStyle;
   /** Has finished (or skipped) the first-sign-in welcome: pick resorts + how to save spots. */
   onboarded: boolean;
@@ -28,7 +36,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   myResorts: null,
   sectionOrder: [],
   sectionOpen: {},
-  resortSort: "snow",
+  resortOrder: "near",
+  resortState: null,
   mapStyle: "osm",
   onboarded: false,
 };
@@ -84,7 +93,9 @@ export function sanitize(input: unknown): Preferences {
       Object.entries(v.sectionOpen as Record<string, unknown>).filter(([k, b]) => SECTION_IDS.has(k) && typeof b === "boolean")
     ) as Record<string, boolean>;
   }
-  if (v.resortSort === "snow" || v.resortSort === "mine") out.resortSort = v.resortSort;
+  if (v.resortOrder === "near" || v.resortOrder === "snow" || v.resortOrder === "mine") out.resortOrder = v.resortOrder;
+  else if (v.resortSort === "mine") out.resortOrder = "mine";
+  if (typeof v.resortState === "string" && /^([A-Z]{2}|ALL)$/.test(v.resortState)) out.resortState = v.resortState;
   if (v.mapStyle === "osm" || v.mapStyle === "topo" || v.mapStyle === "satellite") out.mapStyle = v.mapStyle;
   if (typeof v.onboarded === "boolean") out.onboarded = v.onboarded;
   return out;

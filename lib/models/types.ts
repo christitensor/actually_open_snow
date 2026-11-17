@@ -23,6 +23,8 @@ export interface Resort {
   name: string;
   /** Display grouping, e.g. "Northern Utah", "Colorado", "Tahoe & Sierra" (see data/resorts.json). */
   region: string;
+  /** Two-letter US state code — drives the home page's state dropdown. */
+  state: string;
   lat: number;
   lon: number;
   baseElevationFt: number;
