@@ -8,6 +8,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { FAVORITES_CHANGE_EVENT, FAVORITES_STORAGE_KEY } from "@/lib/favorites-storage";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import type { FavoriteLocation } from "@/lib/models/types";
+import type { InitialAccount } from "@/lib/auth/initial";
 
 type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -29,6 +31,8 @@ interface AuthContextValue {
   justCreated: boolean;
   dismissPasskeyOffer: () => void;
   signInWithPasskey: () => Promise<{ ok: boolean; message?: string }>;
+  /** The account's favorites as loaded by the server for this page (seed for useFavorites), or null. */
+  initialFavorites: FavoriteLocation[] | null;
   addPasskey: (name?: string) => Promise<{ ok: boolean; message?: string }>;
 }
 
@@ -62,11 +66,14 @@ async function importLocalFavorites() {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
-  const [email, setEmail] = useState<string | null>(null);
+export function AuthProvider({ children, initial = null }: { children: ReactNode; initial?: InitialAccount }) {
+  // When the server already knows who's signed in (lib/auth/initial.ts), start
+  // from that instead of "loading", so the first render is the person's page.
+  const [status, setStatus] = useState<AuthStatus>(initial?.status ?? "loading");
+  const [email, setEmail] = useState<string | null>(initial?.status === "signed-in" ? initial.email : null);
+  const initialFavorites = initial?.status === "signed-in" ? initial.favorites : null;
   const [signInError, setSignInError] = useState(false);
-  const [hasPasskey, setHasPasskey] = useState(false);
+  const [hasPasskey, setHasPasskey] = useState(initial?.status === "signed-in" ? initial.hasPasskey : false);
   const [offerPasskey, setOfferPasskey] = useState(false);
   const [justCreated, setJustCreated] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
@@ -239,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         signInWithPasskey,
         addPasskey,
+        initialFavorites,
       }}
     >
       {children}

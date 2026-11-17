@@ -93,7 +93,7 @@ async function fetchServerFavorites(): Promise<FavoriteLocation[] | null> {
 }
 
 export function useFavorites() {
-  const { status } = useAuth();
+  const { status, initialFavorites } = useAuth();
   const signedIn = status === "signed-in";
 
   const rawLocal = useSyncExternalStore(subscribe, readRaw, getServerSnapshot);
@@ -105,7 +105,8 @@ export function useFavorites() {
     }
   }, [rawLocal]);
 
-  const [serverFavorites, setServerFavorites] = useState<FavoriteLocation[]>([]);
+  // Seeded from the server-rendered account state, so the first render already has them (no flash of "all resorts").
+  const [serverFavorites, setServerFavorites] = useState<FavoriteLocation[]>(initialFavorites ?? []);
 
   useEffect(() => {
     if (!signedIn) return;

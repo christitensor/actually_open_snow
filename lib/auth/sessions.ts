@@ -193,3 +193,22 @@ export async function revokeOtherSessions(userId: number, keepId: string): Promi
   `) as { id: string }[];
   return rows.length;
 }
+
+/**
+ * Read-only lookup for server rendering (lib/auth/initial.ts): no session
+ * touch, no legacy-token upgrade, since a page render can't re-send the
+ * cookie. /api/auth/me still does the rolling refresh on load.
+ */
+export async function peekSession(token: string): Promise<SessionUser | null> {
+  const id = parse(token);
+  if (!id) {
+    const legacy = verifySessionToken(token);
+    return legacy ? { id: legacy.userId, email: legacy.email, sessionId: "" } : null;
+  }
+  const sql = await getSql();
+  const rows = (await sql`
+    SELECT s.id, s.user_id, u.email FROM sessions s JOIN users u ON u.id = s.user_id
+    WHERE s.id = ${id} AND s.revoked_at IS NULL AND s.expires_at > now()
+  `) as { id: string; user_id: number; email: string }[];
+  return rows[0] ? { id: rows[0].user_id, email: rows[0].email, sessionId: rows[0].id } : null;
+}

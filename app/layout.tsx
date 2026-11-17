@@ -8,6 +8,7 @@ import UndoToast from "@/components/UndoToast";
 import { AuthProvider } from "@/lib/auth";
 import { PreferencesProvider } from "@/lib/preferences/context";
 import Welcome from "@/components/onboarding/Welcome";
+import { getInitialAccount } from "@/lib/auth/initial";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,7 +57,9 @@ const THEME_INIT_SCRIPT = `
 })();
 `;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Who's signed in, plus their favorites and view settings, so pages render as *their* page from the first paint.
+  const initial = await getInitialAccount();
   return (
     // suppressHydrationWarning: THEME_INIT_SCRIPT adds .dark/.light to
     // <html> before React hydrates, so its className never matches the
@@ -66,8 +69,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
-        <AuthProvider>
-          <PreferencesProvider>
+        <AuthProvider initial={initial}>
+          <PreferencesProvider initial={initial?.status === "signed-in" ? initial.prefs : undefined}>
           <AppHeader />
           {/* min-w-0, not flex/flex-col: main only ever wraps one child, and
               making main itself a flex container turned that child into a

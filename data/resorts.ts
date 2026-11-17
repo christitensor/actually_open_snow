@@ -32,3 +32,8 @@ export function resortToLocation(resort: Resort): Location {
 export function pinToLocation(lat: number, lon: number, name = "Custom Pin"): Location {
   return { lat, lon, source: "pin", name };
 }
+
+/** Link to a pin's page; with a saved name, the page renders already titled with it. */
+export function pinHref(lat: number, lon: number, name?: string): string {
+  return `/location/pin?lat=${lat}&lon=${lon}${name ? `&name=${encodeURIComponent(name)}` : ""}`;
+}

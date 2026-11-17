@@ -62,11 +62,15 @@ function writeLocal(p: Preferences) {
 
 const isEmpty = (p: Preferences) => JSON.stringify(p) === JSON.stringify(DEFAULT_PREFERENCES);
 
-export function PreferencesProvider({ children }: { children: ReactNode }) {
+export function PreferencesProvider({ children, initial }: { children: ReactNode; initial?: Preferences | null }) {
   const { status } = useAuth();
-  const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);
-  const [ready, setReady] = useState(false);
-  const [accountLoaded, setAccountLoaded] = useState(false);
+  // Signed in with settings already loaded by the server (lib/auth/initial.ts):
+  // start from them, so the page renders with the person's layout from the
+  // first paint instead of switching after a fetch.
+  const seeded = initial != null;
+  const [prefs, setPrefs] = useState<Preferences>(initial ?? DEFAULT_PREFERENCES);
+  const [ready, setReady] = useState(seeded);
+  const [accountLoaded, setAccountLoaded] = useState(seeded);
   const pending = useRef<Partial<Preferences> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusRef = useRef(status);
@@ -78,12 +82,18 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     statusRef.current = status;
   }, [status]);
 
-  // First paint: this browser's copy (cached account settings, or signed-out settings).
+  // First paint: this browser's copy (cached account settings, or signed-out settings),
+  // unless the server already provided the account's.
   useEffect(() => {
+    if (seeded) {
+      writeLocal(initial!);
+      return;
+    }
     (async () => {
       setPrefs(readLocal());
       setReady(true);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Signed in: load the account's settings (or seed the account from this browser's).

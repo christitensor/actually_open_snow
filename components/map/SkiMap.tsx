@@ -193,7 +193,7 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   const [obsFilterNowMs] = useState(() => Date.now());
   // Map style follows the account's view settings (PERS-08): start on the saved one, save when changed.
   const { prefs, ready: prefsReady, update: updatePrefs } = usePreferences();
-  const [baseLayer, setBaseLayerState] = useState<BaseLayerId>("osm");
+  const [baseLayer, setBaseLayerState] = useState<BaseLayerId>(prefsReady ? prefs.mapStyle : "osm");
   const setBaseLayer = (id: BaseLayerId) => {
     setBaseLayerState(id);
     updatePrefs({ mapStyle: id });
