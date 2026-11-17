@@ -1,5 +1,6 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
 import FavoriteButton from "@/components/location/FavoriteButton";
+import LocationTitle, { LocationNamedText } from "@/components/location/LocationTitle";
 import WakeAlarmForm from "@/components/location/WakeAlarmForm";
 import ForecastTable from "@/components/location/ForecastTable";
 import { ElevationProvider, TodaySnowTile } from "@/components/location/ElevationContext";
@@ -66,7 +67,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{location.name}</h1>
+          <LocationTitle location={location} />
           <p className="text-sm text-muted-foreground">
             {location.lat.toFixed(4)}, {location.lon.toFixed(4)}
             {elevationFt != null ? ` · ${elevationFt.toLocaleString()} ft` : ""}
@@ -101,8 +102,14 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
         <ElevationProvider location={location} elevationFt={elevationFt} elevationModel={data.elevationModel}>
         {/* flex column (not space-y) so each Section can position itself with CSS order from the person's saved layout. */}
         <div className="flex flex-col gap-5 md:min-w-0 md:flex-1">
-          <Section id="conditions-summary" title="Conditions summary" summary={conditionsSummary.narrative}>
-            <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
+          <Section
+            id="conditions-summary"
+            title="Conditions summary"
+            summary={<LocationNamedText location={location} text={conditionsSummary.narrative} />}
+          >
+            <p className="text-sm leading-relaxed text-foreground/90">
+              <LocationNamedText location={location} text={conditionsSummary.narrative} />
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className={`pill ${conditionsSummary.corroboration.modelsAgree ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"}`}>
                 {conditionsSummary.corroboration.modelsAgree ? "Models agree" : "Models disagree"}
