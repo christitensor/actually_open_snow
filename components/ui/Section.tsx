@@ -49,7 +49,8 @@ export default function Section({
       ref={ref}
       id={id}
       data-section={id}
-      open={baseOpen}
+      // With settings already known (server-seeded for signed-in people), render the saved state from the first paint.
+      open={ready ? wantOpen : baseOpen}
       style={order >= 0 ? { order } : undefined}
       onToggle={(e) => {
         const open = e.currentTarget.open;
