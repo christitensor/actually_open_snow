@@ -21,7 +21,8 @@ export interface Location {
 export interface Resort {
   id: string;
   name: string;
-  region: "Northern Utah" | "Southeast Idaho";
+  /** Display grouping, e.g. "Northern Utah", "Colorado", "Tahoe & Sierra" (see data/resorts.json). */
+  region: string;
   lat: number;
   lon: number;
   baseElevationFt: number;

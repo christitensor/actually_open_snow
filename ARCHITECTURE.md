@@ -14,7 +14,7 @@ Technical design for building the features tracked in `TRACE_MATRIX.md`. The P0/
 
 ## Phase 1 regional scope
 
-All P0/P1 build-out targets **Northern Utah & Southeast Idaho** first (see `TRACE_MATRIX.md` for the full rationale and initial resort list) — one or two NWS forecast offices (SLC, PIH), a dense SNOTEL network, and a documented UDOT camera API make this region unusually good ground for validating the data pipeline before generalizing nationally. `resorts.json` starts as this regional subset; the schema itself is not region-specific.
+All P0/P1 build-out targets **Northern Utah & Southeast Idaho** first (see `TRACE_MATRIX.md` for the full rationale and initial resort list) — one or two NWS forecast offices (SLC, PIH), a dense SNOTEL network, and a documented UDOT camera API make this region unusually good ground for validating the data pipeline before generalizing nationally. `resorts.json` started as this regional subset and now covers every public lift-served area within 500 mi of Salt Lake City (103 resorts; see TRACE_MATRIX.md for how they were picked); the schema itself is not region-specific.
 
 ## Why no proprietary weather model
 

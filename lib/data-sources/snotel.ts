@@ -26,8 +26,14 @@ interface AwdbStation {
   dataTimeZone?: number;
 }
 
-/** Phase 1 scope: only need UT/ID SNOTEL networks (see TRACE_MATRIX.md regional scope). */
-const PHASE_1_TRIPLETS = "*:UT:SNTL,*:ID:SNTL";
+/**
+ * Every state with a curated resort (data/resorts.json covers ~500 mi
+ * around Salt Lake City). Started as UT/ID only (Phase 1); a resort in a
+ * state missing here silently gets no SNOTEL data, so add the state when
+ * adding resorts outside these.
+ */
+const SNOTEL_STATES = ["UT", "ID", "WY", "MT", "CO", "NV", "CA", "OR", "WA", "AZ", "NM", "SD"];
+const PHASE_1_TRIPLETS = SNOTEL_STATES.map((s) => `*:${s}:SNTL`).join(",");
 
 // The station list barely changes, but it's a ~2.1MB response (see below)
 // that every caller used to re-download. Keep a trimmed copy per warm
@@ -72,7 +78,7 @@ async function fetchPhase1StationsUncached(): Promise<AwdbStation[]> {
   return res.json() as Promise<AwdbStation[]>;
 }
 
-/** DATA-01: nearest SNOTEL stations to a point, within Phase 1's UT/ID scope. */
+/** DATA-01: nearest SNOTEL stations to a point, within SNOTEL_STATES. */
 export async function findNearbyStations(
   lat: number,
   lon: number,
@@ -147,13 +153,22 @@ export async function getAllPhase1StationsWithReadings(): Promise<SnotelReading[
     distanceMi: 0,
   }));
 
-  const triplets = stations.map((s) => s.stationTriplet).join(",");
-  const url = `${BASE}/data?stationTriplets=${triplets}&elements=SNWD,WTEQ&duration=DAILY&beginDate=-3&endDate=0`;
-  const res = await fetch(url, { next: { revalidate: 3600 } });
-  if (!res.ok) {
-    throw new Error(`SNOTEL batched data request failed (${res.status})`);
-  }
-  const raw = (await res.json()) as AwdbDataResponse[];
+  // ~225 UT/ID stations fit one request; with every state in
+  // SNOTEL_STATES it's several hundred, so chunk to keep each URL and
+  // response a sane size. A failed chunk only blanks its own stations.
+  const CHUNK = 250;
+  const chunks: string[][] = [];
+  for (let i = 0; i < stations.length; i += CHUNK) chunks.push(stations.slice(i, i + CHUNK).map((s) => s.stationTriplet));
+  const results = await Promise.allSettled(
+    chunks.map(async (triplets) => {
+      const url = `${BASE}/data?stationTriplets=${triplets.join(",")}&elements=SNWD,WTEQ&duration=DAILY&beginDate=-3&endDate=0`;
+      const res = await fetch(url, { next: { revalidate: 3600 } });
+      if (!res.ok) throw new Error(`SNOTEL batched data request failed (${res.status})`);
+      return (await res.json()) as AwdbDataResponse[];
+    })
+  );
+  if (results.every((r) => r.status === "rejected")) throw (results[0] as PromiseRejectedResult).reason;
+  const raw = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   const byTriplet = new Map(raw.map((r) => [r.stationTriplet, r]));
 
   return stations.map((station) => {

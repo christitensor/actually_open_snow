@@ -1,26 +1,24 @@
 import HomeExplorer from "@/components/location/HomeExplorer";
 import { resorts } from "@/data/resorts";
 import { webcams } from "@/data/webcams";
-import { getGridDailySnowfallIn, getGridPastDailySnowfallIn, getGridRecentSnowfallIn } from "@/lib/data-sources/open-meteo";
+import { getGridSnowSummaryIn } from "@/lib/data-sources/open-meteo";
 import { getMeasuredSnowNearPoints } from "@/lib/data-sources/snotel";
 import { withTimeout } from "@/lib/util/with-timeout";
 
-// Phase 1 regional scope (TRACE_MATRIX.md): Northern Utah & Southeast Idaho.
-// Centered roughly on the Wasatch Front.
+// Resorts now span ~500 mi around Salt Lake City (data/resorts.json); the
+// map still opens on the Wasatch Front, where the app started.
 const REGION_CENTER: [number, number] = [-111.75, 41.2];
 
 export default async function Home() {
   const points = resorts.map((r) => ({ lat: r.lat, lon: r.lon }));
-  const empty: { lat: number; lon: number; valueIn: number }[] = [];
+  const empty: { todayIn: number; pastIn: number[] }[] = [];
 
   // MAP-10 Powder Finder (today) + the "quick forecast visual" 12h/7d
-  // totals, each batched into one Open-Meteo call across every seeded resort.
+  // totals, all in one batched Open-Meteo call across every seeded resort.
   // Plus measured snow at each resort's nearest SNOTEL (best-effort, capped
   // so a slow NRCS API never holds up the page).
-  const [snowfall, last12h, last7d, measured] = await Promise.all([
-    getGridDailySnowfallIn(points).catch(() => empty),
-    getGridRecentSnowfallIn(points, 12).catch(() => empty),
-    getGridPastDailySnowfallIn(points, 7).catch(() => empty),
+  const [snow, measured] = await Promise.all([
+    getGridSnowSummaryIn(points, [12, 7 * 24]).catch(() => empty),
     withTimeout(getMeasuredSnowNearPoints(points), 4000).catch(() => []),
   ]);
   const resortsWithSnow = resorts.map((r, i) => ({
@@ -29,9 +27,9 @@ export default async function Home() {
     region: r.region,
     lat: r.lat,
     lon: r.lon,
-    snowfallTodayIn: snowfall[i]?.valueIn,
-    last12hIn: last12h[i]?.valueIn,
-    last7dIn: last7d[i]?.valueIn,
+    snowfallTodayIn: snow[i]?.todayIn,
+    last12hIn: snow[i]?.pastIn[0],
+    last7dIn: snow[i]?.pastIn[1],
     measured: measured[i] ?? null,
   }));
 
