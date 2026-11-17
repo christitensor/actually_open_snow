@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Actually Open Snow",
     short_name: "Open Snow",
-    description: "An open-data ski/snow forecast app for Northern Utah & Southeast Idaho — resorts and backcountry.",
+    description: "An open-data ski/snow forecast app for the Intermountain West — resorts and backcountry.",
     start_url: "/",
     display: "standalone",
     background_color: "#f8fafc",

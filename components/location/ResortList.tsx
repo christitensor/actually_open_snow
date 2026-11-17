@@ -10,11 +10,13 @@ import MeasuredSnow from "@/components/location/MeasuredSnow";
 import type { Location } from "@/lib/models/types";
 import { usePreferences } from "@/lib/preferences/context";
 import type { ResortSort } from "@/lib/preferences/schema";
+import { milesFrom } from "@/lib/resort-states";
 
 interface ResortRow {
   id: string;
   name: string;
   region: string;
+  state: string;
   lat: number;
   lon: number;
   snowfallTodayIn?: number;
@@ -31,12 +33,13 @@ function bySnowDesc(a: ResortRow, b: ResortRow) {
   return (b.snowfallTodayIn ?? 0) - (a.snowfallTodayIn ?? 0);
 }
 
-// PERS-07: "Most snow" (default — the list's job is "where's it dumping")
-// vs "My order" (starred resorts first, in the order you dragged them).
+// PERS-07: "Nearest" (default — closest to you first, see HomeExplorer's
+// origin), "Most snow" ("where's it dumping"), or "My order" (starred
+// resorts first, in the order you dragged them; only with 2+ stars).
 // Saved with the account's view settings (PERS-08), so it follows you.
 type SortMode = ResortSort;
 
-function SortToggle({ mode, onChange }: { mode: SortMode; onChange: (m: SortMode) => void }) {
+function SortToggle({ mode, onChange, showMine }: { mode: SortMode; onChange: (m: SortMode) => void; showMine: boolean }) {
   const option = (value: SortMode, label: string) => (
     <button
       onClick={() => onChange(value)}
@@ -50,10 +53,15 @@ function SortToggle({ mode, onChange }: { mode: SortMode; onChange: (m: SortMode
   );
   return (
     <div className="inline-flex rounded-full bg-muted p-0.5" role="group" aria-label="Sort resorts">
+      {option("near", "Nearest")}
       {option("snow", "Most snow")}
-      {option("mine", "My order")}
+      {showMine && option("mine", "My order")}
     </div>
   );
+}
+
+function fmtMiles(mi: number): string {
+  return mi < 10 ? `${mi.toFixed(1)} mi` : `${Math.round(mi).toLocaleString()} mi`;
 }
 
 function fmtIn(v: number | undefined): string {
@@ -81,8 +89,10 @@ function Row({
   onRef,
   grip,
   dragging = false,
+  distanceMi,
 }: {
   r: ResortRow;
+  distanceMi?: number;
   active: boolean;
   onHover: (id: string | null) => void;
   onRef: (id: string, el: HTMLLIElement | null) => void;
@@ -106,7 +116,10 @@ function Row({
         } ${dragging ? "scale-[1.02] shadow-lg ring-2 ring-primary/40" : ""}`}
       >
         <div className="text-base font-bold tracking-tight">{r.name}</div>
-        <div className="text-xs font-normal text-muted-foreground">{r.region}</div>
+        <div className="text-xs font-normal text-muted-foreground">
+          {r.region}
+          {distanceMi != null && <> · {fmtMiles(distanceMi)}</>}
+        </div>
         <SnowStats r={r} />
         <MeasuredSnow m={r.measured} />
       </Link>
@@ -144,7 +157,7 @@ function UpdatedLabel({ fetchedAt }: { fetchedAt?: string }) {
   // Rendered client-side only (Date.now()-derived), so it never disagrees
   // with the server-rendered markup during hydration.
   if (!label) return null;
-  return <p className="text-xs text-muted-foreground">{label}</p>;
+  return <span>{label}</span>;
 }
 
 // Puts primaryResortIds (data/resorts.ts) plus anything starred at the
@@ -161,6 +174,9 @@ export default function ResortList({
   fetchedAt,
   onExpandedChange,
   expandLabel,
+  origin,
+  controls,
+  footnote,
 }: {
   resorts: ResortRow[];
   primaryIds: string[];
@@ -173,15 +189,21 @@ export default function ResortList({
   onExpandedChange?: (expanded: boolean) => void;
   /** Label for the collapsed-remainder button (default "Show all N resorts"). */
   expandLabel?: string;
+  /** Where distances are measured from; "Nearest" sorts by it. */
+  origin?: { lat: number; lon: number } | null;
+  /** Rendered at the start of the controls row (the home page's state dropdown). */
+  controls?: ReactNode;
+  /** Small print under the controls (e.g. where distances are measured from). */
+  footnote?: ReactNode;
 }) {
   const { favorites, isFavorite, reorderFavorites } = useFavorites();
   const [showAll, setShowAll] = useState(false);
   const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
   const { prefs, update } = usePreferences();
-  const sortMode = prefs.resortSort;
+  const distances = new Map(origin ? resorts.map((r) => [r.id, milesFrom(origin, r)] as const) : []);
+  const byNear = (a: ResortRow, b: ResortRow) => (distances.get(a.id) ?? 0) - (distances.get(b.id) ?? 0);
 
   const visible = favoritesOnly ? resorts.filter((r) => isFavorite(toLocation(r))) : resorts;
-  const topBySnow = visible.filter((r) => primaryIds.includes(r.id) || isFavorite(toLocation(r))).sort(bySnowDesc);
 
   // "My order": starred resorts first in your saved order (draggable),
   // then the non-starred defaults by snow as before.
@@ -189,10 +211,14 @@ export default function ResortList({
   const starred = starredOrder.flatMap((id) => visible.filter((r) => r.id === id));
   const drag = useDragReorder(starred, (r) => r.id, (ordered) => reorderFavorites(ordered.map(toLocation)));
   const canReorder = starred.length >= 2;
-  const myOrder = sortMode === "mine" && canReorder;
-  const top = myOrder ? [...drag.ordered, ...topBySnow.filter((r) => !starredOrder.includes(r.id))] : topBySnow;
+  // "My order" saved on a device that has since dropped below 2 stars falls back to nearest.
+  const sortMode: SortMode = prefs.resortOrder === "mine" && !canReorder ? "near" : prefs.resortOrder;
+  const compare = sortMode === "snow" || !origin ? bySnowDesc : byNear;
+  const topSorted = visible.filter((r) => primaryIds.includes(r.id) || isFavorite(toLocation(r))).sort(compare);
+  const myOrder = sortMode === "mine";
+  const top = myOrder ? [...drag.ordered, ...topSorted.filter((r) => !starredOrder.includes(r.id))] : topSorted;
   const topIds = new Set(top.map((r) => r.id));
-  const rest = visible.filter((r) => !topIds.has(r.id)).sort(bySnowDesc);
+  const rest = visible.filter((r) => !topIds.has(r.id)).sort(compare);
 
   // A pin clicked on the map might belong to a resort collapsed behind
   // "Show all" — derived (not stored) so selecting one expands the list
@@ -220,13 +246,15 @@ export default function ResortList({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-2 empty:hidden">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        {controls}
+        <div className="ml-auto">
+          <SortToggle mode={sortMode} onChange={(m) => update({ resortOrder: m })} showMine={canReorder} />
+        </div>
+      </div>
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
         <UpdatedLabel fetchedAt={fetchedAt} />
-        {canReorder && (
-          <div className="ml-auto">
-            <SortToggle mode={sortMode} onChange={(m) => update({ resortSort: m })} />
-          </div>
-        )}
+        {footnote}
       </div>
       <ul className="space-y-2">
         {top.map((r) => {
@@ -238,6 +266,7 @@ export default function ResortList({
               active={r.id === hoveredId || r.id === selectedId}
               onHover={(id) => onHover?.(id)}
               onRef={handleRef}
+              distanceMi={distances.get(r.id)}
               dragging={r.id === drag.dragKey}
               grip={starredIndex !== -1 ? <DragGrip label={r.name} {...drag.gripProps(r.id, starredIndex)} /> : undefined}
             />
@@ -257,7 +286,14 @@ export default function ResortList({
             <div className="overflow-hidden">
               <ul className="mt-2 space-y-2">
                 {rest.map((r) => (
-                  <Row key={r.id} r={r} active={r.id === hoveredId || r.id === selectedId} onHover={(id) => onHover?.(id)} onRef={handleRef} />
+                  <Row
+                    key={r.id}
+                    r={r}
+                    distanceMi={distances.get(r.id)}
+                    active={r.id === hoveredId || r.id === selectedId}
+                    onHover={(id) => onHover?.(id)}
+                    onRef={handleRef}
+                  />
                 ))}
               </ul>
             </div>

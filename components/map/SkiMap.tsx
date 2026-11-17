@@ -110,6 +110,8 @@ interface SkiMapProps {
 export interface SkiMapHandle {
   toggleSnowOverlay: () => void;
   toggleAvalancheObservations: () => void;
+  /** Frames these points (e.g. the resorts of the state picked on the home page). */
+  fitToPoints: (points: { lat: number; lon: number }[], opts?: { animate?: boolean }) => void;
 }
 
 // UAC reports aspect as a full compass word ("North", "Southwest") — the
@@ -144,6 +146,15 @@ function parseUacDate(raw: string): Date | null {
 // radar. Their nowcast/forecast frames aren't used here, only the latest
 // observed frame; see TRACE_MATRIX.md MAP-02 for why forecast radar is
 // out of scope for now.
+// fitToPoints padding: clears the search box + base-style pills (top) and
+// the layers/attribution row (bottom) that sit over the map — capped as a
+// share of the map's size, or a short phone map would zoom out to nothing.
+function fitPadding(el: HTMLElement) {
+  const h = el.clientHeight;
+  const w = el.clientWidth;
+  return { top: Math.min(120, h * 0.28), bottom: Math.min(70, h * 0.18), left: Math.min(40, w * 0.08), right: Math.min(64, w * 0.12) };
+}
+
 const RAINVIEWER_MAPS_URL = "https://api.rainviewer.com/public/weather-maps.json";
 
 const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
@@ -169,6 +180,7 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const pendingFitRef = useRef<[[number, number], [number, number]] | null>(null);
   const router = useRouter();
   const [radarOn, setRadarOn] = useState(false);
   const [radarReady, setRadarReady] = useState(false);
@@ -249,6 +261,25 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     () => ({
       toggleSnowOverlay: () => setSnowOverlayOn((v) => !v),
       toggleAvalancheObservations: () => setObsOn((v) => !v),
+      fitToPoints: (points, { animate = true } = {}) => {
+        if (points.length === 0) return;
+        const lons = points.map((p) => p.lon);
+        const lats = points.map((p) => p.lat);
+        const bounds: [[number, number], [number, number]] = [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        ];
+        const map = mapRef.current;
+        // A hidden map (the mobile List view) has a 0×0 box, and fitting
+        // against that picks a nonsense zoom — hold it until the
+        // ResizeObserver sees a real size.
+        if (!map || !containerRef.current?.clientWidth) {
+          pendingFitRef.current = bounds;
+          return;
+        }
+        pendingFitRef.current = null;
+        map.fitBounds(bounds, { padding: fitPadding(containerRef.current), maxZoom: 10, animate });
+      },
     }),
     []
   );
@@ -355,7 +386,14 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     // in theory, but nowhere the user could see or reach. A
     // ResizeObserver keeps the map's internal size in sync with
     // whatever its container actually ends up being, not just at mount.
-    const resizeObserver = new ResizeObserver(() => map.resize());
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+      const pending = pendingFitRef.current;
+      if (pending && containerRef.current?.clientWidth) {
+        pendingFitRef.current = null;
+        map.fitBounds(pending, { padding: fitPadding(containerRef.current), maxZoom: 10, animate: false });
+      }
+    });
     resizeObserver.observe(containerRef.current);
 
     // MAP-17: click anywhere that isn't a marker drops a backcountry pin.

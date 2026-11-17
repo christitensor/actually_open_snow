@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Actually Open Snow",
-  description: "An open-data ski/snow forecast app for Northern Utah & Southeast Idaho — resorts and backcountry.",
+  description: "An open-data ski/snow forecast app for the Intermountain West — resorts and backcountry.",
 };
 
 export const viewport: Viewport = {

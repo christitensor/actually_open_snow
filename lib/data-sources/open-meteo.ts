@@ -94,13 +94,13 @@ interface OpenMeteoForecastRaw {
  * is the last line of defense if all retries are exhausted — every
  * caller should also `.catch()` non-critical calls on top of this.
  */
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, revalidateSec = 900): Promise<T> {
   const backoffsMs = [750, 1500];
   let lastStatus = 0;
 
   for (let attempt = 0; attempt <= backoffsMs.length; attempt++) {
     if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, backoffsMs[attempt - 1]));
-    const res = await fetch(url, { next: { revalidate: 900 } }); // 15 min cache — stay well under any fair-use ceiling
+    const res = await fetch(url, { next: { revalidate: revalidateSec } }); // default 15 min cache — stay well under any fair-use ceiling
     if (res.ok) return res.json() as Promise<T>;
     lastStatus = res.status;
     if (res.status !== 429 && res.status < 500) break; // don't retry genuine client errors (4xx other than 429)
@@ -406,6 +406,35 @@ export async function getGridRecentSnowfallIn(
 
   const raw = asArray(await fetchJson<GridHourlySnowfall | GridHourlySnowfall[]>(url));
   return raw.map((r, i) => ({ lat: points[i].lat, lon: points[i].lon, valueIn: sumPastHours(r.hourly, r.utc_offset_seconds, hoursBack) }));
+}
+
+/**
+ * Home page's per-resort snow numbers in ONE request: today's forecast
+ * total plus measured-ish (reanalysis) totals for each trailing window in
+ * `hoursBack`. Open-Meteo bills a multi-location call per location, so
+ * with ~100 resorts the old three separate calls (today / 12h / 7d) per
+ * 15 min would have run past the free 10k/day fair-use limit on their own.
+ * One call, cached 30 min, is ~5k/day worst case.
+ */
+export async function getGridSnowSummaryIn(
+  points: { lat: number; lon: number }[],
+  hoursBack: number[]
+): Promise<{ todayIn: number; pastIn: number[] }[]> {
+  if (points.length === 0) return [];
+  const lats = points.map((p) => p.lat).join(",");
+  const lons = points.map((p) => p.lon).join(",");
+  const pastDays = Math.ceil(Math.max(...hoursBack) / 24);
+  const url =
+    `${FORECAST_BASE}?latitude=${lats}&longitude=${lons}` +
+    `&hourly=snowfall&daily=snowfall_sum&precipitation_unit=inch&past_days=${pastDays}&forecast_days=1&timezone=auto`;
+
+  type Raw = GridHourlySnowfall & { daily: { time: string[]; snowfall_sum: number[] } };
+  const raw = asArray(await fetchJson<Raw | Raw[]>(url, 1800));
+  return raw.map((r) => ({
+    // With past_days, daily[] starts that many days back — today is the last entry.
+    todayIn: r.daily.snowfall_sum.at(-1) ?? 0,
+    pastIn: hoursBack.map((h) => sumPastHours(r.hourly, r.utc_offset_seconds, h)),
+  }));
 }
 
 /**
