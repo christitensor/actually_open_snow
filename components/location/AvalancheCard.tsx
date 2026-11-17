@@ -1,4 +1,4 @@
-import type { AvalancheForecast, AvalancheZone } from "@/lib/models/types";
+import type { AvalancheForecast, AvalancheMedia, AvalancheZone } from "@/lib/models/types";
 import DangerRose, { ProblemRose, dangerColor } from "@/components/location/DangerRose";
 import Section from "@/components/ui/Section";
 
@@ -8,10 +8,14 @@ import Section from "@/components/ui/Section";
 //     where/likelihood/size/discussion, bottom line, warning, recent
 //     activity + weather discussion.
 //  2. Full avalanche.org forecast (e.g. CAIC): band ratings today and
-//     tomorrow, problems, bottom line.
+//     tomorrow, problems (+ the center's discussion and what the problem
+//     type is), bottom line, hazard/weather discussion, field photos.
 //  3. Overall rating only → one badge + link to the center.
-//  4. No rating posted yet (early season) → say so plainly, with whatever
-//     text the forecaster did publish.
+//  4. A "summary" product (early/late season: no ratings yet, but a full
+//     written conditions update with photos) → say ratings haven't started
+//     and show the update.
+//  5. Nothing posted → say so plainly.
+// An expired product (some are months old) gets a banner with its date.
 
 const DANGER_NAMES = ["", "Low", "Moderate", "Considerable", "High", "Extreme"];
 const dangerName = (l: number | null) => (l != null ? DANGER_NAMES[l] ?? "" : "");
@@ -78,6 +82,49 @@ function describeSize(size: string[]): string {
   return `D${lo}${hi !== lo ? `–D${hi}` : ""}`;
 }
 
+function MediaStrip({ media, centerName }: { media: AvalancheMedia[]; centerName: string }) {
+  return (
+    <div>
+      <h3 className="mb-1 font-semibold">Field photos &amp; video</h3>
+      <ul className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+        {media.map((m, i) => (
+          <li key={`${m.href}-${i}`} className="w-44 shrink-0 snap-start">
+            <a href={m.href} target="_blank" rel="noopener noreferrer" className="group block">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-muted">
+                {/* Remote images from the center's media host: plain <img>, no Next image optimizer needed for small thumbnails. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={m.thumbnailUrl}
+                  alt={m.caption || `${m.type === "video" ? "Video" : "Photo"} from ${centerName}`}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition group-hover:scale-105"
+                />
+                {m.type === "video" && (
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white">▶</span>
+                  </span>
+                )}
+              </div>
+              {m.caption && <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{m.caption}</p>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Days since a YYYY-MM-DD forecast date (whole days, by calendar date). */
+function daysOld(ymd: string | null): number {
+  if (!ymd) return 0;
+  return Math.floor((Date.now() - new Date(`${ymd}T12:00:00Z`).getTime()) / 86_400_000);
+}
+
+// An expired product a few days old is still useful context (the banner
+// says how old). One from weeks or months ago — last spring's wet-snow
+// advice — reads like today's if it's shown open, so it's tucked away.
+const HIDE_STALE_AFTER_DAYS = 4;
+
 export default function AvalancheCard({ zone, forecast }: { zone: AvalancheZone | null; forecast: AvalancheForecast | null }) {
   const overall = forecast?.overallDanger ?? zone?.overallDanger ?? null;
   const zoneName = forecast?.zoneName ?? zone?.zoneName ?? "";
@@ -88,14 +135,18 @@ export default function AvalancheCard({ zone, forecast }: { zone: AvalancheZone 
       ? `⚠️ Avalanche warning · ${dangerName(overall)}`
       : overall != null
         ? `${dangerName(overall)} (${overall}/5)${forecast?.hasBandRatings ? ` · ${forecast.dangerAboveTreeline ?? "–"} / ${forecast.dangerNearTreeline ?? "–"} / ${forecast.dangerBelowTreeline ?? "–"} above / near / below treeline` : ""}${forecast?.problems.length ? ` · ${forecast.problems.map((p) => p.name).join(", ")}` : ""}`
-        : "No danger rating posted today";
+        : forecast?.productType === "summary" && !forecast.isStale
+          ? "No danger ratings yet · conditions update posted"
+          : "No danger rating posted today";
   const centerLink = forecast?.url ?? zone?.link ?? null;
+  const oldNews = !!forecast?.isStale && daysOld(forecast.forecastDate) >= HIDE_STALE_AFTER_DAYS;
 
   return (
     <Section id="avalanche" title="Avalanche forecast" meta={where} summary={summary} defaultOpen={false}>
       {!zone ? (
         <p className="text-sm text-muted-foreground">
-          No avalanche forecast zone covers this point (outside avalanche.org coverage, or the point/zone-boundary API needs verification — see ARCHITECTURE.md).
+          No avalanche center forecasts this area — it&apos;s outside every zone on avalanche.org. That doesn&apos;t mean the terrain can&apos;t slide; check
+          recent observations and the snowpack yourself before riding steep slopes.
         </p>
       ) : (
         <div className="space-y-3 text-sm">
@@ -139,6 +190,13 @@ export default function AvalancheCard({ zone, forecast }: { zone: AvalancheZone 
                 {zone.centerName} shares only its overall rating through the feed. The breakdown by elevation and aspect is in the full forecast on its site.
               </p>
             </div>
+          ) : forecast?.productType === "summary" && !forecast.isStale ? (
+            <div className="rounded-xl border border-border bg-muted/50 p-3">
+              <p className="font-medium">{zone.centerName} isn&apos;t issuing daily danger ratings yet.</p>
+              <p className="mt-1 text-muted-foreground">
+                Below is its latest general conditions update. Avalanches can still happen wherever there&apos;s enough snow to slide.
+              </p>
+            </div>
           ) : (
             <div className="rounded-xl border border-border bg-muted/50 p-3">
               <p className="font-medium">No danger rating posted for {zoneName} today.</p>
@@ -148,62 +206,85 @@ export default function AvalancheCard({ zone, forecast }: { zone: AvalancheZone 
             </div>
           )}
 
-          {forecast?.summary && (
-            <div>
-              <h3 className="mb-1 font-semibold">Bottom line</h3>
-              <p className="whitespace-pre-line text-foreground/90">{forecast.summary}</p>
-            </div>
-          )}
+          {(() => {
+            const detail = (
+              <>
+              {forecast?.summary && (
+                <div>
+                  <h3 className="mb-1 font-semibold">{forecast.productType === "summary" ? "Conditions summary" : "Bottom line"}</h3>
+                  <p className="whitespace-pre-line text-foreground/90">{forecast.summary}</p>
+                </div>
+              )}
 
-          {forecast && forecast.problems.length > 0 && (
-            <div>
-              <h3 className="mb-1 font-semibold">Avalanche problems</h3>
-              <ul className="space-y-2">
-                {forecast.problems.map((p, i) => (
-                  <li key={`${p.name}-${i}`} className="rounded-lg bg-muted/60 p-3">
-                    <div className="flex gap-3">
-                      {p.locations.length > 0 && <ProblemRose locations={p.locations} />}
-                      <div className="min-w-0">
-                        <div className="font-medium">
-                          {i + 1}. {p.name}
-                        </div>
-                        {(p.likelihood || p.size.length > 0) && (
-                          <div className="text-xs text-muted-foreground">
-                            {p.likelihood && <>Likelihood: <span className="font-medium text-foreground">{p.likelihood.toLowerCase()}</span></>}
-                            {p.likelihood && p.size.length > 0 && " · "}
-                            {p.size.length > 0 && <>Size: <span className="font-medium text-foreground">{describeSize(p.size)}</span></>}
+              {forecast && forecast.problems.length > 0 && (
+                <div>
+                  <h3 className="mb-1 font-semibold">Avalanche problems</h3>
+                  <ul className="space-y-2">
+                    {forecast.problems.map((p, i) => (
+                      <li key={`${p.name}-${i}`} className="rounded-lg bg-muted/60 p-3">
+                        <div className="flex gap-3">
+                          {p.locations.length > 0 && <ProblemRose locations={p.locations} />}
+                          <div className="min-w-0">
+                            <div className="font-medium">
+                              {i + 1}. {p.name}
+                            </div>
+                            {(p.likelihood || p.size.length > 0) && (
+                              <div className="text-xs text-muted-foreground">
+                                {p.likelihood && <>Likelihood: <span className="font-medium text-foreground">{p.likelihood.toLowerCase()}</span></>}
+                                {p.likelihood && p.size.length > 0 && " · "}
+                                {p.size.length > 0 && <>Size: <span className="font-medium text-foreground">{describeSize(p.size)}</span></>}
+                              </div>
+                            )}
+                            {p.locations.length > 0 && <div className="mt-0.5 text-xs text-muted-foreground">{describeLocations(p.locations)}</div>}
                           </div>
+                        </div>
+                        {p.description && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-medium text-primary">Forecaster discussion</summary>
+                            <p className="mt-1 whitespace-pre-line text-foreground/90">{p.description}</p>
+                          </details>
                         )}
-                        {p.locations.length > 0 && <div className="mt-0.5 text-xs text-muted-foreground">{describeLocations(p.locations)}</div>}
-                      </div>
-                    </div>
-                    {p.description && (
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-xs font-medium text-primary">Forecaster discussion</summary>
-                        <p className="mt-1 whitespace-pre-line text-foreground/90">{p.description}</p>
-                      </details>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+                        {p.about && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-medium text-primary">What is a {p.name.toLowerCase()} problem?</summary>
+                            <p className="mt-1 whitespace-pre-line text-foreground/90">{p.about}</p>
+                          </details>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-          {forecast && forecast.discussion.length > 0 && (
-            <details className="rounded-lg border border-border px-3 py-2">
-              <summary className="cursor-pointer font-medium">
-                {forecast.discussion.map((d) => d.heading).join(" · ")}
-              </summary>
-              <div className="mt-2 space-y-3">
-                {forecast.discussion.map((d) => (
-                  <div key={d.heading}>
-                    <h4 className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{d.heading}</h4>
-                    <p className="whitespace-pre-line text-foreground/90">{d.text}</p>
+              {forecast && forecast.discussion.length > 0 && (
+                <details className="rounded-lg border border-border px-3 py-2">
+                  <summary className="cursor-pointer font-medium">
+                    {forecast.discussion.map((d) => d.heading).join(" · ")}
+                  </summary>
+                  <div className="mt-2 space-y-3">
+                    {forecast.discussion.map((d) => (
+                      <div key={d.heading}>
+                        <h4 className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{d.heading}</h4>
+                        <p className="whitespace-pre-line text-foreground/90">{d.text}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </details>
-          )}
+                </details>
+              )}
+
+              {forecast && forecast.media.length > 0 && <MediaStrip media={forecast.media} centerName={zone.centerName} />}
+
+              </>
+            );
+            return oldNews && forecast?.forecastDate ? (
+              <details className="rounded-lg border border-border px-3 py-2">
+                <summary className="cursor-pointer font-medium">Show the {fmtDate(forecast.forecastDate)} update anyway</summary>
+                <div className="mt-2 space-y-3">{detail}</div>
+              </details>
+            ) : (
+              detail
+            );
+          })()}
 
           <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
             <span>

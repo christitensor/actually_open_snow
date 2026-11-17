@@ -187,6 +187,8 @@ export interface AvalancheZone {
   travelAdvice: string | null;
   /** IANA timezone of the center, e.g. "America/Denver" */
   timezone: string | null;
+  /** The map layer's `warning.product` when a warning is in effect, else null. */
+  warning: unknown;
 }
 
 export interface AvalancheProblem {
@@ -196,8 +198,19 @@ export interface AvalancheProblem {
   size: string[];
   /** e.g. "northwest upper" — aspect + elevation band (upper/middle/lower) */
   locations: string[];
-  /** Forecaster's discussion of this problem (UAC). */
+  /** Forecaster's discussion of this problem (UAC; avalanche.org centers when they write one). */
   description?: string;
+  /** The center's generic explanation of this problem type ("Wet Loose avalanches are..."). */
+  about?: string;
+}
+
+/** A field photo or video a center attached to its forecast. */
+export interface AvalancheMedia {
+  type: "image" | "video";
+  thumbnailUrl: string;
+  /** Where tapping it goes: the full-size image, or the video on YouTube. */
+  href: string;
+  caption: string;
 }
 
 export interface AvalancheForecast {
@@ -224,9 +237,16 @@ export interface AvalancheForecast {
   /** Extra forecaster sections (recent activity, weather, ...). */
   discussion: { heading: string; text: string }[];
   author: string | null;
+  /**
+   * "forecast" = daily danger ratings; "summary" = a center's general
+   * conditions update (early/late season, before or after daily ratings).
+   */
+  productType: "forecast" | "summary" | null;
+  /** Field photos/videos from the forecast, newest first as the center ordered them. */
+  media: AvalancheMedia[];
   /** The forecast's own date (YYYY-MM-DD, center-local), when known. */
   forecastDate: string | null;
-  /** True when the latest available forecast is older than yesterday. */
+  /** True when the latest available forecast has expired (UAC: is older than yesterday). */
   isStale: boolean;
   source: "avalanche.org" | "uac";
 }

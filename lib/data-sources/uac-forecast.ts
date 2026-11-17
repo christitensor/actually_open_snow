@@ -153,9 +153,10 @@ export function mergeUacForecast(base: AvalancheForecast, uac: UacForecast): Ava
     rose: uac.rose,
     problems: uac.problems,
     summary: uac.bottomLine || base.summary,
-    warning: uac.warning,
+    warning: uac.warning ?? base.warning,
     discussion: uac.discussion,
     author: uac.author,
+    productType: "forecast",
     // Keep avalanche.org's exact publish time only when it's for the same
     // day as UAC's forecast; otherwise the card falls back to the date.
     issuedAt:
