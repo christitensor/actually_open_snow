@@ -91,73 +91,93 @@ export function anchoredNwsRatio(p: NwsPrecipPeriod, gridFt: number, targetFt: n
   return mTgt * clamp(rNws / Math.max(mRef, 1), MIN_ANCHOR, MAX_ANCHOR);
 }
 
-interface DayAcc {
-  tMax: number;
-  tMin: number;
-  precip: number;
-  snow: number;
-  nwsHours: number;
-  omHours: number;
-}
-
 const HOUR_MS = 3600_000;
 
-export function computeElevationForecast(inputs: ElevationModelInputs, targetFt: number): ElevationAdjustedDay[] {
+/** One hour of the elevation-adjusted forecast. `time` is the Open-Meteo hour (local wall clock, hour *ending* then). */
+export interface ElevationAdjustedHour {
+  time: string;
+  tempF: number;
+  precipIn: number;
+  snowIn: number;
+  source: "nws" | "open-meteo";
+}
+
+/**
+ * The model, hour by hour, at `targetFt`. Daily figures (below) are sums of
+ * these, so the hourly chart and the daily views always agree.
+ *
+ * NWS QPF arrives in ~6-hour periods. Each period's total is spread over its
+ * hours half evenly and half following Open-Meteo's hourly precip shape
+ * (all evenly if Open-Meteo has none), so the hourly bars keep a realistic
+ * onset and peak while the totals stay NWS's.
+ */
+export function computeElevationHourly(inputs: ElevationModelInputs, targetFt: number): ElevationAdjustedHour[] {
   const { utcOffsetSeconds, openMeteo, nws, gradient } = inputs;
   const offsetMs = utcOffsetSeconds * 1000;
-  const localDate = (epochMs: number) => new Date(epochMs + offsetMs).toISOString().slice(0, 10);
-  const days = new Map<string, DayAcc>();
-  const acc = (date: string) => {
-    let d = days.get(date);
-    if (!d) days.set(date, (d = { tMax: -Infinity, tMin: Infinity, precip: 0, snow: 0, nwsHours: 0, omHours: 0 }));
-    return d;
-  };
+  const hours = openMeteo.hourly.map((h) => ({
+    time: h.time,
+    endMs: Date.parse(`${h.time}Z`) - offsetMs,
+    raw: h,
+    tempF: temperatureAt(h.temperatureF, openMeteo.refElevationFt, targetFt),
+    precipIn: 0,
+    snowIn: 0,
+    source: "open-meteo" as "nws" | "open-meteo",
+  }));
+  const byEnd = new Map(hours.map((h) => [h.endMs, h]));
 
-  // Temps: Open-Meteo hourly, lapse-adjusted from its own reference elevation.
-  // Also defines which days exist (Open-Meteo's local-day grid).
-  const omHours = openMeteo.hourly.map((h) => ({ ...h, endMs: Date.parse(`${h.time}Z`) - offsetMs }));
-  for (const h of omHours) {
-    const d = acc(h.time.slice(0, 10));
-    const t = temperatureAt(h.temperatureF, openMeteo.refElevationFt, targetFt);
-    d.tMax = Math.max(d.tMax, t);
-    d.tMin = Math.min(d.tMin, t);
-  }
-
-  // Precip/snow, NWS where it covers the hour.
-  const nwsPeriods = nws?.periods ?? [];
-  const covered = (midMs: number) => nwsPeriods.some((p) => midMs >= p.startMs && midMs < p.startMs + p.hours * HOUR_MS);
+  // NWS where it covers the hour.
   if (nws) {
     const mult = precipMultiplier(gradient.perKft, nws.gridElevationFt, targetFt);
-    for (const p of nwsPeriods) {
+    for (const p of nws.periods) {
       if (p.hours <= 0) continue;
-      const fallbackTemp = omHours.find((h) => h.endMs >= p.startMs)?.temperatureF ?? 30;
+      const slots = Array.from({ length: p.hours }, (_, i) => byEnd.get(p.startMs + (i + 1) * HOUR_MS));
+      for (const h of slots) if (h) h.source = "nws";
+      const fallbackTemp = hours.find((h) => h.endMs >= p.startMs)?.raw.temperatureF ?? 30;
       const precip = p.qpfIn * mult;
-      const snow = precip * anchoredNwsRatio(p, nws.gridElevationFt, targetFt, fallbackTemp);
-      for (let i = 0; i < p.hours; i++) {
-        const d = days.get(localDate(p.startMs + i * HOUR_MS + HOUR_MS / 2));
-        if (!d) continue; // before/after the Open-Meteo day grid
-        d.precip += precip / p.hours;
-        d.snow += snow / p.hours;
-        d.nwsHours++;
-      }
+      const ratio = anchoredNwsRatio(p, nws.gridElevationFt, targetFt, fallbackTemp);
+      const weights = slots.map((h) => Math.max(0, h?.raw.precipitationIn ?? 0));
+      const total = weights.reduce((a, b) => a + b, 0);
+      slots.forEach((h, i) => {
+        if (!h) return; // outside the Open-Meteo hour grid
+        // Half even, half Open-Meteo's shape: keeps the timing without piling a
+        // whole 6-hour NWS total into the one hour Open-Meteo happens to peak.
+        const share = total > 0 ? 0.5 / p.hours + (0.5 * weights[i]) / total : 1 / p.hours;
+        h.precipIn += precip * share;
+        h.snowIn += precip * share * ratio;
+      });
     }
   }
 
-  // Open-Meteo for every hour NWS doesn't cover. Hourly values are totals for
-  // the hour *ending* at `time`, and Open-Meteo's own daily sums bucket them
-  // by that timestamp's date, so this does too.
+  // Open-Meteo for every hour NWS doesn't cover.
   const omMult = precipMultiplier(gradient.perKft, openMeteo.refElevationFt, targetFt);
-  for (const h of omHours) {
-    if (covered(h.endMs - HOUR_MS / 2)) continue;
-    const d = acc(h.time.slice(0, 10));
-    d.omHours++;
-    if (h.precipitationIn <= 0) continue;
-    const t = temperatureAt(h.temperatureF, openMeteo.refElevationFt, targetFt);
-    const precip = h.precipitationIn * omMult;
-    d.precip += precip;
-    d.snow += precip * modelRatio(targetFt, h.freezingLevelFt - FREEZING_TO_SNOW_LEVEL_FT, t);
+  for (const h of hours) {
+    if (h.source === "nws" || h.raw.precipitationIn <= 0) continue;
+    const precip = h.raw.precipitationIn * omMult;
+    h.precipIn = precip;
+    h.snowIn = precip * modelRatio(targetFt, h.raw.freezingLevelFt - FREEZING_TO_SNOW_LEVEL_FT, h.tempF);
   }
 
+  return hours.map(({ time, tempF, precipIn, snowIn, source }) => ({ time, tempF, precipIn, snowIn, source }));
+}
+
+export function computeElevationForecast(inputs: ElevationModelInputs, targetFt: number): ElevationAdjustedDay[] {
+  return dailyFromHourly(computeElevationHourly(inputs, targetFt));
+}
+
+/** Rolls hours up into days. Open-Meteo hourly values are totals for the hour *ending* at `time`, and its own daily sums bucket them by that timestamp's date, so this does too. */
+export function dailyFromHourly(hours: ElevationAdjustedHour[]): ElevationAdjustedDay[] {
+  const days = new Map<string, { tMax: number; tMin: number; precip: number; snow: number; nwsHours: number; omHours: number }>();
+  for (const h of hours) {
+    const date = h.time.slice(0, 10);
+    let d = days.get(date);
+    if (!d) days.set(date, (d = { tMax: -Infinity, tMin: Infinity, precip: 0, snow: 0, nwsHours: 0, omHours: 0 }));
+    d.tMax = Math.max(d.tMax, h.tempF);
+    d.tMin = Math.min(d.tMin, h.tempF);
+    d.precip += h.precipIn;
+    d.snow += h.snowIn;
+    if (h.source === "nws") d.nwsHours++;
+    else d.omHours++;
+  }
   return [...days.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, d]) => ({

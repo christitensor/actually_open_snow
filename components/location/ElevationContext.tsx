@@ -2,11 +2,12 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import type { ElevationAdjustedDay, ElevationModelInputs, Location } from "@/lib/models/types";
-import { computeElevationForecast } from "@/lib/derive/elevation-snow";
+import { computeElevationHourly, dailyFromHourly, type ElevationAdjustedHour } from "@/lib/derive/elevation-snow";
 
 // One elevation choice for the whole location page. The Snow Summary, the
-// "Today's new snow" tile and the 14-day table all read their forecast snow
-// from here, so moving either slider moves every number together.
+// "Today's new snow" tile, the 14-day table and the 24-hour chart all read
+// their forecast from here, so moving either slider moves every number
+// together.
 //
 // Snow comes from lib/derive/elevation-snow.ts at every position — the
 // base elevation included — so the numbers agree with each other before
@@ -25,6 +26,8 @@ interface ElevationState {
   isAdjusted: boolean;
   /** Elevation-modeled days by date; null when the model is unavailable (callers fall back to the raw forecast). */
   modeledByDate: Map<string, ElevationAdjustedDay> | null;
+  /** Elevation-modeled hours by local time string (same keys as the hourly forecast); null when unavailable. */
+  modeledByHour: Map<string, ElevationAdjustedHour> | null;
 }
 
 const Ctx = createContext<ElevationState | null>(null);
@@ -50,10 +53,15 @@ export function ElevationProvider({
 }) {
   const { min, max } = bounds(location, elevationFt);
   const [selected, setSelected] = useState(elevationFt ?? Math.round((min + max) / 2));
-  const modeledByDate = useMemo(
-    () => (elevationModel ? new Map(computeElevationForecast(elevationModel, selected).map((d) => [d.date, d])) : null),
-    [elevationModel, selected]
-  );
+  // One model run per slider position, hourly; days are sums of the hours, so every view agrees.
+  const { modeledByDate, modeledByHour } = useMemo(() => {
+    if (!elevationModel) return { modeledByDate: null, modeledByHour: null };
+    const hours = computeElevationHourly(elevationModel, selected);
+    return {
+      modeledByHour: new Map(hours.map((h) => [h.time, h])),
+      modeledByDate: new Map(dailyFromHourly(hours).map((d) => [d.date, d])),
+    };
+  }, [elevationModel, selected]);
   const value = useMemo<ElevationState>(
     () => ({
       selected,
@@ -63,8 +71,9 @@ export function ElevationProvider({
       baseFt: elevationFt,
       isAdjusted: elevationFt == null || selected !== elevationFt,
       modeledByDate,
+      modeledByHour,
     }),
-    [selected, min, max, elevationFt, modeledByDate]
+    [selected, min, max, elevationFt, modeledByDate, modeledByHour]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
