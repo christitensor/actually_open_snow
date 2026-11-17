@@ -1,7 +1,11 @@
+"use client";
+
 import type { DailyForecastDay, HourlyForecastPoint } from "@/lib/models/types";
 import { degToCompass } from "@/lib/util/wind";
 import { describeWeather as sky } from "@/lib/util/weather-code";
 import Section from "@/components/ui/Section";
+import { useElevation } from "@/components/location/ElevationContext";
+import type { ElevationAdjustedHour } from "@/lib/derive/elevation-snow";
 
 // FC-02: the next-24-hours view as one aligned strip of small charts instead
 // of a five-column table. Every row shares the same hour columns, so "when
@@ -80,7 +84,30 @@ interface Props {
   daily: DailyForecastDay[];
 }
 
-export default function HourlyForecast({ hours, daily }: Props) {
+const isSnowCode = (c: number) => (c >= 71 && c <= 77) || c === 85 || c === 86;
+const isRainCode = (c: number) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82);
+
+/**
+ * The raw hour with temperature, snow and precip replaced by the elevation
+ * model's (lib/derive/elevation-snow.ts) at the page's selected elevation.
+ * The sky icon follows the model too: snow where the model has snow at
+ * that elevation even if the raw forecast (at its own, lower elevation)
+ * said rain, and vice versa.
+ */
+function atElevation(h: HourlyForecastPoint, m: ElevationAdjustedHour | undefined): HourlyForecastPoint {
+  if (!m) return h;
+  let weatherCode = h.weatherCode;
+  const showery = h.weatherCode >= 80 && h.weatherCode <= 86;
+  if (m.snowIn >= 0.05 && !isSnowCode(weatherCode)) weatherCode = showery ? 85 : 73;
+  else if (m.snowIn < 0.05 && m.precipIn >= 0.01 && isSnowCode(weatherCode)) weatherCode = showery ? 80 : 61;
+  else if (m.precipIn < 0.01 && (isSnowCode(weatherCode) || isRainCode(weatherCode))) weatherCode = 3;
+  return { ...h, temperatureF: m.tempF, snowfallIn: m.snowIn, precipitationIn: m.precipIn, weatherCode };
+}
+
+export default function HourlyForecast({ hours: rawHours, daily }: Props) {
+  // FC-10-adj: temperature, snow and rain follow the page's elevation slider (ElevationContext).
+  const { modeledByHour, selected, isAdjusted } = useElevation();
+  const hours = modeledByHour ? rawHours.map((h) => atElevation(h, modeledByHour.get(h.time))) : rawHours;
   const n = hours.length;
   if (n === 0) return null;
 
@@ -143,7 +170,7 @@ export default function HourlyForecast({ hours, daily }: Props) {
     <Section
       id="hourly"
       title={`Next ${n} hours`}
-      meta={sunDays.map((d, i) => (
+      meta={isAdjusted && modeledByHour ? <span className="pill bg-primary/10 text-primary">At {selected.toLocaleString()} ft</span> : sunDays.map((d, i) => (
         <span key={d.date}>
           {i > 0 && " · "}
           {sunDays.length > 1 && `${weekday(d.date)} `}↑{sunTime(d.sunrise)} ↓{sunTime(d.sunset)}
@@ -414,6 +441,7 @@ export default function HourlyForecast({ hours, daily }: Props) {
         <summary className="cursor-pointer text-xs font-medium text-primary">View as table</summary>
         <p className="mb-2 mt-2 text-xs text-muted-foreground">
           Precip (liquid) is rain+snow water content, not snow depth — see Snow for that. {totalLiquid.toFixed(2)}&quot; liquid over the next {n} hours.
+          {modeledByHour && ` Temperature, snow and rain are for ${selected.toLocaleString()} ft (the elevation slider), from the same model as the daily forecast; wind, clouds and precip chance are the general forecast.`}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
