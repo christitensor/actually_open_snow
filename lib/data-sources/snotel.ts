@@ -12,6 +12,7 @@
 
 import { haversineMiles } from "@/lib/util/geo";
 import type { PrecipGradient, SnotelReading, SnotelStation } from "@/lib/models/types";
+import snotelStations from "@/data/snotel-stations.json";
 import { defaultPrecipGradient, fitPrecipGradient, type GradientStation } from "@/lib/derive/precip-gradient";
 
 const BASE = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
@@ -27,58 +28,57 @@ interface AwdbStation {
 }
 
 /**
- * Every state with a curated resort (data/resorts.json covers ~500 mi
- * around Salt Lake City). Started as UT/ID only (Phase 1); a resort in a
- * state missing here silently gets no SNOTEL data, so add the state when
- * adding resorts outside these.
+ * Every active SNOTEL station in the states with a curated resort (UT, ID,
+ * WY, MT, CO, NV, CA, OR, WA, AZ, NM, SD), baked into the repo by
+ * scripts/build-snotel-stations.mjs. Fetching it live cost ~3s per cold
+ * serverless start (a ~2MB AWDB response Next can't fetch-cache), which on
+ * its own pushed the home page's measured-snow line past its 4s timeout —
+ * so SNOTEL numbers mostly never showed. Stations change a few times a
+ * year; a retired one just returns no data. Rerun the script when adding a
+ * resort in a new state.
  */
-const SNOTEL_STATES = ["UT", "ID", "WY", "MT", "CO", "NV", "CA", "OR", "WA", "AZ", "NM", "SD"];
-const PHASE_1_TRIPLETS = SNOTEL_STATES.map((s) => `*:${s}:SNTL`).join(",");
-
-// The station list barely changes, but it's a ~2.1MB response (see below)
-// that every caller used to re-download. Keep a trimmed copy per warm
-// server instance instead.
-const STATIONS_TTL_MS = 6 * 60 * 60 * 1000;
-let stationsCache: { at: number; stations: Promise<AwdbStation[]> } | null = null;
-
 function fetchPhase1Stations(): Promise<AwdbStation[]> {
-  if (stationsCache && Date.now() - stationsCache.at < STATIONS_TTL_MS) return stationsCache.stations;
-  const stations = fetchPhase1StationsUncached()
-    .then((all) =>
-      all.map(({ stationTriplet, name, latitude, longitude, elevation, dataTimeZone }) => ({
-        stationTriplet,
-        name,
-        latitude,
-        longitude,
-        elevation,
-        dataTimeZone,
-      }))
-    )
-    .catch((err) => {
-      stationsCache = null; // don't cache a failure
-      throw err;
-    });
-  stationsCache = { at: Date.now(), stations };
-  return stations;
+  return Promise.resolve(snotelStations as AwdbStation[]);
 }
 
-async function fetchPhase1StationsUncached(): Promise<AwdbStation[]> {
-  const url = `${BASE}/stations?stationTriplets=${PHASE_1_TRIPLETS}&activeOnly=true`;
-  // Not using Next's `next: { revalidate }` data cache here: the AWDB
-  // response for ~225 UT/ID stations is ~2.1MB (each station's
-  // `associatedHucs` array is large), over Next's 2MB fetch-cache ceiling
-  // — caching silently failed with a console warning every request before
-  // this was explicit. `no-store` matches what was actually happening
-  // already; a real fix would trim the response to the ~4 fields this app
-  // uses and cache that instead, not attempted yet.
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`SNOTEL stations request failed (${res.status})`);
-  }
-  return res.json() as Promise<AwdbStation[]>;
+/**
+ * The AWDB /data endpoint's response time scales with the number of
+ * stations in one request (~0.1s per station for a few days of hourly
+ * data), but parallel requests don't slow each other down: 60 stations
+ * took ~5.7s as one request vs ~1.8s as six parallel requests of 10.
+ */
+const HOURLY_CHUNK = 10;
+async function fetchDataChunked(
+  triplets: string[],
+  chunkSize: number,
+  query: string,
+  init: RequestInit
+): Promise<AwdbDataResponse[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < triplets.length; i += chunkSize) chunks.push(triplets.slice(i, i + chunkSize));
+  const results = await Promise.allSettled(
+    chunks.map(async (chunk) => {
+      const res = await fetch(`${BASE}/data?stationTriplets=${chunk.join(",")}&${query}`, init);
+      if (!res.ok) throw new Error(`SNOTEL data request failed (${res.status})`);
+      return (await res.json()) as AwdbDataResponse[];
+    })
+  );
+  // A failed chunk only blanks its own stations; fail only if all did.
+  if (results.length > 0 && results.every((r) => r.status === "rejected")) throw (results[0] as PromiseRejectedResult).reason;
+  return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
 }
 
-/** DATA-01: nearest SNOTEL stations to a point, within SNOTEL_STATES. */
+/** Newest reading that actually has a value — AWDB pads missing hours/days with nulls. */
+function latestNonNull(values: { date: string; value: number | null }[] | undefined) {
+  return values?.findLast((v) => v.value != null);
+}
+
+/** AWDB timestamps ("YYYY-MM-DD HH:mm") are in the station's fixed offset, not UTC. */
+function stationTimeToIso(date: string, offsetH = -8): string {
+  return new Date(new Date(`${date.replace(" ", "T")}:00Z`).getTime() - offsetH * 3600 * 1000).toISOString();
+}
+
+/** DATA-01: nearest SNOTEL stations to a point, from the baked station list. */
 export async function findNearbyStations(
   lat: number,
   lon: number,
@@ -107,26 +107,34 @@ interface AwdbDataResponse {
   }[];
 }
 
-/** Latest snow depth (SNWD) + snow-water-equivalent (WTEQ) reading for a station. */
-export async function getLatestReading(station: SnotelStation): Promise<SnotelReading> {
+/**
+ * Latest snow depth (SNWD) + snow-water-equivalent (WTEQ) reading for a
+ * station. Hourly, not daily: a DAILY value is the midnight reading, so it
+ * was always "as of yesterday" and looked stuck all day. Hourly data lags
+ * real time by ~1-2h.
+ */
+export async function getLatestReading(station: SnotelStation, now = new Date()): Promise<SnotelReading> {
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const begin = fmt(new Date(now.getTime() - 2 * 24 * 3600 * 1000));
+  const end = fmt(new Date(now.getTime() + 24 * 3600 * 1000));
   const url =
     `${BASE}/data?stationTriplets=${station.stationTriplet}` +
-    `&elements=SNWD,WTEQ&duration=DAILY&beginDate=-3&endDate=0`;
-  const res = await fetch(url, { next: { revalidate: 3600 } });
+    `&elements=SNWD,WTEQ&duration=HOURLY&beginDate=${begin}&endDate=${end}`;
+  const res = await fetch(url, { next: { revalidate: 900 } });
   if (!res.ok) {
     throw new Error(`SNOTEL data request failed (${res.status}) for ${station.stationTriplet}`);
   }
   const raw = (await res.json()) as AwdbDataResponse[];
   const stationData = raw[0];
+  const offsetH = (snotelStations as AwdbStation[]).find((s) => s.stationTriplet === station.stationTriplet)?.dataTimeZone;
 
-  const snwd = stationData?.data.find((d) => d.stationElement.elementCode === "SNWD");
-  const wteq = stationData?.data.find((d) => d.stationElement.elementCode === "WTEQ");
-  const latestSnwd = snwd?.values.at(-1);
-  const latestWteq = wteq?.values.at(-1);
+  const latestSnwd = latestNonNull(stationData?.data.find((d) => d.stationElement.elementCode === "SNWD")?.values);
+  const latestWteq = latestNonNull(stationData?.data.find((d) => d.stationElement.elementCode === "WTEQ")?.values);
+  const latestDate = latestSnwd?.date ?? latestWteq?.date;
 
   return {
     station,
-    date: latestSnwd?.date ?? latestWteq?.date ?? new Date().toISOString(),
+    date: latestDate ? stationTimeToIso(latestDate, offsetH) : new Date().toISOString(),
     snowDepthIn: latestSnwd?.value ?? null,
     sweIn: latestWteq?.value ?? null,
   };
@@ -153,30 +161,22 @@ export async function getAllPhase1StationsWithReadings(): Promise<SnotelReading[
     distanceMi: 0,
   }));
 
-  // ~225 UT/ID stations fit one request; with every state in
-  // SNOTEL_STATES it's several hundred, so chunk to keep each URL and
-  // response a sane size. A failed chunk only blanks its own stations.
-  const CHUNK = 250;
-  const chunks: string[][] = [];
-  for (let i = 0; i < stations.length; i += CHUNK) chunks.push(stations.slice(i, i + CHUNK).map((s) => s.stationTriplet));
-  const results = await Promise.allSettled(
-    chunks.map(async (triplets) => {
-      const url = `${BASE}/data?stationTriplets=${triplets.join(",")}&elements=SNWD,WTEQ&duration=DAILY&beginDate=-3&endDate=0`;
-      const res = await fetch(url, { next: { revalidate: 3600 } });
-      if (!res.ok) throw new Error(`SNOTEL batched data request failed (${res.status})`);
-      return (await res.json()) as AwdbDataResponse[];
-    })
+  // Daily values are cheap per station; 100-station chunks in parallel
+  // keep each request a few seconds instead of one ~30s request.
+  const raw = await fetchDataChunked(
+    stations.map((s) => s.stationTriplet),
+    100,
+    "elements=SNWD,WTEQ&duration=DAILY&beginDate=-3&endDate=0",
+    { next: { revalidate: 3600 } }
   );
-  if (results.every((r) => r.status === "rejected")) throw (results[0] as PromiseRejectedResult).reason;
-  const raw = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   const byTriplet = new Map(raw.map((r) => [r.stationTriplet, r]));
 
   return stations.map((station) => {
     const stationData = byTriplet.get(station.stationTriplet);
     const snwd = stationData?.data.find((d) => d.stationElement.elementCode === "SNWD");
     const wteq = stationData?.data.find((d) => d.stationElement.elementCode === "WTEQ");
-    const latestSnwd = snwd?.values.at(-1);
-    const latestWteq = wteq?.values.at(-1);
+    const latestSnwd = latestNonNull(snwd?.values);
+    const latestWteq = latestNonNull(wteq?.values);
     return {
       station,
       date: latestSnwd?.date ?? latestWteq?.date ?? new Date().toISOString(),
@@ -295,10 +295,9 @@ export async function getMeasuredSnowNearPoints(
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
   const begin = fmt(new Date(now.getTime() - 2 * 24 * 3600 * 1000));
   const end = fmt(new Date(now.getTime() + 24 * 3600 * 1000));
-  const url = `${BASE}/data?stationTriplets=${triplets.join(",")}&elements=SNWD&duration=HOURLY&beginDate=${begin}&endDate=${end}`;
-  const res = await fetch(url, { next: { revalidate: 900 } });
-  if (!res.ok) throw new Error(`SNOTEL hourly request failed (${res.status})`);
-  const raw = (await res.json()) as AwdbDataResponse[];
+  const raw = await fetchDataChunked(triplets, HOURLY_CHUNK, `elements=SNWD&duration=HOURLY&beginDate=${begin}&endDate=${end}`, {
+    next: { revalidate: 900 },
+  });
   const byTriplet = new Map(raw.map((r) => [r.stationTriplet, r]));
 
   return nearest.map((n) => {
@@ -383,4 +382,21 @@ async function getPrecipGradientUncached(lat: number, lon: number, now: Date): P
     return [{ elevationFt: s.elevation, meanPrecipIn: years.reduce((a, v) => a + v.value, 0) / years.length, distanceMi }];
   });
   return fitPrecipGradient(stations);
+}
+
+/**
+ * "Nov 21, 8 AM" for an hourly reading's ISO time, in the location's
+ * local time (utcOffsetSeconds, e.g. Open-Meteo's); a plain daily date
+ * ("2026-11-20") passes through unchanged.
+ */
+export function formatSnotelAsOf(date: string, utcOffsetSeconds: number): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  const t = new Date(date).getTime();
+  if (Number.isNaN(t)) return date;
+  return new Date(t + utcOffsetSeconds * 1000).toLocaleString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+  });
 }
