@@ -1,4 +1,5 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
+import { formatSnotelAsOf } from "@/lib/data-sources/snotel";
 import FavoriteButton from "@/components/location/FavoriteButton";
 import LocationTitle, { LocationNamedText } from "@/components/location/LocationTitle";
 import WakeAlarmForm from "@/components/location/WakeAlarmForm";
@@ -264,7 +265,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <p className="text-sm text-foreground/90">
                   <strong>SNOTEL</strong> — {nearestSnotel.station.name} ({nearestSnotel.station.distanceMi.toFixed(1)} mi away, {nearestSnotel.station.elevationFt.toLocaleString()} ft) —{" "}
                   {nearestSnotel.snowDepthIn != null ? `${nearestSnotel.snowDepthIn}" snow depth` : "no depth reading"}
-                  {nearestSnotel.sweIn != null ? `, ${nearestSnotel.sweIn}" SWE` : ""} as of {nearestSnotel.date}.
+                  {nearestSnotel.sweIn != null ? `, ${nearestSnotel.sweIn}" SWE` : ""} as of {formatSnotelAsOf(nearestSnotel.date, forecast.utcOffsetSeconds)}.
                 </p>
               )}
               {nearestNwsStations.length > 0 && (
