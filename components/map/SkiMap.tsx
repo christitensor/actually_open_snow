@@ -21,6 +21,7 @@ import { ALL_BASE_LAYER_IDS, BASE_STYLE, type BaseLayerId, visibleBaseLayerIds }
 import { usePreferences } from "@/lib/preferences/context";
 import { PISTE_MAX_TILES_PER_VIEW, PISTE_MIN_VIEW_ZOOM, PISTE_TILE_ZOOM, tilesForBbox } from "@/lib/util/tiles";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
+import { NOHRSC_BOUNDS, SNOW_DEPTH_LEGEND } from "@/lib/data-sources/nohrsc";
 
 interface MapPin {
   id: string;
@@ -186,6 +187,10 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   const [radarReady, setRadarReady] = useState(false);
   const [radarTime, setRadarTime] = useState<string | null>(null);
   const [snowOverlayOn, setSnowOverlayOn] = useState(false);
+  // NOAA NOHRSC modeled snowpack (1 km grid). While on, a map tap shows
+  // depth/SWE/elevation for that spot instead of dropping a forecast pin.
+  const [snowpackOn, setSnowpackOn] = useState(false);
+  const snowpackOnRef = useRef(false);
   const snowOverlayOnRef = useRef(false);
   const loadSnowGridRef = useRef<(() => void) | null>(null);
   // BC-03: "Avalanche observations" mode — recent UAC field reports as map
@@ -399,10 +404,43 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     // MAP-17: click anywhere that isn't a marker drops a backcountry pin.
     if (allowPinDrop) {
       map.on("click", (e: MapMouseEvent) => {
+        if (snowpackOnRef.current) return; // the snowpack inspector below owns taps
         const { lat, lng } = e.lngLat;
         router.push(`/location/pin?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`);
       });
     }
+
+    // Snowpack layer: NOAA NOHRSC snow depth, via the CDN-cached tile proxy.
+    // Added hidden at load (like radar); hidden raster sources fetch nothing.
+    map.on("load", () => {
+      map.addSource("snowpack", {
+        type: "raster",
+        tiles: [`${window.location.origin}/api/snowpack/tile/{z}/{x}/{y}`],
+        tileSize: 256,
+        bounds: NOHRSC_BOUNDS,
+        // The grid is 1 km; past z10 MapLibre just upscales the z10 tiles.
+        maxzoom: 10,
+        attribution: '<a href="https://www.nohrsc.noaa.gov/nsa/" target="_blank" rel="noopener noreferrer">NOAA NOHRSC</a>',
+      });
+      map.addLayer({
+        id: "snowpack-layer",
+        type: "raster",
+        source: "snowpack",
+        paint: { "raster-opacity": 0.65, "raster-resampling": "nearest" },
+        layout: { visibility: snowpackOnRef.current ? "visible" : "none" },
+      });
+    });
+    let snowpackPopup: Popup | null = null;
+    map.on("click", (e: MapMouseEvent) => {
+      if (!snowpackOnRef.current) return;
+      // Taps on station/observation dots keep their own popups.
+      const pointLayers = ["weather-stations-circles", "avalanche-observations-circles"].filter((id) => map.getLayer(id));
+      if (pointLayers.length && map.queryRenderedFeatures(e.point, { layers: pointLayers }).length) return;
+      const { lat, lng } = e.lngLat;
+      snowpackPopup?.remove();
+      const content = snowpackPopupContent(lat, lng, (href) => router.push(href));
+      snowpackPopup = new Popup({ offset: 8, maxWidth: "260px" }).setLngLat(e.lngLat).setDOMContent(content).addTo(map);
+    });
 
     // Resort pins are created by the sync effect below, so they follow changes to `resorts`.
 
@@ -824,6 +862,13 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   }, [snowOverlayOn, onSnowOverlayChange]);
 
   useEffect(() => {
+    snowpackOnRef.current = snowpackOn;
+    const map = mapRef.current;
+    if (!map || !map.getLayer("snowpack-layer")) return;
+    map.setLayoutProperty("snowpack-layer", "visibility", snowpackOn ? "visible" : "none");
+  }, [snowpackOn]);
+
+  useEffect(() => {
     onAvalancheObservationsChange?.(obsOn);
   }, [obsOn, onAvalancheObservationsChange]);
 
@@ -1004,7 +1049,7 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // body, escaping that ancestor's stacking context entirely — MapLibre's
   // container node is relocated, not recreated, so the map instance
   // itself is undisturbed.
-  const activeLayerCount = [radarOn, snowOverlayOn, obsOn, stationsOn].filter(Boolean).length;
+  const activeLayerCount = [radarOn, snowOverlayOn, snowpackOn, obsOn, stationsOn].filter(Boolean).length;
 
   const mapContent = (
     <div className={isFullscreen ? "fixed inset-0 z-50 h-dvh w-dvw bg-background" : "relative h-full w-full"}>
@@ -1107,8 +1152,27 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
                   `${filteredObservations.length} UAC observation${filteredObservations.length === 1 ? "" : "s"} loaded statewide — pan or zoom out if none are visible near this spot.`}
           </div>
         )}
+        {snowpackOn && (
+          <div className="max-w-[280px] rounded-2xl border border-border bg-card/90 px-3 py-2 text-xs shadow-sm backdrop-blur-sm">
+            <div className="mb-1 font-semibold text-foreground">Snow depth (modeled) · tap the map for a spot</div>
+            <div className="flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
+              {SNOW_DEPTH_LEGEND.map((c) => (
+                <span key={c.label} className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: c.color }} />
+                  {c.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {layersOpen && (
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSnowpackOn((v) => !v)}
+              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+            >
+              {snowpackOn ? "Hide" : "Show"} snowpack depth · NOAA
+            </button>
             {showRadarToggle && radarReady && (
               <button
                 onClick={() => setRadarOn((v) => !v)}
@@ -1154,5 +1218,70 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
 
   return isFullscreen && typeof document !== "undefined" ? createPortal(mapContent, document.body) : mapContent;
 });
+
+interface SnowpackPoint {
+  depthIn: number | null;
+  sweIn: number | null;
+  validTime: string | null;
+  elevationFt: number | null;
+  nearestSnotel: { stationName: string; distanceMi: number; elevationFt: number; depthIn: number } | null;
+}
+
+/**
+ * Popup body for a snowpack-layer tap: shows "Loading…" right away, then
+ * fills in NOAA's modeled depth/SWE, the spot's elevation, and the nearest
+ * SNOTEL's measured depth for comparison. Built with DOM nodes (station
+ * names are third-party text).
+ */
+function snowpackPopupContent(lat: number, lon: number, navigate: (href: string) => void): HTMLElement {
+  const root = document.createElement("div");
+  root.style.cssText = "font-size:12px;line-height:1.45;min-width:180px";
+  const line = (text: string, style = "") => {
+    const el = document.createElement("div");
+    el.textContent = text;
+    if (style) el.style.cssText = style;
+    root.append(el);
+    return el;
+  };
+  const loading = line("Loading snowpack…", "color:#6b7280");
+
+  fetch(`/api/snowpack/point?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`)
+    .then((r) => (r.ok ? (r.json() as Promise<SnowpackPoint>) : Promise.reject()))
+    .then((p) => {
+      loading.remove();
+      const elev = p.elevationFt != null ? ` at ${p.elevationFt.toLocaleString()} ft` : "";
+      if (p.depthIn == null) {
+        line(`No NOAA snowpack data here${elev} (lower 48 only).`);
+      } else {
+        line(`${p.depthIn}" snow depth${elev}`, "font-weight:700;font-size:14px");
+        line(`${p.sweIn ?? 0}" water equivalent (SWE)`);
+        const asOf = p.validTime
+          ? new Date(p.validTime).toLocaleString([], { month: "short", day: "numeric", hour: "numeric" })
+          : null;
+        line(`NOAA model, 1 km average${asOf ? ` · ${asOf}` : ""}`, "color:#6b7280;font-size:11px");
+      }
+      if (p.nearestSnotel) {
+        const s = p.nearestSnotel;
+        line(
+          `Measured: ${s.depthIn}" at ${s.stationName} SNOTEL (${s.distanceMi.toFixed(1)} mi, ${s.elevationFt.toLocaleString()} ft)`,
+          "margin-top:4px"
+        );
+      }
+      const link = document.createElement("a");
+      const href = `/location/pin?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`;
+      link.href = href;
+      link.textContent = "Forecast for this spot →";
+      link.style.cssText = "display:block;margin-top:6px;font-weight:600;color:var(--color-primary, #2563eb)";
+      link.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        navigate(href);
+      });
+      root.append(link);
+    })
+    .catch(() => {
+      loading.textContent = "Couldn't load snowpack for this spot.";
+    });
+  return root;
+}
 
 export default SkiMap;
