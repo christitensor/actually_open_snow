@@ -159,7 +159,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           <HourlyForecast hours={upcomingHours} daily={forecast.daily} />
 
           {resortWebcams.length > 0 && (
-            <Section id="webcams" title="Live webcams" summary={`${resortWebcams.length} camera${resortWebcams.length === 1 ? "" : "s"}`} defaultOpen={false}>
+            <Section id="webcams" title="Live webcams" summary={resortWebcams.some((w) => w.imageUrl || w.videoEmbedUrl) ? `${resortWebcams.length} camera${resortWebcams.length === 1 ? "" : "s"}` : "link to resort cams"} defaultOpen={false}>
               <WebcamGrid webcams={resortWebcams} />
             </Section>
           )}

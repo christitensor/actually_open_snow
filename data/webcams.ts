@@ -61,10 +61,53 @@ import rawWebcams from "./webcams.json";
  * cams. The stored page URL from the original seed had gone stale (a dead
  * legacy `.aspx` redirect) and is fixed to the real cams page above.
  *
- * **Brighton**: genuinely still page-link-only — checked its Sanity CMS
- * conditions-page data model directly (`"webcam":null` on every stat
- * entry) and every guessed `/webcams`-style path 404s. Unlike the three
- * above, there's actually no camera data to find on their current site.
+ * **Ski Utah aggregator** (`skiutah.com/resorts/webcams`): one static page
+ * with every member resort's cams grouped under per-resort headings — the
+ * source for Brighton (its own site has no cam data, but Ski Utah has its
+ * snow stake + YouTube lift streams), Deer Valley, Cherry Peak, Sundance,
+ * Brian Head, and the snow-stake cams for Alta/Snowbird/Powder Mountain/
+ * Park City. Its `?_ts=` value is the frame's capture time, which made it
+ * easy to drop cams that had stopped updating (Cherry Peak Vista Valley,
+ * Sundance Mandan Summit). Road cams on that page are skipped. Nordic
+ * Valley isn't a Ski Utah member — its single YouTube stream comes from
+ * its own MCP-template webcam page.
+ *
+ * **Nov 2026 expansion to every resort in resorts.json** — crawled each
+ * resort's site for its webcam page, then verified each feed: images must
+ * return a real JPEG (and, where the CDN sends Last-Modified, be < 72h
+ * old); YouTube embeds must resolve via oEmbed (two Brighton streams that
+ * didn't were dropped); other iframes must load with no X-Frame-Options /
+ * restrictive frame-ancestors. Vendors seen, and the stable URL used:
+ *  - Brown Rice (`player.brownrice.com/snapshot/{name}` — a live JPEG for
+ *    any cam the resort embeds as `…/embed/{name}`): Purgatory, Monarch,
+ *    Wolf Creek, Mt. Rose, Red River, Sipapu, Angel Fire, Ski Santa Fe,
+ *    Granby Ranch, Pajarito.
+ *  - HD Relay (`img.hdrelay.com/frames/…/last.jpg`, or the
+ *    `manage.hdrelay.com/player/{id}` → `{server.jpg}/camera/{id}/get_image`
+ *    resolution described for Snowbasin above): Sun Valley, Copper,
+ *    Diamond Peak, Sierra-at-Tahoe, Powderhorn; Lee Canyon's web player.
+ *  - Roundshot panoramas (`backend.roundshot.com/cams/{id}/medium`, which
+ *    302s to the latest frame): Aspen Snowmass ×4 mountains, Jackson Hole
+ *    (found in the CSS of jacksonhole.com/live-mountain-cams).
+ *  - SeeJH (`streams.seejh.ai/{alias}`): a frameable wrapper around a
+ *    YouTube live stream whose alias stays stable when the underlying
+ *    YouTube video id rotates — preferred over the raw id. Grand Targhee,
+ *    Snow King.
+ *  - CamStreamer / IPCamLive / Angelcam / Nest / CameraFTP / Ozolio iframe
+ *    players (Big Sky, Winter Park, June, Dodge Ridge, Sunrise, Great
+ *    Divide; Telluride, Lookout Pass, Terry Peak, Eagle Point, Montana
+ *    Snowbowl, Antelope Butte; Red Lodge; Showdown; Snowy Range;
+ *    Palisades Tahoe).
+ *  - Plain JPEGs on the resort's own host: Loveland, Brundage, Discovery,
+ *    Arapahoe Basin, Hogadon, Bluewood, Winter Park's town cam.
+ *
+ * Link-only (pageUrl, no feed): resorts whose cams are rendered entirely
+ * client-side or blocked to non-browser fetches. The 8 Vail Resorts
+ * properties use the same `…/mountain-cams.aspx` path that Park City's
+ * page uses; Akamai blocked fetches of those pages during the crawl, so
+ * those link-outs follow Park City's verified pattern rather than being
+ * individually loaded. Resorts with no entry at all had no findable
+ * public webcam (or no working website) at crawl time.
  *
  * UDOT's real highway camera images (a separate, non-resort source) still
  * require a free developer-key signup at udottraffic.utah.gov/developers/doc

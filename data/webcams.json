@@ -70,6 +70,17 @@
     "source": "resort"
   },
   {
+    "id": "alta-su-snow-stake",
+    "name": "Alta — Snow Stake",
+    "resortId": "alta",
+    "lat": 40.5884,
+    "lon": -111.6386,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/HGGKfCsATYTvLiCZi9X3K3",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
     "id": "snowbird-peruvian-gulch-webcam",
     "name": "Snowbird — Peruvian Gulch",
     "resortId": "snowbird",
@@ -90,12 +101,110 @@
     "source": "resort"
   },
   {
-    "id": "brighton-webcam",
-    "name": "Brighton",
+    "id": "snowbird-su-snow-stake",
+    "name": "Snowbird — Snow Stake",
+    "resortId": "snowbird",
+    "lat": 40.582,
+    "lon": -111.6558,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/bTLZYuVtvhk7XA5UTRBZhj",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-su-mineral-basin-top-shack",
+    "name": "Snowbird — Mineral Basin Top Shack",
+    "resortId": "snowbird",
+    "lat": 40.582,
+    "lon": -111.6558,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/JzGCjxnUE3ydhKf9XaqtFE",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-su-tram-maze",
+    "name": "Snowbird — Tram Maze",
+    "resortId": "snowbird",
+    "lat": 40.582,
+    "lon": -111.6558,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/894457031",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-su-upper-silver-fox",
+    "name": "Snowbird — Upper Silver Fox",
+    "resortId": "snowbird",
+    "lat": 40.582,
+    "lon": -111.6558,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1774279552",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-su-peak-cam-powder-paradise",
+    "name": "Snowbird — Peak Cam / Powder Paradise",
+    "resortId": "snowbird",
+    "lat": 40.582,
+    "lon": -111.6558,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1518315246",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "snowbird-su-hidden-peak-down-canyon",
+    "name": "Snowbird — Hidden Peak / Down Canyon",
+    "resortId": "snowbird",
+    "lat": 40.582,
+    "lon": -111.6558,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1072144394",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brighton-su-snow-stake",
+    "name": "Brighton — Snow Stake",
     "resortId": "brighton",
     "lat": 40.5977,
     "lon": -111.5836,
-    "pageUrl": "https://www.brightonresort.com/conditions",
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/LBSKmCQHw9GVGF5AcHnE2o",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brighton-su-main-parking-lot",
+    "name": "Brighton — Main Parking Lot",
+    "resortId": "brighton",
+    "lat": 40.5977,
+    "lon": -111.5836,
+    "videoEmbedUrl": "https://www.youtube.com/embed/4a-3iEM7bHk",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brighton-su-crest-chair-top",
+    "name": "Brighton — Crest Chair (top)",
+    "resortId": "brighton",
+    "lat": 40.5977,
+    "lon": -111.5836,
+    "videoEmbedUrl": "https://www.youtube.com/embed/Zv8HYwaXjBg",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brighton-su-great-western",
+    "name": "Brighton — Great Western",
+    "resortId": "brighton",
+    "lat": 40.5977,
+    "lon": -111.5836,
+    "videoEmbedUrl": "https://www.youtube.com/embed/RPIfUKjRQgI",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
     "source": "resort"
   },
   {
@@ -269,6 +378,108 @@
     "source": "resort"
   },
   {
+    "id": "park-city-su-summit-house-snow-stake-9-200-ft",
+    "name": "Park City — Summit House Snow Stake (9,200 ft)",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/2101381068",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "park-city-su-canyons-snow-stake-8-608-ft",
+    "name": "Park City — Canyons Snow Stake (8,608 ft)",
+    "resortId": "park-city",
+    "lat": 40.6514,
+    "lon": -111.508,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/2101381079",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-ontario-snow-stake",
+    "name": "Deer Valley — Ontario Snow Stake",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/4vi7EiWba7E",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-empire-express-chairlift",
+    "name": "Deer Valley — Empire Express Chairlift",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/r8qiPv9XCOM",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-revelator-express-chairlift",
+    "name": "Deer Valley — Revelator Express Chairlift",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/XZjubaPbamE",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-sterling-express-chairlift",
+    "name": "Deer Valley — Sterling Express Chairlift",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/iNdfTLilLlU",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-silver-lake-lodge",
+    "name": "Deer Valley — Silver Lake Lodge",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/uE_ent5rC3Y",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-galena-express-chairlift",
+    "name": "Deer Valley — Galena Express Chairlift",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/0shWeR7Fvpg",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-snow-park-lodge",
+    "name": "Deer Valley — Snow Park Lodge",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/nJ54gJejVu4",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "deer-valley-su-hoodoo-express-chairlift",
+    "name": "Deer Valley — Hoodoo Express Chairlift",
+    "resortId": "deer-valley",
+    "lat": 40.6374,
+    "lon": -111.4783,
+    "videoEmbedUrl": "https://www.youtube.com/embed/RaX_MhXETq4",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
     "id": "snowbasin-winter",
     "name": "Snowbasin — Winter",
     "resortId": "snowbasin",
@@ -369,6 +580,27 @@
     "source": "resort"
   },
   {
+    "id": "powder-mountain-su-snow-stake",
+    "name": "Powder Mountain — Snow Stake",
+    "resortId": "powder-mountain",
+    "lat": 41.3797,
+    "lon": -111.7877,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/iTWYRKPu6ZJB4EJtRvSoD8",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "nordic-valley-base-area",
+    "name": "Nordic Valley — Base Area",
+    "resortId": "nordic-valley",
+    "lat": 41.3467,
+    "lon": -111.8225,
+    "videoEmbedUrl": "https://www.youtube.com/embed/a_75PFulDyg",
+    "pageUrl": "https://www.nordicvalley.ski/nordic-valley-weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
     "id": "beaver-mountain-logan-summit",
     "name": "Beaver Mountain — Logan Summit",
     "resortId": "beaver-mountain",
@@ -410,6 +642,1632 @@
     "imageUrl": "https://www.skiutah.com/files/blob/webcam/1758577868",
     "cacheBustParam": "_ts",
     "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "cherry-peak-su-snow-stake",
+    "name": "Cherry Peak — Snow Stake",
+    "resortId": "cherry-peak",
+    "lat": 41.9856,
+    "lon": -111.7658,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/2090891117",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "cherry-peak-su-summit-7-000-ft",
+    "name": "Cherry Peak — Summit (7,000 ft)",
+    "resortId": "cherry-peak",
+    "lat": 41.9856,
+    "lon": -111.7658,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1366276999",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "sundance-su-sundance-base",
+    "name": "Sundance — Sundance Base",
+    "resortId": "sundance",
+    "lat": 40.3908,
+    "lon": -111.5885,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1175860327",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "sundance-su-bear-claw-summit-top-of-reds",
+    "name": "Sundance — Bear Claw Summit / Top of Reds",
+    "resortId": "sundance",
+    "lat": 40.3908,
+    "lon": -111.5885,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/317728966",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "pebble-creek-webcams",
+    "name": "Pebble Creek — Webcams",
+    "resortId": "pebble-creek",
+    "lat": 42.7189,
+    "lon": -111.9647,
+    "pageUrl": "https://pebblecreekskiarea.com/the-mountain/webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "pomerelle-webcams",
+    "name": "Pomerelle Mountain Resort — Webcams",
+    "resortId": "pomerelle",
+    "lat": 42.1642,
+    "lon": -113.4653,
+    "pageUrl": "https://www.pomerelle.com/conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "grand-targhee-summit",
+    "name": "Grand Targhee — Summit",
+    "resortId": "grand-targhee",
+    "lat": 43.7904,
+    "lon": -110.9587,
+    "videoEmbedUrl": "https://streams.seejh.ai/gtrsummit",
+    "pageUrl": "https://www.grandtarghee.com/the-mountain/cams-conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "grand-targhee-stick-of-truth-snow-stake",
+    "name": "Grand Targhee — Stick of Truth (snow stake)",
+    "resortId": "grand-targhee",
+    "lat": 43.7904,
+    "lon": -110.9587,
+    "videoEmbedUrl": "https://streams.seejh.ai/gtrsnowstick",
+    "pageUrl": "https://www.grandtarghee.com/the-mountain/cams-conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "grand-targhee-dreamcatcher",
+    "name": "Grand Targhee — Dreamcatcher",
+    "resortId": "grand-targhee",
+    "lat": 43.7904,
+    "lon": -110.9587,
+    "videoEmbedUrl": "https://streams.seejh.ai/gtrdream",
+    "pageUrl": "https://www.grandtarghee.com/the-mountain/cams-conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "grand-targhee-plaza",
+    "name": "Grand Targhee — Plaza",
+    "resortId": "grand-targhee",
+    "lat": 43.7904,
+    "lon": -110.9587,
+    "videoEmbedUrl": "https://streams.seejh.ai/gtrplaza",
+    "pageUrl": "https://www.grandtarghee.com/the-mountain/cams-conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "pine-creek-webcams",
+    "name": "Pine Creek — Webcams",
+    "resortId": "pine-creek",
+    "lat": 42.103,
+    "lon": -110.8288,
+    "pageUrl": "https://www.pinecreekskiresort.com/mountain/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "eagle-point-skyline-lift-top",
+    "name": "Eagle Point — Skyline Lift Top",
+    "resortId": "eagle-point",
+    "lat": 38.3222,
+    "lon": -112.378,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=5c64b6b8dfe34&mute=1",
+    "pageUrl": "https://www.eaglepointresort.com/mountain-conditions/",
+    "source": "resort"
+  },
+  {
+    "id": "eagle-point-monarch-lift",
+    "name": "Eagle Point — Monarch Lift",
+    "resortId": "eagle-point",
+    "lat": 38.3222,
+    "lon": -112.378,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=5dfd3048669e2&mute=1",
+    "pageUrl": "https://www.eaglepointresort.com/mountain-conditions/",
+    "source": "resort"
+  },
+  {
+    "id": "eagle-point-delano-s-drop",
+    "name": "Eagle Point — Delano's Drop",
+    "resortId": "eagle-point",
+    "lat": 38.3222,
+    "lon": -112.378,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=canyonsidelower&mute=1",
+    "pageUrl": "https://www.eaglepointresort.com/mountain-conditions/",
+    "source": "resort"
+  },
+  {
+    "id": "snow-king-mountain-base",
+    "name": "Snow King Mountain — Base",
+    "resortId": "snow-king-mountain",
+    "lat": 43.4657,
+    "lon": -110.7587,
+    "videoEmbedUrl": "https://streams.seejh.ai/snowkingbase",
+    "pageUrl": "https://streams.seejh.ai/snowkingbase",
+    "source": "resort"
+  },
+  {
+    "id": "jackson-hole-summit-panorama",
+    "name": "Jackson Hole — Summit Panorama",
+    "resortId": "jackson-hole",
+    "lat": 43.5949,
+    "lon": -110.8495,
+    "imageUrl": "https://backend.roundshot.com/cams/12a4b2c24cd515e0a115d4a0f59ef7f8/medium",
+    "pageUrl": "https://www.jacksonhole.com/live-mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "jackson-hole-rendezvous-panorama",
+    "name": "Jackson Hole — Rendezvous Panorama",
+    "resortId": "jackson-hole",
+    "lat": 43.5949,
+    "lon": -110.8495,
+    "imageUrl": "https://backend.roundshot.com/cams/6f7dc91857e22fe329e8bdeef5ee5750/medium",
+    "pageUrl": "https://www.jacksonhole.com/live-mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "brian-head-su-snow-stake-10-000-ft",
+    "name": "Brian Head — Snow Stake (10,000 ft)",
+    "resortId": "brian-head",
+    "lat": 37.6911,
+    "lon": -112.847,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/nDJNy9Gr6s2NvdsRAjWnW3",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brian-head-su-giant-steps-lift",
+    "name": "Brian Head — Giant Steps Lift",
+    "resortId": "brian-head",
+    "lat": 37.6911,
+    "lon": -112.847,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/840230442",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brian-head-su-last-chair-grill-deck",
+    "name": "Brian Head — Last Chair Grill Deck",
+    "resortId": "brian-head",
+    "lat": 37.6911,
+    "lon": -112.847,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/1770611104",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "brian-head-su-navajo-express",
+    "name": "Brian Head — Navajo Express",
+    "resortId": "brian-head",
+    "lat": 37.6911,
+    "lon": -112.847,
+    "imageUrl": "https://www.skiutah.com/files/blob/webcam/840230421",
+    "cacheBustParam": "_ts",
+    "pageUrl": "https://www.skiutah.com/resorts/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "powderhorn-mountain-cam",
+    "name": "Powderhorn — Mountain Cam",
+    "resortId": "powderhorn",
+    "lat": 39.0606,
+    "lon": -108.1522,
+    "imageUrl": "https://b16.hdrelay.com/camera/6376ac116db11e6bbdca2564/snapshot",
+    "pageUrl": "https://www.powderhorn.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-dollar-mountain-quarter-dollar",
+    "name": "Sun Valley (Dollar Mountain) — Quarter Dollar",
+    "resortId": "sun-valley-dollar-mountain",
+    "lat": 43.6825,
+    "lon": -114.3437,
+    "imageUrl": "https://b16b.hdrelay.com/camera/b4e43d2a-4ba6-4f25-8753-1055f95230cb/get_image",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-bald-mountain-roundhouse",
+    "name": "Sun Valley (Bald Mountain) — Roundhouse",
+    "resortId": "sun-valley-bald-mountain",
+    "lat": 43.6632,
+    "lon": -114.3895,
+    "imageUrl": "https://app.prismcam.com/public/helpers/realtime_preview.php?c=38&s=720",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-bald-mountain-white-clouds",
+    "name": "Sun Valley (Bald Mountain) — White Clouds",
+    "resortId": "sun-valley-bald-mountain",
+    "lat": 43.6632,
+    "lon": -114.3895,
+    "imageUrl": "https://app.prismcam.com/public/helpers/realtime_preview.php?c=52&s=720",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-bald-mountain-snow-stake",
+    "name": "Sun Valley (Bald Mountain) — Snow Stake",
+    "resortId": "sun-valley-bald-mountain",
+    "lat": 43.6632,
+    "lon": -114.3895,
+    "imageUrl": "https://b16b.hdrelay.com/camera/9d9a56b7-bf9e-4162-be9c-06c42ca208ff/get_image",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-bald-mountain-the-bowls",
+    "name": "Sun Valley (Bald Mountain) — The Bowls",
+    "resortId": "sun-valley-bald-mountain",
+    "lat": 43.6632,
+    "lon": -114.3895,
+    "imageUrl": "https://b16b.hdrelay.com/camera/390488dd-a758-4dd3-ae95-91c408abbff0/get_image",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-bald-mountain-river-run",
+    "name": "Sun Valley (Bald Mountain) — River Run",
+    "resortId": "sun-valley-bald-mountain",
+    "lat": 43.6632,
+    "lon": -114.3895,
+    "imageUrl": "https://b16b.hdrelay.com/camera/4c82abd4-5ef5-4b16-870f-548c2885d3f0/get_image",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "sun-valley-bald-mountain-warm-springs",
+    "name": "Sun Valley (Bald Mountain) — Warm Springs",
+    "resortId": "sun-valley-bald-mountain",
+    "lat": 43.6632,
+    "lon": -114.3895,
+    "imageUrl": "https://b16b.hdrelay.com/camera/5f27e4b8-7c51-4451-bcf5-3ab843f56bc6/get_image",
+    "pageUrl": "https://www.sunvalley.com/the-mountain/web-cams",
+    "source": "resort"
+  },
+  {
+    "id": "steamboat-webcams",
+    "name": "Steamboat — Webcams",
+    "resortId": "steamboat",
+    "lat": 40.4539,
+    "lon": -106.7752,
+    "pageUrl": "https://www.steamboat.com/the-mountain/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "aspen-snowmass-sam-s-knob-panorama",
+    "name": "Aspen Snowmass — Sam's Knob Panorama",
+    "resortId": "aspen-snowmass",
+    "lat": 39.1864,
+    "lon": -106.9502,
+    "imageUrl": "https://backend.roundshot.com/cams/d06c2257c923777ee36fee23722ea2c2/medium",
+    "pageUrl": "https://www.aspensnowmass.com/four-mountains/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "aspen-snowmass-elk-camp-panorama",
+    "name": "Aspen Snowmass — Elk Camp Panorama",
+    "resortId": "aspen-snowmass",
+    "lat": 39.1864,
+    "lon": -106.9502,
+    "imageUrl": "https://backend.roundshot.com/cams/88/medium",
+    "pageUrl": "https://www.aspensnowmass.com/four-mountains/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "aspen-snowmass-power-of-four-panorama",
+    "name": "Aspen Snowmass — Power of Four Panorama",
+    "resortId": "aspen-snowmass",
+    "lat": 39.1864,
+    "lon": -106.9502,
+    "imageUrl": "https://backend.roundshot.com/cams/90/medium",
+    "pageUrl": "https://www.aspensnowmass.com/four-mountains/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "buttermilk-panorama",
+    "name": "Buttermilk — Panorama",
+    "resortId": "buttermilk",
+    "lat": 39.1926,
+    "lon": -106.87,
+    "imageUrl": "https://backend.roundshot.com/cams/87/medium",
+    "pageUrl": "https://www.aspensnowmass.com/four-mountains/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "aspen-highlands-panorama",
+    "name": "Aspen Highlands — Panorama",
+    "resortId": "aspen-highlands",
+    "lat": 39.1621,
+    "lon": -106.8613,
+    "imageUrl": "https://backend.roundshot.com/cams/89/medium",
+    "pageUrl": "https://www.aspensnowmass.com/four-mountains/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "aspen-mountain-summit-panorama",
+    "name": "Aspen Mountain — Summit Panorama",
+    "resortId": "aspen-mountain",
+    "lat": 39.1653,
+    "lon": -106.8184,
+    "imageUrl": "https://backend.roundshot.com/cams/91/medium",
+    "pageUrl": "https://www.aspensnowmass.com/four-mountains/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "telluride-powcam-prospect-basin-snow-shelf",
+    "name": "Telluride — Powcam (Prospect Basin snow shelf)",
+    "resortId": "telluride",
+    "lat": 37.9212,
+    "lon": -107.8468,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=powcam&mute=1",
+    "pageUrl": "https://tellurideskiresort.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "telluride-village-plaza",
+    "name": "Telluride — Village Plaza",
+    "resortId": "telluride",
+    "lat": 37.9212,
+    "lon": -107.8468,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=plazacam&mute=1",
+    "pageUrl": "https://tellurideskiresort.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "telluride-black-iron-bowl",
+    "name": "Telluride — Black Iron Bowl",
+    "resortId": "telluride",
+    "lat": 37.9212,
+    "lon": -107.8468,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=bonvivant&mute=1",
+    "pageUrl": "https://tellurideskiresort.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "telluride-see-forever",
+    "name": "Telluride — See Forever",
+    "resortId": "telluride",
+    "lat": 37.9212,
+    "lon": -107.8468,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=jointpoint&mute=1",
+    "pageUrl": "https://tellurideskiresort.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "crested-butte-webcams",
+    "name": "Crested Butte — Webcams",
+    "resortId": "crested-butte",
+    "lat": 38.8988,
+    "lon": -106.9436,
+    "pageUrl": "https://www.skicb.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "beaver-creek-webcams",
+    "name": "Beaver Creek — Webcams",
+    "resortId": "beaver-creek",
+    "lat": 39.6045,
+    "lon": -106.5296,
+    "pageUrl": "https://www.beavercreek.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "bogus-basin-summit",
+    "name": "Bogus Basin — Summit",
+    "resortId": "bogus-basin",
+    "lat": 43.7784,
+    "lon": -116.0936,
+    "imageUrl": "https://storage.googleapis.com/prism-cam-00091/1080-watermark.jpg",
+    "pageUrl": "https://bogusbasin.org/your-mountain/conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "bogus-basin-snow-marker-6-230-ft",
+    "name": "Bogus Basin — Snow Marker (6,230 ft)",
+    "resortId": "bogus-basin",
+    "lat": 43.7784,
+    "lon": -116.0936,
+    "videoEmbedUrl": "https://www.youtube.com/embed/g714uvR8Rjg",
+    "pageUrl": "https://bogusbasin.org/your-mountain/conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "bogus-basin-simplot-base-area",
+    "name": "Bogus Basin — Simplot Base Area",
+    "resortId": "bogus-basin",
+    "lat": 43.7784,
+    "lon": -116.0936,
+    "videoEmbedUrl": "https://www.youtube.com/embed/_wkw4iZ5x1c",
+    "pageUrl": "https://bogusbasin.org/your-mountain/conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowy-range-snow-cam",
+    "name": "Snowy Range — Snow Cam",
+    "resortId": "snowy-range",
+    "lat": 41.3377,
+    "lon": -106.1802,
+    "videoEmbedUrl": "https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=397142069&shareID=17935300&isEmbedded=true&mode=live",
+    "pageUrl": "https://snowyrangeski.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowy-range-base",
+    "name": "Snowy Range — Base",
+    "resortId": "snowy-range",
+    "lat": 41.3377,
+    "lon": -106.1802,
+    "videoEmbedUrl": "https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864296&shareID=13751043&isEmbedded=true&mode=live",
+    "pageUrl": "https://snowyrangeski.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowy-range-sundance",
+    "name": "Snowy Range — Sundance",
+    "resortId": "snowy-range",
+    "lat": 41.3377,
+    "lon": -106.1802,
+    "videoEmbedUrl": "https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224855203&shareID=13750595&isEmbedded=true&mode=live",
+    "pageUrl": "https://snowyrangeski.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowy-range-chute",
+    "name": "Snowy Range — Chute",
+    "resortId": "snowy-range",
+    "lat": 41.3377,
+    "lon": -106.1802,
+    "videoEmbedUrl": "https://www.cameraftp.com/file/PublishCameraplayer.aspx?parentID=224864295&shareID=13789949&isEmbedded=true&mode=live",
+    "pageUrl": "https://snowyrangeski.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "snowy-range-colt",
+    "name": "Snowy Range — Colt",
+    "resortId": "snowy-range",
+    "lat": 41.3377,
+    "lon": -106.1802,
+    "videoEmbedUrl": "https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=300668346&shareID=14584106&isEmbedded=true&mode=live",
+    "pageUrl": "https://snowyrangeski.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "vail-webcams",
+    "name": "Vail — Webcams",
+    "resortId": "vail",
+    "lat": 39.603,
+    "lon": -106.3507,
+    "pageUrl": "https://www.vail.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "purgatory-snow-stake",
+    "name": "Purgatory — Snow Stake",
+    "resortId": "purgatory",
+    "lat": 37.6233,
+    "lon": -107.8357,
+    "imageUrl": "https://player.brownrice.com/snapshot/purgatorysnowstake1",
+    "pageUrl": "https://www.purgatory.ski/mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "purgatory-legends-summit-lift-1-top",
+    "name": "Purgatory — Legends Summit (Lift 1 top)",
+    "resortId": "purgatory",
+    "lat": 37.6233,
+    "lon": -107.8357,
+    "imageUrl": "https://player.brownrice.com/snapshot/purgatoryparadise",
+    "pageUrl": "https://www.purgatory.ski/mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "purgatory-rays-ridge-lift-8-top",
+    "name": "Purgatory — Rays Ridge (Lift 8 top)",
+    "resortId": "purgatory",
+    "lat": 37.6233,
+    "lon": -107.8357,
+    "imageUrl": "https://player.brownrice.com/snapshot/purgatoryraysridge",
+    "pageUrl": "https://www.purgatory.ski/mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "purgatory-village-plaza",
+    "name": "Purgatory — Village Plaza",
+    "resortId": "purgatory",
+    "lat": 37.6233,
+    "lon": -107.8357,
+    "imageUrl": "https://player.brownrice.com/snapshot/purgatoryplaza",
+    "pageUrl": "https://www.purgatory.ski/mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "ski-cooper-webcams",
+    "name": "Ski Cooper — Webcams",
+    "resortId": "ski-cooper",
+    "lat": 39.3544,
+    "lon": -106.2888,
+    "pageUrl": "https://www.skicooper.com/weather-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "big-sky-lone-peak-tram",
+    "name": "Big Sky — Lone Peak Tram",
+    "resortId": "big-sky",
+    "lat": 45.2841,
+    "lon": -111.4087,
+    "videoEmbedUrl": "https://camstreamer.com/embed/hcsmYlCWjirEU86zfXwaFGyX7w6GL3xJ3M3TkbZf",
+    "pageUrl": "https://www.bigskyresort.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "big-sky-everett-s-8800",
+    "name": "Big Sky — Everett's 8800",
+    "resortId": "big-sky",
+    "lat": 45.2841,
+    "lon": -111.4087,
+    "videoEmbedUrl": "https://camstreamer.com/embed/dmy0fkeL3LXtkQnzlK5Td1QrVGSt08aM8IVVmE08",
+    "pageUrl": "https://www.bigskyresort.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "big-sky-headwaters-snow-stake",
+    "name": "Big Sky — Headwaters Snow Stake",
+    "resortId": "big-sky",
+    "lat": 45.2841,
+    "lon": -111.4087,
+    "videoEmbedUrl": "https://camstreamer.com/embed/79477d2888e3958/S-53010",
+    "pageUrl": "https://www.bigskyresort.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "big-sky-andesite-snow-stake",
+    "name": "Big Sky — Andesite Snow Stake",
+    "resortId": "big-sky",
+    "lat": 45.2841,
+    "lon": -111.4087,
+    "videoEmbedUrl": "https://camstreamer.com/embed/d769e9f2b4ef400/S-47977",
+    "pageUrl": "https://www.bigskyresort.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "copper-mountain-mountain-cam",
+    "name": "Copper Mountain — Mountain Cam",
+    "resortId": "copper-mountain",
+    "lat": 39.4777,
+    "lon": -106.1612,
+    "imageUrl": "https://img.hdrelay.com/frames/fb469125-f1f3-459f-aeb4-98cb674e395f/default/last.jpg",
+    "pageUrl": "https://www.coppercolorado.com/the-mountain/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "copper-mountain-super-bee",
+    "name": "Copper Mountain — Super Bee",
+    "resortId": "copper-mountain",
+    "lat": 39.4777,
+    "lon": -106.1612,
+    "imageUrl": "https://img.hdrelay.com/frames/671bcfb507697ecebbaffc13/default/last.jpg",
+    "pageUrl": "https://www.coppercolorado.com/the-mountain/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "hogadon-basin-cam-1",
+    "name": "Hogadon Basin — Cam 1",
+    "resortId": "hogadon-basin",
+    "lat": 42.7469,
+    "lon": -106.341,
+    "imageUrl": "https://my.casperwy.gov/ftp/hogadon_webcam01.jpg",
+    "pageUrl": "https://www.casperwy.gov/explore/hogadon_basin_ski_area/index.php",
+    "source": "resort"
+  },
+  {
+    "id": "hogadon-basin-cam-2",
+    "name": "Hogadon Basin — Cam 2",
+    "resortId": "hogadon-basin",
+    "lat": 42.7469,
+    "lon": -106.341,
+    "imageUrl": "https://my.casperwy.gov/ftp/hogadon_webcam02.jpg",
+    "pageUrl": "https://www.casperwy.gov/explore/hogadon_basin_ski_area/index.php",
+    "source": "resort"
+  },
+  {
+    "id": "granby-ranch-base-area",
+    "name": "Granby Ranch — Base Area",
+    "resortId": "granby-ranch",
+    "lat": 40.0276,
+    "lon": -105.9027,
+    "imageUrl": "https://player.brownrice.com/snapshot/granby2",
+    "pageUrl": "https://granbyranch.com/live-web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "breckenridge-webcams",
+    "name": "Breckenridge — Webcams",
+    "resortId": "breckenridge",
+    "lat": 39.4723,
+    "lon": -106.0657,
+    "pageUrl": "https://www.breckenridge.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "loveland-snow-stake",
+    "name": "Loveland — Snow Stake",
+    "resortId": "loveland",
+    "lat": 39.6783,
+    "lon": -105.9107,
+    "imageUrl": "https://cams.skiloveland.com/snowcam/snowcam.jpg",
+    "pageUrl": "https://skiloveland.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "loveland-ptarmigan-roost",
+    "name": "Loveland — Ptarmigan Roost",
+    "resortId": "loveland",
+    "lat": 39.6783,
+    "lon": -105.9107,
+    "imageUrl": "https://cams.skiloveland.com/lsacams/ptarmroost/ptarmroost.jpg",
+    "pageUrl": "https://skiloveland.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "loveland-basin-deck",
+    "name": "Loveland — Basin Deck",
+    "resortId": "loveland",
+    "lat": 39.6783,
+    "lon": -105.9107,
+    "imageUrl": "https://cams.skiloveland.com/lsacams/basindeck/basindeck.jpg",
+    "pageUrl": "https://skiloveland.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "loveland-chet-s-top",
+    "name": "Loveland — Chet's Top",
+    "resortId": "loveland",
+    "lat": 39.6783,
+    "lon": -105.9107,
+    "imageUrl": "https://cams.skiloveland.com/lsacams/chetstop/chetstop.jpg",
+    "pageUrl": "https://skiloveland.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "loveland-valley-deck",
+    "name": "Loveland — Valley Deck",
+    "resortId": "loveland",
+    "lat": 39.6783,
+    "lon": -105.9107,
+    "imageUrl": "https://cams.skiloveland.com/lsacams/valleydeck/valleydeck.jpg",
+    "pageUrl": "https://skiloveland.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "loveland-lift-9",
+    "name": "Loveland — Lift 9",
+    "resortId": "loveland",
+    "lat": 39.6783,
+    "lon": -105.9107,
+    "imageUrl": "https://cams.skiloveland.com/lsacams/lift9/lift9.jpg",
+    "pageUrl": "https://skiloveland.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "keystone-webcams",
+    "name": "Keystone — Webcams",
+    "resortId": "keystone",
+    "lat": 39.5718,
+    "lon": -105.9344,
+    "pageUrl": "https://www.keystoneresort.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "arapahoe-basin-mountain-goat-plaza-base",
+    "name": "Arapahoe Basin — Mountain Goat Plaza / Base",
+    "resortId": "arapahoe-basin",
+    "lat": 39.6267,
+    "lon": -105.879,
+    "imageUrl": "https://dirigo-resorts-f4e2bde5azc2cne6.z02.azurefd.net/arapahoe/images/medium/webcams/abasincam1001m.jpg",
+    "pageUrl": "https://www.arapahoebasin.com/mountain-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "arapahoe-basin-montezuma-bowl",
+    "name": "Arapahoe Basin — Montezuma Bowl",
+    "resortId": "arapahoe-basin",
+    "lat": 39.6267,
+    "lon": -105.879,
+    "imageUrl": "https://dirigo-resorts-f4e2bde5azc2cne6.z02.azurefd.net/arapahoe/images/medium/webcams/abasincam5.jpg",
+    "pageUrl": "https://www.arapahoebasin.com/mountain-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "winter-park-snow-stake",
+    "name": "Winter Park — Snow Stake",
+    "resortId": "winter-park",
+    "lat": 39.8676,
+    "lon": -105.7755,
+    "videoEmbedUrl": "https://camstreamer.com/embed/mXhcYGDptt4PPiSEJVwxPNmUZjj1CNAjSkrBdj3s",
+    "pageUrl": "https://www.winterparkresort.com/the-mountain/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "winter-park-base",
+    "name": "Winter Park — Base",
+    "resortId": "winter-park",
+    "lat": 39.8676,
+    "lon": -105.7755,
+    "videoEmbedUrl": "https://camstreamer.com/embed/c909b9be0f94f0d/S-50783",
+    "pageUrl": "https://www.winterparkresort.com/the-mountain/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "winter-park-lunch-rock",
+    "name": "Winter Park — Lunch Rock",
+    "resortId": "winter-park",
+    "lat": 39.8676,
+    "lon": -105.7755,
+    "videoEmbedUrl": "https://camstreamer.com/embed/FkuQtJjEJaLOpalZiTsiVrZUw5IG3fCjMS3Vcc8h",
+    "pageUrl": "https://www.winterparkresort.com/the-mountain/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "winter-park-snoasis",
+    "name": "Winter Park — Snoasis",
+    "resortId": "winter-park",
+    "lat": 39.8676,
+    "lon": -105.7755,
+    "videoEmbedUrl": "https://camstreamer.com/embed/e6H5OSc0NDBQR7KCR0zZnKCV0qqX1YF1b8egwy8x",
+    "pageUrl": "https://www.winterparkresort.com/the-mountain/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "red-lodge-mountain-cam-1",
+    "name": "Red Lodge Mountain — Cam 1",
+    "resortId": "red-lodge-mountain",
+    "lat": 45.1897,
+    "lon": -109.3533,
+    "videoEmbedUrl": "https://v.angelcam.com/iframe?v=16rb82kzr4",
+    "pageUrl": "https://www.redlodgemountain.com/webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "red-lodge-mountain-cam-2",
+    "name": "Red Lodge Mountain — Cam 2",
+    "resortId": "red-lodge-mountain",
+    "lat": 45.1897,
+    "lon": -109.3533,
+    "videoEmbedUrl": "https://v.angelcam.com/iframe?v=2dy6e2kprk",
+    "pageUrl": "https://www.redlodgemountain.com/webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "red-lodge-mountain-cam-3",
+    "name": "Red Lodge Mountain — Cam 3",
+    "resortId": "red-lodge-mountain",
+    "lat": 45.1897,
+    "lon": -109.3533,
+    "videoEmbedUrl": "https://v.angelcam.com/iframe?v=16lb823dl4",
+    "pageUrl": "https://www.redlodgemountain.com/webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "red-lodge-mountain-cam-4",
+    "name": "Red Lodge Mountain — Cam 4",
+    "resortId": "red-lodge-mountain",
+    "lat": 45.1897,
+    "lon": -109.3533,
+    "videoEmbedUrl": "https://v.angelcam.com/iframe?v=2dy6e070rk",
+    "pageUrl": "https://www.redlodgemountain.com/webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "monarch-pioneer-top",
+    "name": "Monarch — Pioneer Top",
+    "resortId": "monarch",
+    "lat": 38.5122,
+    "lon": -106.3427,
+    "imageUrl": "https://player.brownrice.com/snapshot/skimonarchgarfield",
+    "pageUrl": "https://skimonarch.com/conditions/cams/",
+    "source": "resort"
+  },
+  {
+    "id": "monarch-sundeck",
+    "name": "Monarch — Sundeck",
+    "resortId": "monarch",
+    "lat": 38.5122,
+    "lon": -106.3427,
+    "imageUrl": "https://player.brownrice.com/snapshot/skimonarchsundeck",
+    "pageUrl": "https://skimonarch.com/conditions/cams/",
+    "source": "resort"
+  },
+  {
+    "id": "monarch-pano-flats",
+    "name": "Monarch — Pano Flats",
+    "resortId": "monarch",
+    "lat": 38.5122,
+    "lon": -106.3427,
+    "imageUrl": "https://player.brownrice.com/snapshot/skimonarchpanoflats",
+    "pageUrl": "https://skimonarch.com/conditions/cams/",
+    "source": "resort"
+  },
+  {
+    "id": "eldora-webcams",
+    "name": "Eldora — Webcams",
+    "resortId": "eldora",
+    "lat": 39.933,
+    "lon": -105.5864,
+    "pageUrl": "https://www.eldora.com/the-mountain/current-conditions/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "tamarack-webcams",
+    "name": "Tamarack — Webcams",
+    "resortId": "tamarack",
+    "lat": 44.6851,
+    "lon": -116.1429,
+    "pageUrl": "https://tamarackidaho.com/about/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "antelope-butte-pow-stick",
+    "name": "Antelope Butte — Pow Stick",
+    "resortId": "antelope-butte",
+    "lat": 44.6068,
+    "lon": -107.5162,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=antelopebuttepowstick&mute=1",
+    "pageUrl": "https://www.skiantelopebutte.com/webcam",
+    "source": "resort"
+  },
+  {
+    "id": "bridger-bowl-red-chair-snow-stake",
+    "name": "Bridger Bowl — Red Chair Snow Stake",
+    "resortId": "bridger-bowl",
+    "lat": 45.8225,
+    "lon": -110.9087,
+    "videoEmbedUrl": "https://www.youtube.com/embed/AHARPwavQ_0",
+    "pageUrl": "https://bridgerbowl.com/weather/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "wolf-creek-summit",
+    "name": "Wolf Creek — Summit",
+    "resortId": "wolf-creek",
+    "lat": 37.4642,
+    "lon": -106.786,
+    "imageUrl": "https://player.brownrice.com/snapshot/wolfcreeksummit",
+    "pageUrl": "https://wolfcreekski.com/",
+    "source": "resort"
+  },
+  {
+    "id": "wolf-creek-wolf-creek-lodge",
+    "name": "Wolf Creek — Wolf Creek Lodge",
+    "resortId": "wolf-creek",
+    "lat": 37.4642,
+    "lon": -106.786,
+    "imageUrl": "https://player.brownrice.com/snapshot/wolfcreektreasure",
+    "pageUrl": "https://wolfcreekski.com/",
+    "source": "resort"
+  },
+  {
+    "id": "wolf-creek-treasure-lift",
+    "name": "Wolf Creek — Treasure Lift",
+    "resortId": "wolf-creek",
+    "lat": 37.4642,
+    "lon": -106.786,
+    "imageUrl": "https://player.brownrice.com/snapshot/wolfcreektresurlift",
+    "pageUrl": "https://wolfcreekski.com/",
+    "source": "resort"
+  },
+  {
+    "id": "brundage-summit-top-bird",
+    "name": "Brundage — Summit (Top Bird)",
+    "resortId": "brundage",
+    "lat": 45.0014,
+    "lon": -116.1432,
+    "imageUrl": "https://brundage.com/webcam/bmrsummit.jpg",
+    "pageUrl": "https://brundage.com/live-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "brundage-snow-stake",
+    "name": "Brundage — Snow Stake",
+    "resortId": "brundage",
+    "lat": 45.0014,
+    "lon": -116.1432,
+    "imageUrl": "https://brundage.com/webcam/snowcam.jpg",
+    "pageUrl": "https://brundage.com/live-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "brundage-centennial-express",
+    "name": "Brundage — Centennial Express",
+    "resortId": "brundage",
+    "lat": 45.0014,
+    "lon": -116.1432,
+    "imageUrl": "https://brundage.com/webcam/centennialexpresscam.jpg",
+    "pageUrl": "https://brundage.com/live-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "brundage-bear",
+    "name": "Brundage — Bear",
+    "resortId": "brundage",
+    "lat": 45.0014,
+    "lon": -116.1432,
+    "imageUrl": "https://brundage.com/webcam/bmrbear.jpg",
+    "pageUrl": "https://brundage.com/live-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "lee-canyon-mountain-cam",
+    "name": "Lee Canyon — Mountain Cam",
+    "resortId": "lee-canyon",
+    "lat": 36.3006,
+    "lon": -115.6801,
+    "videoEmbedUrl": "https://manage.hdrelay.com/webPlayer/iframe/e8ecca63-a91c-4ebe-98a7-341b2244dbc5",
+    "pageUrl": "https://www.leecanyonlv.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "arizona-snowbowl-arizona-gondola",
+    "name": "Arizona Snowbowl — Arizona Gondola",
+    "resortId": "arizona-snowbowl",
+    "lat": 35.3292,
+    "lon": -111.698,
+    "videoEmbedUrl": "https://www.youtube.com/embed/WkWctaDP-LE",
+    "pageUrl": "https://www.snowbowl.ski/the-mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "arizona-snowbowl-grand-canyon-express",
+    "name": "Arizona Snowbowl — Grand Canyon Express",
+    "resortId": "arizona-snowbowl",
+    "lat": 35.3292,
+    "lon": -111.698,
+    "videoEmbedUrl": "https://www.youtube.com/embed/TQwlCPGw-7s",
+    "pageUrl": "https://www.snowbowl.ski/the-mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "arizona-snowbowl-hart-prairie-aspen",
+    "name": "Arizona Snowbowl — Hart Prairie & Aspen",
+    "resortId": "arizona-snowbowl",
+    "lat": 35.3292,
+    "lon": -111.698,
+    "videoEmbedUrl": "https://www.youtube.com/embed/Uppii4hIVQs",
+    "pageUrl": "https://www.snowbowl.ski/the-mountain/weather-conditions-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "discovery-top-snow-stake",
+    "name": "Discovery — Top Snow Stake",
+    "resortId": "discovery",
+    "lat": 46.2639,
+    "lon": -113.2522,
+    "imageUrl": "https://webcam.skidiscovery.com/webcam-images/top-stake/top-stake/top-stake-webcam.jpg",
+    "pageUrl": "https://www.skidiscovery.com/",
+    "source": "resort"
+  },
+  {
+    "id": "discovery-base-snow-stake",
+    "name": "Discovery — Base Snow Stake",
+    "resortId": "discovery",
+    "lat": 46.2639,
+    "lon": -113.2522,
+    "imageUrl": "https://webcam.skidiscovery.com/webcam-images/base-stake/base-stake/base-stake-webcam.jpg",
+    "pageUrl": "https://www.skidiscovery.com/",
+    "source": "resort"
+  },
+  {
+    "id": "discovery-top-overview",
+    "name": "Discovery — Top Overview",
+    "resortId": "discovery",
+    "lat": 46.2639,
+    "lon": -113.2522,
+    "imageUrl": "https://webcam.skidiscovery.com/webcam-images/top-overview/top-overview/top-overview-webcam.jpg",
+    "pageUrl": "https://www.skidiscovery.com/",
+    "source": "resort"
+  },
+  {
+    "id": "discovery-front-side",
+    "name": "Discovery — Front Side",
+    "resortId": "discovery",
+    "lat": 46.2639,
+    "lon": -113.2522,
+    "imageUrl": "https://webcam.skidiscovery.com/webcam-images/od-front/od-front/od-front-webcam.jpg",
+    "pageUrl": "https://www.skidiscovery.com/",
+    "source": "resort"
+  },
+  {
+    "id": "great-divide-ski-cam",
+    "name": "Great Divide — Ski Cam",
+    "resortId": "great-divide",
+    "lat": 46.7512,
+    "lon": -112.3261,
+    "videoEmbedUrl": "https://camstreamer.com/embed/V5dtB7F32kI4jhHMa3D48QS7T9c6utjsgGwMiw1C",
+    "pageUrl": "https://www.skigd.com/webcam",
+    "source": "resort"
+  },
+  {
+    "id": "showdown-cam-1",
+    "name": "Showdown — Cam 1",
+    "resortId": "showdown",
+    "lat": 46.8361,
+    "lon": -110.7084,
+    "videoEmbedUrl": "https://video.nest.com/embedded/live/AfYTevjCiS",
+    "pageUrl": "https://www.showdownmontana.com/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "showdown-cam-2",
+    "name": "Showdown — Cam 2",
+    "resortId": "showdown",
+    "lat": 46.8361,
+    "lon": -110.7084,
+    "videoEmbedUrl": "https://video.nest.com/embedded/live/kqtJQIN6tD",
+    "pageUrl": "https://www.showdownmontana.com/mountain-cams",
+    "source": "resort"
+  },
+  {
+    "id": "mt-rose-main-lodge-base",
+    "name": "Mt. Rose — Main Lodge Base",
+    "resortId": "mt-rose",
+    "lat": 39.3235,
+    "lon": -119.8838,
+    "imageUrl": "https://player.brownrice.com/snapshot/mtrosecam",
+    "pageUrl": "https://skirose.com/the-mountain-web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "mt-rose-summit-northwest-express",
+    "name": "Mt. Rose — Summit / Northwest Express",
+    "resortId": "mt-rose",
+    "lat": 39.3235,
+    "lon": -119.8838,
+    "imageUrl": "https://player.brownrice.com/snapshot/mtrose1",
+    "pageUrl": "https://skirose.com/the-mountain-web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "mt-rose-summit-panoramic-9-700-ft",
+    "name": "Mt. Rose — Summit Panoramic (9,700 ft)",
+    "resortId": "mt-rose",
+    "lat": 39.3235,
+    "lon": -119.8838,
+    "imageUrl": "https://player.brownrice.com/snapshot/mtrosesummit",
+    "pageUrl": "https://skirose.com/the-mountain-web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "mt-rose-mid-mountain-slide-bowl",
+    "name": "Mt. Rose — Mid-Mountain Slide Bowl",
+    "resortId": "mt-rose",
+    "lat": 39.3235,
+    "lon": -119.8838,
+    "imageUrl": "https://player.brownrice.com/snapshot/mtroseslidebowl",
+    "pageUrl": "https://skirose.com/the-mountain-web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "mt-rose-winters-creek-lodge",
+    "name": "Mt. Rose — Winters Creek Lodge",
+    "resortId": "mt-rose",
+    "lat": 39.3235,
+    "lon": -119.8838,
+    "imageUrl": "https://player.brownrice.com/snapshot/mtrosewcl",
+    "pageUrl": "https://skirose.com/the-mountain-web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "june-mountain-chalet",
+    "name": "June Mountain — Chalet",
+    "resortId": "june-mountain",
+    "lat": 37.7537,
+    "lon": -119.0757,
+    "videoEmbedUrl": "https://camstreamer.com/embed/tE4lQnjGNYDmWJGJR8cq5ZFfk1ayE3eGsk1s9Efk",
+    "pageUrl": "https://www.junemountain.com/mountain-information/live-cams",
+    "source": "resort"
+  },
+  {
+    "id": "june-mountain-patrol",
+    "name": "June Mountain — Patrol",
+    "resortId": "june-mountain",
+    "lat": 37.7537,
+    "lon": -119.0757,
+    "videoEmbedUrl": "https://camstreamer.com/embed/fe1S3BCV9oWLDdx7eOnpCmwgykoYQ7Qk4i3Wr8oE",
+    "pageUrl": "https://www.junemountain.com/mountain-information/live-cams",
+    "source": "resort"
+  },
+  {
+    "id": "june-mountain-chair-j3",
+    "name": "June Mountain — Chair J3",
+    "resortId": "june-mountain",
+    "lat": 37.7537,
+    "lon": -119.0757,
+    "videoEmbedUrl": "https://camstreamer.com/embed/w9LUOU7DhJifalaO87SUPE9jF9cNytXkD7INTyy0",
+    "pageUrl": "https://www.junemountain.com/mountain-information/live-cams",
+    "source": "resort"
+  },
+  {
+    "id": "diamond-peak-summit",
+    "name": "Diamond Peak — Summit",
+    "resortId": "diamond-peak",
+    "lat": 39.2536,
+    "lon": -119.9161,
+    "imageUrl": "https://img.hdrelay.com/frames/544ccabf-7940-470e-86ba-4e06b192c29f/default/last.jpg",
+    "pageUrl": "https://www.diamondpeak.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "diamond-peak-snowflake-lodge-mid-mountain",
+    "name": "Diamond Peak — Snowflake Lodge (mid-mountain)",
+    "resortId": "diamond-peak",
+    "lat": 39.2536,
+    "lon": -119.9161,
+    "imageUrl": "https://img.hdrelay.com/frames/0b881044-f574-49ff-b548-e2b617063ae6/default/last.jpg",
+    "pageUrl": "https://www.diamondpeak.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "diamond-peak-base-area",
+    "name": "Diamond Peak — Base Area",
+    "resortId": "diamond-peak",
+    "lat": 39.2536,
+    "lon": -119.9161,
+    "imageUrl": "https://img.hdrelay.com/frames/f696eee0-2224-4f36-b215-864ddb36012f/default/last.jpg",
+    "pageUrl": "https://www.diamondpeak.com/the-mountain/web-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "mammoth-mountain-main-lodge",
+    "name": "Mammoth Mountain — Main Lodge",
+    "resortId": "mammoth-mountain",
+    "lat": 37.6402,
+    "lon": -119.0205,
+    "videoEmbedUrl": "https://www.youtube.com/embed/m4u2kGpkYD4",
+    "pageUrl": "https://www.mammothmountain.com/on-the-mountain/mammoth-webcam",
+    "source": "resort"
+  },
+  {
+    "id": "heavenly-webcams",
+    "name": "Heavenly — Webcams",
+    "resortId": "heavenly",
+    "lat": 38.9397,
+    "lon": -119.912,
+    "pageUrl": "https://www.skiheavenly.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "montana-snowbowl-base",
+    "name": "Montana Snowbowl — Base",
+    "resortId": "montana-snowbowl",
+    "lat": 47.0229,
+    "lon": -114.0061,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=690b67247173f&mute=1",
+    "pageUrl": "https://montanasnowbowl.com/sbblog/base-web-cam/",
+    "source": "resort"
+  },
+  {
+    "id": "northstar-webcams",
+    "name": "Northstar — Webcams",
+    "resortId": "northstar",
+    "lat": 39.2588,
+    "lon": -120.1371,
+    "pageUrl": "https://www.northstarcalifornia.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "red-river-summit",
+    "name": "Red River — Summit",
+    "resortId": "red-river",
+    "lat": 36.7008,
+    "lon": -105.4087,
+    "imageUrl": "https://player.brownrice.com/snapshot/rrsasummitcam",
+    "pageUrl": "https://www.redriverskiarea.com/explore/about/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "red-river-platinum-chair",
+    "name": "Red River — Platinum Chair",
+    "resortId": "red-river",
+    "lat": 36.7008,
+    "lon": -105.4087,
+    "imageUrl": "https://player.brownrice.com/snapshot/rrsaplatinum",
+    "pageUrl": "https://www.redriverskiarea.com/explore/about/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "red-river-gold-chair",
+    "name": "Red River — Gold Chair",
+    "resortId": "red-river",
+    "lat": 36.7008,
+    "lon": -105.4087,
+    "imageUrl": "https://player.brownrice.com/snapshot/rrsagold",
+    "pageUrl": "https://www.redriverskiarea.com/explore/about/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "red-river-copper-mid-chair",
+    "name": "Red River — Copper Mid-Chair",
+    "resortId": "red-river",
+    "lat": 36.7008,
+    "lon": -105.4087,
+    "imageUrl": "https://player.brownrice.com/snapshot/rrsacoppermidchair",
+    "pageUrl": "https://www.redriverskiarea.com/explore/about/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "red-river-downtown-broadway",
+    "name": "Red River — Downtown / Broadway",
+    "resortId": "red-river",
+    "lat": 36.7008,
+    "lon": -105.4087,
+    "imageUrl": "https://player.brownrice.com/snapshot/rrsabroadway",
+    "pageUrl": "https://www.redriverskiarea.com/explore/about/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "pajarito-mountain-mountain-cam",
+    "name": "Pajarito Mountain — Mountain Cam",
+    "resortId": "pajarito-mountain",
+    "lat": 35.8909,
+    "lon": -106.3926,
+    "imageUrl": "https://player.brownrice.com/snapshot/pajarito1",
+    "pageUrl": "https://www.pajarito.ski/weather-conditions-webcams/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "taos-ski-valley-webcams",
+    "name": "Taos Ski Valley — Webcams",
+    "resortId": "taos-ski-valley",
+    "lat": 36.5789,
+    "lon": -105.4502,
+    "pageUrl": "https://www.skitaos.com/weather",
+    "source": "resort"
+  },
+  {
+    "id": "homewood-webcams",
+    "name": "Homewood — Webcams",
+    "resortId": "homewood",
+    "lat": 39.0774,
+    "lon": -120.1734,
+    "pageUrl": "https://skihomewood.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "sierra-at-tahoe-mountain-cam",
+    "name": "Sierra-at-Tahoe — Mountain Cam",
+    "resortId": "sierra-at-tahoe",
+    "lat": 38.7962,
+    "lon": -120.079,
+    "imageUrl": "https://img.hdrelay.com/frames/f5145304-44dc-475f-a654-8a7bacee1e81/sugar/last.jpg",
+    "pageUrl": "https://sierraattahoe.com/live-cams/",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-olympic-valley-palisades-base-area",
+    "name": "Palisades Tahoe (Olympic Valley) — Palisades Base Area",
+    "resortId": "palisades-tahoe-olympic-valley",
+    "lat": 39.1924,
+    "lon": -120.2501,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_ZIGI00000147",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-olympic-valley-high-camp",
+    "name": "Palisades Tahoe (Olympic Valley) — High Camp",
+    "resortId": "palisades-tahoe-olympic-valley",
+    "lat": 39.1924,
+    "lon": -120.2501,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_EIFC0000015B",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-olympic-valley-top-of-siberia-express",
+    "name": "Palisades Tahoe (Olympic Valley) — Top of Siberia Express",
+    "resortId": "palisades-tahoe-olympic-valley",
+    "lat": 39.1924,
+    "lon": -120.2501,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_OBCE00000ECB",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-olympic-valley-far-east-top",
+    "name": "Palisades Tahoe (Olympic Valley) — Far East Top",
+    "resortId": "palisades-tahoe-olympic-valley",
+    "lat": 39.1924,
+    "lon": -120.2501,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_EMST000001C4",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-alpine-meadows-alpine-lodge-base-area",
+    "name": "Palisades Tahoe (Alpine Meadows) — Alpine Lodge Base Area",
+    "resortId": "palisades-tahoe-alpine-meadows",
+    "lat": 39.1654,
+    "lon": -120.2435,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_VPAY0000014C",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-alpine-meadows-alpine-race",
+    "name": "Palisades Tahoe (Alpine Meadows) — Alpine Race",
+    "resortId": "palisades-tahoe-alpine-meadows",
+    "lat": 39.1654,
+    "lon": -120.2435,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_KIYV000003C2",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "palisades-tahoe-alpine-meadows-alpine-chalet",
+    "name": "Palisades Tahoe (Alpine Meadows) — Alpine Chalet",
+    "resortId": "palisades-tahoe-alpine-meadows",
+    "lat": 39.1654,
+    "lon": -120.2435,
+    "videoEmbedUrl": "https://relay.ozolio.com/pub.api?cmd=embed&oid=EMB_FPOI000010AB",
+    "pageUrl": "https://www.palisadestahoe.com/mountain-information/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "kirkwood-webcams",
+    "name": "Kirkwood — Webcams",
+    "resortId": "kirkwood",
+    "lat": 38.6738,
+    "lon": -120.0647,
+    "pageUrl": "https://www.kirkwood.com/the-mountain/mountain-conditions/mountain-cams.aspx",
+    "source": "resort"
+  },
+  {
+    "id": "boreal-webcams",
+    "name": "Boreal — Webcams",
+    "resortId": "boreal",
+    "lat": 39.3314,
+    "lon": -120.3481,
+    "pageUrl": "https://www.rideboreal.com/explore/webcams/boreal-mountain-cam/",
+    "source": "resort"
+  },
+  {
+    "id": "donner-ski-ranch-deck-cam",
+    "name": "Donner Ski Ranch — Deck Cam",
+    "resortId": "donner-ski-ranch",
+    "lat": 39.3213,
+    "lon": -120.337,
+    "videoEmbedUrl": "https://www.youtube.com/embed/ArDIIhAHwWE",
+    "pageUrl": "https://www.donnerskiranch.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "sugar-bowl-webcams",
+    "name": "Sugar Bowl — Webcams",
+    "resortId": "sugar-bowl",
+    "lat": 39.3007,
+    "lon": -120.3358,
+    "pageUrl": "https://www.sugarbowl.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "china-peak-webcams",
+    "name": "China Peak — Webcams",
+    "resortId": "china-peak",
+    "lat": 37.2264,
+    "lon": -119.1581,
+    "pageUrl": "https://www.skichinapeak.com/webcam/",
+    "source": "resort"
+  },
+  {
+    "id": "bear-valley-webcams",
+    "name": "Bear Valley — Webcams",
+    "resortId": "bear-valley",
+    "lat": 38.4832,
+    "lon": -120.0527,
+    "pageUrl": "https://www.bearvalley.com/webcam",
+    "source": "resort"
+  },
+  {
+    "id": "dodge-ridge-summit-8-200-ft",
+    "name": "Dodge Ridge — Summit (8,200 ft)",
+    "resortId": "dodge-ridge",
+    "lat": 38.1899,
+    "lon": -119.9393,
+    "videoEmbedUrl": "https://camstreamer.com/embed/qNANAbY1LFNjIC2aSgnh9Rh688XN31WQnGM1PmyD",
+    "pageUrl": "https://dodgeridge.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "dodge-ridge-mid-mountain",
+    "name": "Dodge Ridge — Mid-Mountain",
+    "resortId": "dodge-ridge",
+    "lat": 38.1899,
+    "lon": -119.9393,
+    "videoEmbedUrl": "https://camstreamer.com/embed/T2FrYZAC2zMlEqPtEN0pJn9AYWP8HSRQC1voamnK",
+    "pageUrl": "https://dodgeridge.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "dodge-ridge-base-area",
+    "name": "Dodge Ridge — Base Area",
+    "resortId": "dodge-ridge",
+    "lat": 38.1899,
+    "lon": -119.9393,
+    "videoEmbedUrl": "https://camstreamer.com/embed/QV9LJz7lbYsNtWmfqVvj3Hdsfn4EHjYmFoV4tL8f",
+    "pageUrl": "https://dodgeridge.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "sipapu-upper-top-of-lift-one",
+    "name": "Sipapu — Upper (top of Lift One)",
+    "resortId": "sipapu",
+    "lat": 36.1496,
+    "lon": -105.5523,
+    "imageUrl": "https://player.brownrice.com/snapshot/sipapu1",
+    "pageUrl": "https://www.sipapu.ski/the-mountain/sipapu-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "sipapu-base-area",
+    "name": "Sipapu — Base Area",
+    "resortId": "sipapu",
+    "lat": 36.1496,
+    "lon": -105.5523,
+    "imageUrl": "https://player.brownrice.com/snapshot/sipapu2",
+    "pageUrl": "https://www.sipapu.ski/the-mountain/sipapu-webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "angel-fire-summit",
+    "name": "Angel Fire — Summit",
+    "resortId": "angel-fire",
+    "lat": 36.3794,
+    "lon": -105.2468,
+    "imageUrl": "https://player.brownrice.com/snapshot/swsummit",
+    "pageUrl": "https://www.angelfireresort.com/the-mountain/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "angel-fire-ski-school",
+    "name": "Angel Fire — Ski School",
+    "resortId": "angel-fire",
+    "lat": 36.3794,
+    "lon": -105.2468,
+    "imageUrl": "https://player.brownrice.com/snapshot/afskischool",
+    "pageUrl": "https://www.angelfireresort.com/the-mountain/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "bluewood-base",
+    "name": "Bluewood — Base",
+    "resortId": "bluewood",
+    "lat": 46.0764,
+    "lon": -117.8512,
+    "imageUrl": "https://cameraftpapi.drivehq.com/api/Camera/LastImageaspx/shareID17403629/bwdbase.jpg",
+    "pageUrl": "https://bluewood.com/conditions",
+    "source": "resort"
+  },
+  {
+    "id": "ski-santa-fe-quad-top",
+    "name": "Ski Santa Fe — Quad Top",
+    "resortId": "ski-santa-fe",
+    "lat": 35.7913,
+    "lon": -105.7895,
+    "imageUrl": "https://player.brownrice.com/snapshot/quadtop",
+    "pageUrl": "https://www.skisantafe.com/conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "ski-santa-fe-base",
+    "name": "Ski Santa Fe — Base",
+    "resortId": "ski-santa-fe",
+    "lat": 35.7913,
+    "lon": -105.7895,
+    "imageUrl": "https://player.brownrice.com/snapshot/santafe",
+    "pageUrl": "https://www.skisantafe.com/conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "ski-santa-fe-millennium-chair-5",
+    "name": "Ski Santa Fe — Millennium (Chair 5)",
+    "resortId": "ski-santa-fe",
+    "lat": 35.7913,
+    "lon": -105.7895,
+    "imageUrl": "https://player.brownrice.com/snapshot/santafechair5",
+    "pageUrl": "https://www.skisantafe.com/conditions/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "terry-peak-stewart-lodge",
+    "name": "Terry Peak — Stewart Lodge",
+    "resortId": "terry-peak",
+    "lat": 44.3329,
+    "lon": -103.8317,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=5c3526110e41f&mute=1",
+    "pageUrl": "https://terrypeak.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "terry-peak-summit",
+    "name": "Terry Peak — Summit",
+    "resortId": "terry-peak",
+    "lat": 44.3329,
+    "lon": -103.8317,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=5c352da4f3420&mute=1",
+    "pageUrl": "https://terrypeak.com/webcams",
+    "source": "resort"
+  },
+  {
+    "id": "sandia-peak-webcams",
+    "name": "Sandia Peak — Webcams",
+    "resortId": "sandia-peak",
+    "lat": 35.2014,
+    "lon": -106.4233,
+    "pageUrl": "https://sandiapeak.com/snow-report/",
+    "source": "resort"
+  },
+  {
+    "id": "sunrise-park-sunrise-peak",
+    "name": "Sunrise Park — Sunrise Peak",
+    "resortId": "sunrise-park",
+    "lat": 33.9555,
+    "lon": -109.5669,
+    "videoEmbedUrl": "https://camstreamer.com/embed/R71P21FF2bgBuDND103MQxOHShh6dAEZtC5hDAWA",
+    "pageUrl": "https://sunrise.ski/winter/snow-report/",
+    "source": "resort"
+  },
+  {
+    "id": "sunrise-park-base",
+    "name": "Sunrise Park — Base",
+    "resortId": "sunrise-park",
+    "lat": 33.9555,
+    "lon": -109.5669,
+    "videoEmbedUrl": "https://camstreamer.com/embed/yPpbEyLAB0qTEviDanrvK7qV2jmPqxfh8DtYYF6K",
+    "pageUrl": "https://sunrise.ski/winter/snow-report/",
+    "source": "resort"
+  },
+  {
+    "id": "lookout-pass-chair-1-base",
+    "name": "Lookout Pass — Chair 1 Base",
+    "resortId": "lookout-pass",
+    "lat": 47.451,
+    "lon": -115.7203,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=63485bb43c85b&mute=1",
+    "pageUrl": "https://skilookout.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "lookout-pass-chair-1-patrol-hut",
+    "name": "Lookout Pass — Chair 1 Patrol Hut",
+    "resortId": "lookout-pass",
+    "lat": 47.451,
+    "lon": -115.7203,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=6345e3cb46ea4&mute=1",
+    "pageUrl": "https://skilookout.com/webcams/",
+    "source": "resort"
+  },
+  {
+    "id": "lookout-pass-weather-cam",
+    "name": "Lookout Pass — Weather Cam",
+    "resortId": "lookout-pass",
+    "lat": 47.451,
+    "lon": -115.7203,
+    "videoEmbedUrl": "https://g1.ipcamlive.com/player/player.php?alias=6345e54d48886&mute=1",
+    "pageUrl": "https://skilookout.com/webcams/",
     "source": "resort"
   },
   {
