@@ -15,7 +15,7 @@
 //
 // Challenges are kept in a short-lived, HMAC-signed, httpOnly cookie, not
 // a table: one per ceremony, nothing to clean up.
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { NextRequest, NextResponse } from "next/server";
 import {
   generateAuthenticationOptions,
@@ -27,11 +27,11 @@ import {
   type RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { getSql } from "@/lib/db/postgres";
+import { getAuthSecret } from "@/lib/auth/secret";
 
 export const RP_NAME = "Actually Open Snow";
 const CHALLENGE_COOKIE = "aos_webauthn";
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
-const SECRET = process.env.SESSION_SECRET ?? randomBytes(32).toString("hex");
 
 // --- Relying party -----------------------------------------------------------
 
@@ -52,7 +52,7 @@ export function relyingParty(req: NextRequest): { rpID: string; origins: string[
 type Purpose = "register" | "login";
 
 function sign(payload: string) {
-  return createHmac("sha256", SECRET).update(`webauthn.${payload}`).digest("base64url");
+  return createHmac("sha256", getAuthSecret()).update(`webauthn.${payload}`).digest("base64url");
 }
 
 export function setChallenge(res: NextResponse, challenge: string, purpose: Purpose, userId?: number) {

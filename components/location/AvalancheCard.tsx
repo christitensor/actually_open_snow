@@ -1,6 +1,7 @@
 import type { AvalancheForecast, AvalancheMedia, AvalancheZone } from "@/lib/models/types";
 import DangerRose, { ProblemRose, dangerColor } from "@/components/location/DangerRose";
 import Section from "@/components/ui/Section";
+import { safeHttpUrl } from "@/lib/util/url";
 
 // BC-01 card. Forecast data arrives in a few shapes (all verified live,
 // Nov 2026), and each gets an honest rendering rather than a fake full one:
@@ -138,7 +139,9 @@ export default function AvalancheCard({ zone, forecast }: { zone: AvalancheZone 
         : forecast?.productType === "summary" && !forecast.isStale
           ? "No danger ratings yet · conditions update posted"
           : "No danger rating posted today";
-  const centerLink = forecast?.url ?? zone?.link ?? null;
+  // URL comes from the UAC / avalanche.org feeds; only render http(s) links.
+  const rawLink = forecast?.url ?? zone?.link ?? null;
+  const centerLink = rawLink ? safeHttpUrl(rawLink, "https://avalanche.org/") : null;
   const oldNews = !!forecast?.isStale && daysOld(forecast.forecastDate) >= HIDE_STALE_AFTER_DAYS;
 
   return (

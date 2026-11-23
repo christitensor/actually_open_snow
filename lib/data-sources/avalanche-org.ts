@@ -26,6 +26,7 @@
 
 import type { AvalancheForecast, AvalancheMedia, AvalancheProblem, AvalancheZone } from "@/lib/models/types";
 import { htmlToText } from "@/lib/util/html";
+import { safeHttpUrl } from "@/lib/util/url";
 import { getUacForecast, mergeUacForecast } from "@/lib/data-sources/uac-forecast";
 
 const MAP_LAYER_URL = "https://api.avalanche.org/v2/public/products/map-layer";
@@ -101,7 +102,9 @@ const STALE_GRACE_H = 12;
 
 function toMedia(raw: AvalancheProductResponse["media"]): AvalancheMedia[] {
   return (raw ?? []).flatMap((m): AvalancheMedia[] => {
-    const thumb = m.url?.medium ?? m.url?.thumbnail ?? m.url?.large;
+    // Feed-supplied URLs end up in <img src> / <a href>: keep only http(s) ones.
+    const httpOrNull = (u: unknown) => (u ? safeHttpUrl(u, "") || null : null);
+    const thumb = httpOrNull(m.url?.medium ?? m.url?.thumbnail ?? m.url?.large);
     if (!thumb) return [];
     if (m.type === "video") {
       if (!m.url?.video_id) return [];
@@ -109,7 +112,7 @@ function toMedia(raw: AvalancheProductResponse["media"]): AvalancheMedia[] {
       return [{ type: "video", thumbnailUrl: thumb, href: `https://www.youtube.com/watch?v=${encodeURIComponent(m.url.video_id)}`, caption }];
     }
     if (m.type !== "image") return [];
-    return [{ type: "image", thumbnailUrl: thumb, href: m.url?.large ?? m.url?.original ?? thumb, caption: htmlToText(m.caption) || htmlToText(m.title) }];
+    return [{ type: "image", thumbnailUrl: thumb, href: httpOrNull(m.url?.large ?? m.url?.original) ?? thumb, caption: htmlToText(m.caption) || htmlToText(m.title) }];
   });
 }
 

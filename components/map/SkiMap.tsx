@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
+import { safeHttpUrl } from "@/lib/util/url";
 import { ALL_BASE_LAYER_IDS, BASE_STYLE, type BaseLayerId, visibleBaseLayerIds } from "@/lib/map/base-style";
 import { usePreferences } from "@/lib/preferences/context";
 import { PISTE_MAX_TILES_PER_VIEW, PISTE_MIN_VIEW_ZOOM, PISTE_TILE_ZOOM, tilesForBbox } from "@/lib/util/tiles";
@@ -30,6 +31,18 @@ interface MapPin {
   lon: number;
   /** MAP-10 Powder Finder: today's forecast snowfall (inches) for this resort, if known — colors the pin */
   snowfallTodayIn?: number;
+}
+
+// Popup HTML is built from third-party feed text (UAC observations are
+// public user submissions; station names come from NWS/NRCS), so every
+// interpolated value is escaped and links are restricted to http(s).
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function powderColor(inches: number | undefined): string {
@@ -405,7 +418,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     if (allowPinDrop) {
       map.on("click", (e: MapMouseEvent) => {
         if (snowpackOnRef.current) return; // the snowpack inspector below owns taps
-        const { lat, lng } = e.lngLat;
+        // wrap(): after panning across the antimeridian lng can be outside ±180, which the API rejects.
+      const { lat, lng } = e.lngLat.wrap();
         router.push(`/location/pin?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`);
       });
     }
@@ -436,7 +450,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       // Taps on station/observation dots keep their own popups.
       const pointLayers = ["weather-stations-circles", "avalanche-observations-circles"].filter((id) => map.getLayer(id));
       if (pointLayers.length && map.queryRenderedFeatures(e.point, { layers: pointLayers }).length) return;
-      const { lat, lng } = e.lngLat;
+      // wrap(): after panning across the antimeridian lng can be outside ±180, which the API rejects.
+      const { lat, lng } = e.lngLat.wrap();
       snowpackPopup?.remove();
       const content = snowpackPopupContent(lat, lng, (href) => router.push(href));
       snowpackPopup = new Popup({ offset: 8, maxWidth: "260px" }).setLngLat(e.lngLat).setDOMContent(content).addTo(map);
@@ -476,9 +491,13 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       const cacheBustedImageUrl = cam.imageUrl
         ? `${cam.imageUrl}${cam.imageUrl.includes("?") ? "&" : "?"}${cacheBustParam}=${Date.now()}`
         : undefined;
-      const popupHtml = cacheBustedImageUrl
-        ? `<strong>${cam.name}</strong><br/><img src="${cacheBustedImageUrl}" alt="${cam.name}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
-        : `<strong>${cam.name}</strong><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`;
+      // Escaped like the other popups: webcam names/URLs are curated data, but setHTML parses whatever it's given.
+      const camName = escapeHtml(cam.name);
+      const pageUrl = escapeHtml(safeHttpUrl(cam.pageUrl, "#"));
+      const imageUrl = cacheBustedImageUrl ? safeHttpUrl(cacheBustedImageUrl, "") : "";
+      const popupHtml = imageUrl
+        ? `<strong>${camName}</strong><br/><img src="${escapeHtml(imageUrl)}" alt="${camName}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
+        : `<strong>${camName}</strong><br/><a href="${pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`;
       const popup = new Popup({ offset: 12 }).setHTML(popupHtml);
       new Marker({ element: el }).setLngLat([cam.lon, cam.lat]).setPopup(popup).addTo(map);
     }
@@ -706,12 +725,12 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
           if (!feature || feature.geometry.type !== "Point") return;
           const p = feature.properties as Record<string, string>;
           const html =
-            `<strong>${p.title}</strong><br/>` +
-            `<span style="font-size:11px;color:#666">${p.type === "avalanche" ? "Avalanche" : "Observation"} · ${p.date}${p.region ? ` · ${p.region}` : ""}</span><br/>` +
-            (p.locationName ? `${p.locationName}<br/>` : "") +
-            (p.aspect || p.elevationFt ? `${p.aspect ? `Aspect: ${p.aspect}` : ""}${p.aspect && p.elevationFt ? " · " : ""}${p.elevationFt ? `${p.elevationFt} ft` : ""}<br/>` : "") +
-            (p.details ? `<p style="margin:4px 0;font-size:12px;max-width:220px">${p.details}</p>` : "") +
-            `<a href="${p.detailsUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full report ↗</a>`;
+            `<strong>${escapeHtml(p.title)}</strong><br/>` +
+            `<span style="font-size:11px;color:#666">${p.type === "avalanche" ? "Avalanche" : "Observation"} · ${escapeHtml(p.date)}${p.region ? ` · ${escapeHtml(p.region)}` : ""}</span><br/>` +
+            (p.locationName ? `${escapeHtml(p.locationName)}<br/>` : "") +
+            (p.aspect || p.elevationFt ? `${p.aspect ? `Aspect: ${escapeHtml(p.aspect)}` : ""}${p.aspect && p.elevationFt ? " · " : ""}${p.elevationFt ? `${escapeHtml(p.elevationFt)} ft` : ""}<br/>` : "") +
+            (p.details ? `<p style="margin:4px 0;font-size:12px;max-width:220px">${escapeHtml(p.details)}</p>` : "") +
+            `<a href="${escapeHtml(safeHttpUrl(p.detailsUrl, "https://utahavalanchecenter.org/observations"))}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full report ↗</a>`;
           new Popup({ offset: 8 })
             .setLngLat(feature.geometry.coordinates as [number, number])
             .setHTML(html)
@@ -759,16 +778,16 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
           const elevation = p.elevationFt ? `${p.elevationFt} ft` : "";
           const html =
             p.kind === "key"
-              ? `<strong>${p.name}</strong><br/>` +
-                `<span style="font-size:11px;color:#666">${elevation}</span><br/>` +
+              ? `<strong>${escapeHtml(p.name)}</strong><br/>` +
+                `<span style="font-size:11px;color:#666">${escapeHtml(elevation)}</span><br/>` +
                 `${p.tempF ? `${Math.round(Number(p.tempF))}°F` : "No temp reading"}` +
                 `${p.windSpeedMph ? ` · ${Math.round(Number(p.windSpeedMph))} mph` : ""}<br/>` +
                 `<span style="font-size:11px;color:#666">NWS · ${p.observedAt ? new Date(p.observedAt).toLocaleString() : "no timestamp"}</span>`
-              : `<strong>${p.name}</strong><br/>` +
-                `<span style="font-size:11px;color:#666">${elevation}</span><br/>` +
-                `${p.snowDepthIn ? `${p.snowDepthIn}" snow depth` : "No depth reading"}` +
-                `${p.sweIn ? ` · ${p.sweIn}" SWE` : ""}<br/>` +
-                `<span style="font-size:11px;color:#666">SNOTEL · ${p.date}</span>`;
+              : `<strong>${escapeHtml(p.name)}</strong><br/>` +
+                `<span style="font-size:11px;color:#666">${escapeHtml(elevation)}</span><br/>` +
+                `${p.snowDepthIn ? `${escapeHtml(p.snowDepthIn)}" snow depth` : "No depth reading"}` +
+                `${p.sweIn ? ` · ${escapeHtml(p.sweIn)}" SWE` : ""}<br/>` +
+                `<span style="font-size:11px;color:#666">SNOTEL · ${escapeHtml(p.date)}</span>`;
           new Popup({ offset: 8 }).setLngLat(feature.geometry.coordinates as [number, number]).setHTML(html).addTo(map);
         });
         map.on("mouseenter", "weather-stations-circles", () => {

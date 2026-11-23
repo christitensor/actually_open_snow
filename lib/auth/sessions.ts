@@ -16,6 +16,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { getSql } from "@/lib/db/postgres";
+import { getAuthSecret } from "@/lib/auth/secret";
 import { verifySessionToken } from "@/lib/auth/session-token";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth/cookie";
 
@@ -24,8 +25,6 @@ const TTL_MS = SESSION_TTL_DAYS * 86_400_000;
 // Only write last_seen/expiry (and re-send the cookie) once a day, not on every request.
 const TOUCH_INTERVAL_MS = 86_400_000;
 
-const SECRET = process.env.SESSION_SECRET ?? randomBytes(32).toString("hex");
-
 export interface SessionUser {
   id: number;
   email: string;
@@ -33,7 +32,7 @@ export interface SessionUser {
 }
 
 function sign(id: string): string {
-  return createHmac("sha256", SECRET).update(`session.${id}`).digest("base64url");
+  return createHmac("sha256", getAuthSecret()).update(`session.${id}`).digest("base64url");
 }
 
 function tokenFor(id: string): string {

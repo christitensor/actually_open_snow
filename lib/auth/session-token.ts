@@ -13,17 +13,15 @@
 // logout just clears the cookie client-side, and a stolen token stays
 // valid until it expires. Acceptable for this app; worth knowing if that
 // ever changes.
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { getAuthSecret, MissingSecretError } from "./secret";
 
-// SESSION_SECRET should be set in the Vercel project's environment
-// variables so every instance (and every future deploy) verifies with the
-// same key. Without it, this falls back to a random per-process secret —
-// safe (never forgeable from outside), but it means tokens still won't
-// verify across instances until the real secret is configured.
-const SECRET = process.env.SESSION_SECRET ?? randomBytes(32).toString("hex");
-
+// SESSION_SECRET must be set in the Vercel project's environment variables
+// so every instance (and every future deploy) verifies with the same key.
+// In production there is no fallback: signing throws and verifying refuses
+// (see lib/auth/secret.ts).
 function sign(payload: string): string {
-  return createHmac("sha256", SECRET).update(payload).digest("base64url");
+  return createHmac("sha256", getAuthSecret()).update(payload).digest("base64url");
 }
 
 export function createSessionToken(userId: number, email: string, expiresAt: Date): string {
@@ -36,7 +34,16 @@ export function verifySessionToken(token: string): { userId: number; email: stri
   if (parts.length !== 4) return null;
   const [userIdStr, emailB64, expiresAtStr, signature] = parts;
 
-  const expected = sign(`${userIdStr}.${emailB64}.${expiresAtStr}`);
+  let expected: string;
+  try {
+    expected = sign(`${userIdStr}.${emailB64}.${expiresAtStr}`);
+  } catch (err) {
+    if (err instanceof MissingSecretError) {
+      console.error(err.message);
+      return null;
+    }
+    throw err;
+  }
   const given = Buffer.from(signature);
   const want = Buffer.from(expected);
   if (given.length !== want.length || !timingSafeEqual(given, want)) return null;

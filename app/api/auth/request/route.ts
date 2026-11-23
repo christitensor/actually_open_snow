@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createMagicLinkToken, magicLinkCode } from "@/lib/auth/magic-link";
+import { createMagicLinkToken, generateSignInCode } from "@/lib/auth/magic-link";
+import { parseEmail } from "@/lib/auth/email";
+import { storeSignInCode } from "@/lib/db/auth-codes";
+import { isPostgresConfigured } from "@/lib/db/postgres";
+import { hitRateLimit } from "@/lib/db/rate-limit";
 import { sendEmail } from "@/lib/email";
-import { badRequest, serverError } from "@/lib/util/api";
-import { hit } from "@/lib/auth/rate-limit";
+import { badRequest, safeNextPath } from "@/lib/util/api";
+import { clientIp } from "@/lib/util/client-ip";
 
-// Sends per email per 15 minutes, so the form can't be used to flood an inbox.
-const MAX_SENDS = 4;
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Per-email caps how many fresh codes (each worth MAX_CODE_ATTEMPTS guesses)
+// an attacker can mint for one victim, and how often a victim's inbox can be
+// spammed. Per-IP caps one client spraying many addresses.
+const REQUESTS_PER_EMAIL_PER_HOUR = 5;
+const REQUESTS_PER_IP_PER_HOUR = 20;
 
 // PERS-04: request a magic sign-in link. Always responds with the same
 // "check your email" message regardless of whether the send actually
@@ -24,17 +29,23 @@ export async function POST(req: NextRequest) {
   }
 
   const { email: rawEmail, next } = body as Record<string, unknown>;
-  if (typeof rawEmail !== "string" || !EMAIL_RE.test(rawEmail.trim())) return badRequest("A valid email is required");
-  const email = rawEmail.trim().toLowerCase();
-  const nextPath = typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const email = parseEmail(rawEmail);
+  if (!email) return badRequest("A valid email is required");
+  const nextPath = safeNextPath(next);
+
+  // Accounts, codes and throttles all live in Postgres; without it sign-in can't complete anyway.
+  if (!isPostgresConfigured) return NextResponse.json({ error: "Sign-in isn't available on this server." }, { status: 503 });
 
   try {
-    const send = await hit(`send:${email}`, MAX_SENDS);
-    if (!send.ok) {
-      return NextResponse.json({ error: "Several codes were already sent. Use the latest one, or try again in 15 minutes." }, { status: 429 });
+    const ipOk = await hitRateLimit(`request:ip:${clientIp(req)}`, REQUESTS_PER_IP_PER_HOUR, 3600);
+    const emailOk = ipOk && (await hitRateLimit(`request:email:${email}`, REQUESTS_PER_EMAIL_PER_HOUR, 3600));
+    if (!ipOk || !emailOk) {
+      return NextResponse.json({ error: "Too many sign-in requests — wait a bit and try again." }, { status: 429 });
     }
+
     const { token } = createMagicLinkToken(email);
-    const code = magicLinkCode(email, send.count); // a different code for each send
+    const code = generateSignInCode(); // random, so every emailed code differs
+    await storeSignInCode(email, code);
     const origin = req.nextUrl.origin;
     const verifyUrl = `${origin}/api/auth/verify?token=${token}&next=${encodeURIComponent(nextPath)}`;
 
@@ -46,6 +57,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: `We sent a 6-digit code to ${email}.` });
   } catch (err) {
-    return serverError(err);
+    console.error("Sign-in request failed:", err);
+    return NextResponse.json({ error: "Couldn't send a sign-in email right now — try again." }, { status: 502 });
   }
 }

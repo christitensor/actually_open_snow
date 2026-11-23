@@ -26,7 +26,7 @@ npx tsc --noEmit                  # type-check
 npx eslint .                      # lint
 ```
 
-## Environment variables (all optional)
+## Environment variables
 
 | Variable | Purpose |
 |---|---|
@@ -35,9 +35,11 @@ npx eslint .                      # lint
 | `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Sign-in code emails, via `lib/email.ts`. Without these, the code is logged to the server console instead of emailed (handy for local dev). Set both to actually deliver email via [Resend](https://resend.com). |
 | `AUTH_ORIGIN` | Optional. The public origin(s) passkeys are bound to, comma-separated (e.g. `https://snow.example.com`). Defaults to the request's host, which is right on Vercel; set it when running behind a proxy that rewrites the host. Passkeys only work on the origin they were created on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Powder wake-up push notifications (PERS-06). Generate once with `npx web-push generate-vapid-keys`; without them the wake-up card says it isn't set up. |
-| `CRON_SECRET` | If set, `/api/push/check` requires `Authorization: Bearer <secret>`. Unset by default for local dev; set it before deploying somewhere public, since nothing else protects that endpoint from being triggered repeatedly. |
+| `DATABASE_URL` (or `POSTGRES_URL`) | Postgres (Neon) for accounts, favorites, sign-in codes and push subscriptions. Tables are created/updated automatically on first use (`lib/db/postgres.ts`). Required for sign-in. |
+| `SESSION_SECRET` | **Required in production.** HMAC key for session cookies, sign-in links and stored sign-in code hashes (e.g. `openssl rand -hex 32`). In production, sign-in refuses to work without it; local dev falls back to a random per-process key. |
+| `CRON_SECRET` | **Required in production** for `/api/push/check` and the operator-only `/api/diag/*` routes, which all require `Authorization: Bearer <secret>`. With it unset, production rejects every call to them; local dev lets them through. |
 
-`/api/push/check` runs daily via Vercel Cron (`vercel.json`, 11:00 UTC) once deployed there. Set `CRON_SECRET` to lock the endpoint down — Vercel automatically sends it as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change.
+`/api/push/check` runs daily via Vercel Cron (`vercel.json`, 11:00 UTC) once deployed there. Vercel automatically sends `CRON_SECRET` as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change once the variable is set.
 
 ## Accounts and sign-in
 

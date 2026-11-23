@@ -6,6 +6,7 @@
 // themselves are stateless (lib/auth/magic-link.ts) — see that file for why.
 import { getSql } from "./postgres";
 import { favoriteKey } from "@/lib/util/favorite-key";
+import { normalizeEmail } from "@/lib/auth/email";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
 
 export interface User {
@@ -25,11 +26,16 @@ interface UserRow {
 // unlike the ephemeral per-instance SQLite this used before.
 
 /** Finds the account for an email, creating it on first sign-in. `created` is true for a brand-new account. */
-export async function getOrCreateUser(email: string): Promise<User & { created: boolean }> {
+export async function getOrCreateUser(rawEmail: string): Promise<User & { created: boolean }> {
+  const email = normalizeEmail(rawEmail);
   const sql = await getSql();
-  email = email.trim().toLowerCase();
-  // Case-insensitive: older rows may have been stored with the casing someone typed.
-  const existing = (await sql`SELECT id, email FROM users WHERE lower(email) = ${email} ORDER BY id LIMIT 1`) as UserRow[];
+  // Case-insensitive: accounts created before emails were normalized may be
+  // stored mixed-case. If case-variant duplicates exist, prefer an exact
+  // (already-lowercase) match, then the oldest account.
+  const existing = (await sql`
+    SELECT id, email FROM users WHERE lower(email) = ${email}
+    ORDER BY (email = ${email}) DESC, id ASC LIMIT 1
+  `) as UserRow[];
   if (existing[0]) return { ...existing[0], created: false };
 
   const inserted = (await sql`
