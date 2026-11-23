@@ -8,9 +8,9 @@ import {
   type DataDrivenPropertyValueSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
-  type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "@/components/map/maplibre-worker";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,11 @@ import type { AvalancheObservation, Webcam } from "@/lib/models/types";
 import type { KeyStationPoint, SnotelStationPoint } from "@/app/api/weather-stations/route";
 import { getIsDarkServerSnapshot, getIsDarkSnapshot, subscribeToTheme } from "@/lib/theme";
 import { safeHttpUrl } from "@/lib/util/url";
+import { ALL_BASE_LAYER_IDS, BASE_STYLE, type BaseLayerId, visibleBaseLayerIds } from "@/lib/map/base-style";
+import { usePreferences } from "@/lib/preferences/context";
+import { PISTE_MAX_TILES_PER_VIEW, PISTE_MIN_VIEW_ZOOM, PISTE_TILE_ZOOM, tilesForBbox } from "@/lib/util/tiles";
 import MapSearch, { type SearchPick } from "@/components/map/MapSearch";
+import { NOHRSC_BOUNDS, SNOW_DEPTH_LEGEND } from "@/lib/data-sources/nohrsc";
 
 interface MapPin {
   id: string;
@@ -50,81 +54,38 @@ function powderColor(inches: number | undefined): string {
   return "#9ca3af";
 }
 
-// No MapTiler/vector-tile API key configured anywhere in this build, so
-// the base map is plain raster tiles — free, no key, always works. Three
-// swappable base layers, all free/open, no key: street, OpenTopoMap
-// (topo, built from OSM + SRTM elevation), and Esri World Imagery
-// (satellite, Esri's public tile service). All three are added as
-// sources/layers up front with only one visible at a time (same pattern
-// as the radar/snow-forecast toggles below) rather than swapping the
-// whole style — that would blow away the pistes/radar/snow-grid layers
-// added at runtime.
-//
-// "Street" is CARTO's free Voyager/Dark Matter basemaps, not raw OSM
-// tiles: both are CORS-open with no key required (confirmed live), and
-// requesting the "@2x" filename at the same tileSize:256 pulls a
-// double-resolution image into the same on-screen tile slot — sharper on
-// any HiDPI display, the same trick as an <img srcset> 2x variant. Dark
-// mode swaps to CARTO's actual dark cartography (osm-dark) instead of the
-// previous CSS invert-filter hack, which also inverted markers/popups and
-// produced a flatter, muddier result than a real dark basemap.
-type BaseLayerId = "osm" | "topo" | "satellite";
+// Base maps (street / topo / satellite) and why each was chosen: see
+// lib/map/base-style.ts.
 const BASE_LAYER_IDS: BaseLayerId[] = ["osm", "topo", "satellite"];
 const BASE_LAYER_LABELS: Record<BaseLayerId, string> = { osm: "Street", topo: "Topo", satellite: "Satellite" };
 
-const BASE_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    },
-    "osm-dark": {
-      type: "raster",
-      tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    },
-    topo: {
-      type: "raster",
-      tiles: [
-        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      maxzoom: 17,
-      attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)",
-    },
-    satellite: {
-      type: "raster",
-      // Esri's public World Imagery tile service — free, no key, {z}/{y}/{x} order (not the usual {z}/{x}/{y}).
-      tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-    },
-  },
-  layers: [
-    { id: "osm", type: "raster", source: "osm" },
-    { id: "osm-dark", type: "raster", source: "osm-dark", layout: { visibility: "none" } },
-    { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
-    { id: "satellite", type: "raster", source: "satellite", layout: { visibility: "none" } },
-  ],
-};
-
+// North American trail-sign colors. Black runs (and lifts) draw white on
+// the dark street map, where black would vanish.
 const DIFFICULTY_COLORS: Record<string, string> = {
   novice: "#22c55e",
   easy: "#22c55e",
   intermediate: "#3b82f6",
   advanced: "#111827",
   expert: "#111827",
+  extreme: "#111827",
   freeride: "#f97316",
 };
+const BLACK_ON_DARK = "#f8fafc";
+
+function runColorExpression(dark: boolean) {
+  const entries = Object.entries(DIFFICULTY_COLORS).flatMap(([k, c]) => [k, dark && c === "#111827" ? BLACK_ON_DARK : c]);
+  return ["match", ["get", "difficulty"], ...entries, "#6b7280"] as unknown as DataDrivenPropertyValueSpecification<string>;
+}
+
+/** One z10 tile of runs + lifts, from public/ski/ (scripts/build-ski-data.mjs) or the live /api/pistes fallback. */
+interface SkiTile {
+  runs: { id: string | number; difficulty: string | null; lines: [number, number][][] }[];
+  lifts: { id: string | number; name: string | null; lines: [number, number][][] }[];
+}
+interface SkiIndex {
+  tiles: string[];
+  attribution: string;
+}
 
 interface PisteWay {
   id: number;
@@ -163,6 +124,8 @@ interface SkiMapProps {
 export interface SkiMapHandle {
   toggleSnowOverlay: () => void;
   toggleAvalancheObservations: () => void;
+  /** Frames these points (e.g. the resorts of the state picked on the home page). */
+  fitToPoints: (points: { lat: number; lon: number }[], opts?: { animate?: boolean }) => void;
 }
 
 // UAC reports aspect as a full compass word ("North", "Southwest") — the
@@ -197,6 +160,15 @@ function parseUacDate(raw: string): Date | null {
 // radar. Their nowcast/forecast frames aren't used here, only the latest
 // observed frame; see TRACE_MATRIX.md MAP-02 for why forecast radar is
 // out of scope for now.
+// fitToPoints padding: clears the search box + base-style pills (top) and
+// the layers/attribution row (bottom) that sit over the map — capped as a
+// share of the map's size, or a short phone map would zoom out to nothing.
+function fitPadding(el: HTMLElement) {
+  const h = el.clientHeight;
+  const w = el.clientWidth;
+  return { top: Math.min(120, h * 0.28), bottom: Math.min(70, h * 0.18), left: Math.min(40, w * 0.08), right: Math.min(64, w * 0.12) };
+}
+
 const RAINVIEWER_MAPS_URL = "https://api.rainviewer.com/public/weather-maps.json";
 
 const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
@@ -222,11 +194,16 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const pendingFitRef = useRef<[[number, number], [number, number]] | null>(null);
   const router = useRouter();
   const [radarOn, setRadarOn] = useState(false);
   const [radarReady, setRadarReady] = useState(false);
   const [radarTime, setRadarTime] = useState<string | null>(null);
   const [snowOverlayOn, setSnowOverlayOn] = useState(false);
+  // NOAA NOHRSC modeled snowpack (1 km grid). While on, a map tap shows
+  // depth/SWE/elevation for that spot instead of dropping a forecast pin.
+  const [snowpackOn, setSnowpackOn] = useState(false);
+  const snowpackOnRef = useRef(false);
   const snowOverlayOnRef = useRef(false);
   const loadSnowGridRef = useRef<(() => void) | null>(null);
   // BC-03: "Avalanche observations" mode — recent UAC field reports as map
@@ -244,7 +221,17 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // mount. A coarse "last N days" filter doesn't need to stay live-accurate
   // to the millisecond for however long this map instance stays mounted.
   const [obsFilterNowMs] = useState(() => Date.now());
-  const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
+  // Map style follows the account's view settings (PERS-08): start on the saved one, save when changed.
+  const { prefs, ready: prefsReady, update: updatePrefs } = usePreferences();
+  const [baseLayer, setBaseLayerState] = useState<BaseLayerId>(prefsReady ? prefs.mapStyle : "osm");
+  const setBaseLayer = (id: BaseLayerId) => {
+    setBaseLayerState(id);
+    updatePrefs({ mapStyle: id });
+  };
+  useEffect(() => {
+    if (prefsReady) setBaseLayerState(prefs.mapStyle);
+  }, [prefsReady, prefs.mapStyle]);
+
   // Full-screen mode: a CSS fixed-position overlay rather than the native
   // Fullscreen API, since Element.requestFullscreen() is unreliable in an
   // iOS home-screen PWA (this app's primary use case, per the sign-in
@@ -279,6 +266,8 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // switcher indefinitely. The map's one-time "load" event is what
   // actually marks the style ready for setLayoutProperty calls.
   const styleReadyRef = useRef(false);
+  // Whether the visible base map is dark (dark street map or satellite), so run/lift colors stay visible.
+  const darkBackdropRef = useRef(false);
   const applyObservationsRef = useRef<((geojson: GeoJSON.FeatureCollection) => void) | null>(null);
   // Resort markers are created once at mount (see the empty deps array
   // below); keeping the element refs around lets a separate effect update
@@ -290,6 +279,25 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     () => ({
       toggleSnowOverlay: () => setSnowOverlayOn((v) => !v),
       toggleAvalancheObservations: () => setObsOn((v) => !v),
+      fitToPoints: (points, { animate = true } = {}) => {
+        if (points.length === 0) return;
+        const lons = points.map((p) => p.lon);
+        const lats = points.map((p) => p.lat);
+        const bounds: [[number, number], [number, number]] = [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        ];
+        const map = mapRef.current;
+        // A hidden map (the mobile List view) has a 0×0 box, and fitting
+        // against that picks a nonsense zoom — hold it until the
+        // ResizeObserver sees a real size.
+        if (!map || !containerRef.current?.clientWidth) {
+          pendingFitRef.current = bounds;
+          return;
+        }
+        pendingFitRef.current = null;
+        map.fitBounds(bounds, { padding: fitPadding(containerRef.current), maxZoom: 10, animate });
+      },
     }),
     []
   );
@@ -396,48 +404,61 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     // in theory, but nowhere the user could see or reach. A
     // ResizeObserver keeps the map's internal size in sync with
     // whatever its container actually ends up being, not just at mount.
-    const resizeObserver = new ResizeObserver(() => map.resize());
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+      const pending = pendingFitRef.current;
+      if (pending && containerRef.current?.clientWidth) {
+        pendingFitRef.current = null;
+        map.fitBounds(pending, { padding: fitPadding(containerRef.current), maxZoom: 10, animate: false });
+      }
+    });
     resizeObserver.observe(containerRef.current);
 
     // MAP-17: click anywhere that isn't a marker drops a backcountry pin.
     if (allowPinDrop) {
       map.on("click", (e: MapMouseEvent) => {
-        const { lat, lng } = e.lngLat;
+        if (snowpackOnRef.current) return; // the snowpack inspector below owns taps
+        // wrap(): after panning across the antimeridian lng can be outside ±180, which the API rejects.
+      const { lat, lng } = e.lngLat.wrap();
         router.push(`/location/pin?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`);
       });
     }
 
-    // Resort pins — colored by today's forecast snowfall when known (MAP-10 Powder Finder).
-    for (const resort of resorts) {
-      // MapLibre's Marker sets `transform` on the element it's given, to
-      // position it on the map — scaling that same element for a hover/
-      // selected highlight would fight that positioning transform every
-      // time the map moves. An inner wrapper div carries the visual
-      // styling instead; the outer `el` stays untouched by anything but
-      // MapLibre itself.
-      const el = document.createElement("div");
-      const inner = document.createElement("div");
-      const color = powderColor(resort.snowfallTodayIn);
-      // z-index above webcam pins: a few resorts (Alta, Brighton, Park City,
-      // Powder Mountain) have a webcam sitting at effectively the same
-      // coordinates, and without this the webcam pin — added after, so
-      // painted on top by default — silently ate the click (its own handler
-      // only stops propagation, no navigation), live-verified as the actual
-      // cause of "clicking the map does nothing" for those resorts.
-      inner.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s,box-shadow .15s;`;
-      inner.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
-      el.style.zIndex = "2";
-      el.appendChild(inner);
-      inner.addEventListener("click", (ev) => {
-        ev.stopPropagation(); // don't also trigger the map's pin-drop handler
-        if (onResortSelect) onResortSelect(resort.id);
-        else router.push(`/location/${resort.id}`);
+    // Snowpack layer: NOAA NOHRSC snow depth, via the CDN-cached tile proxy.
+    // Added hidden at load (like radar); hidden raster sources fetch nothing.
+    map.on("load", () => {
+      map.addSource("snowpack", {
+        type: "raster",
+        tiles: [`${window.location.origin}/api/snowpack/tile/{z}/{x}/{y}`],
+        tileSize: 256,
+        bounds: NOHRSC_BOUNDS,
+        // The grid is 1 km; past z10 MapLibre just upscales the z10 tiles.
+        maxzoom: 10,
+        attribution: '<a href="https://www.nohrsc.noaa.gov/nsa/" target="_blank" rel="noopener noreferrer">NOAA NOHRSC</a>',
       });
-      inner.addEventListener("mouseenter", () => onResortHover?.(resort.id));
-      inner.addEventListener("mouseleave", () => onResortHover?.(null));
-      resortMarkerElsRef.current.set(resort.id, { wrapper: el, inner });
-      new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
-    }
+      map.addLayer({
+        id: "snowpack-layer",
+        type: "raster",
+        source: "snowpack",
+        paint: { "raster-opacity": 0.65, "raster-resampling": "nearest" },
+        layout: { visibility: snowpackOnRef.current ? "visible" : "none" },
+      });
+    });
+    let snowpackPopup: Popup | null = null;
+    map.on("click", (e: MapMouseEvent) => {
+      if (!snowpackOnRef.current) return;
+      // Taps on station/observation dots keep their own popups.
+      const pointLayers = ["weather-stations-circles", "avalanche-observations-circles"].filter((id) => map.getLayer(id));
+      if (pointLayers.length && map.queryRenderedFeatures(e.point, { layers: pointLayers }).length) return;
+      // wrap(): after panning across the antimeridian lng can be outside ±180, which the API rejects.
+      const { lat, lng } = e.lngLat.wrap();
+      snowpackPopup?.remove();
+      const content = snowpackPopupContent(lat, lng, (href) => router.push(href));
+      snowpackPopup = new Popup({ offset: 8, maxWidth: "260px" }).setLngLat(e.lngLat).setDOMContent(content).addTo(map);
+    });
+
+    // Resort pins are created by the sync effect below, so they follow changes to `resorts`.
+
 
     // "You are here" — distinct from the clickable resort pins above, and
     // deliberately not wired to navigate anywhere (you're already on this
@@ -470,64 +491,119 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
       const cacheBustedImageUrl = cam.imageUrl
         ? `${cam.imageUrl}${cam.imageUrl.includes("?") ? "&" : "?"}${cacheBustParam}=${Date.now()}`
         : undefined;
-      const popupHtml = cacheBustedImageUrl
-        ? `<strong>${cam.name}</strong><br/><img src="${cacheBustedImageUrl}" alt="${cam.name}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
-        : `<strong>${cam.name}</strong><br/><a href="${cam.pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`;
+      // Escaped like the other popups: webcam names/URLs are curated data, but setHTML parses whatever it's given.
+      const camName = escapeHtml(cam.name);
+      const pageUrl = escapeHtml(safeHttpUrl(cam.pageUrl, "#"));
+      const imageUrl = cacheBustedImageUrl ? safeHttpUrl(cacheBustedImageUrl, "") : "";
+      const popupHtml = imageUrl
+        ? `<strong>${camName}</strong><br/><img src="${escapeHtml(imageUrl)}" alt="${camName}" style="width:220px;height:auto;border-radius:4px;margin-top:4px" /><br/><a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px">Full page ↗</a>`
+        : `<strong>${camName}</strong><br/><a href="${pageUrl}" target="_blank" rel="noopener noreferrer">View webcam ↗</a>`;
       const popup = new Popup({ offset: 12 }).setHTML(popupHtml);
       new Marker({ element: el }).setLngLat([cam.lon, cam.lat]).setPopup(popup).addTo(map);
     }
 
-    // MAP-13: piste overlay, refetched (debounced) as the user pans/zooms.
+    // MAP-13: ski runs + lifts. Fetched per fixed z10 tile once zoomed in
+    // far enough to see them, and kept for the page's lifetime. Tiles
+    // around the curated resorts are static files built from OpenSkiData
+    // (scripts/build-ski-data.mjs): instant, and independent of anyone
+    // else's server. Anywhere else falls back to the live, CDN-cached
+    // Overpass route (runs only).
     if (showPistes) {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+      const loaded = new Map<string, SkiTile>();
+      const inFlight = new Set<string>();
+      let indexPromise: Promise<SkiIndex | null> | null = null;
+      const getIndex = () =>
+        (indexPromise ??= fetch("/ski/index.json")
+          .then((r) => (r.ok ? (r.json() as Promise<SkiIndex>) : null))
+          .catch(() => null));
+
+      const fetchTile = async (key: string, index: SkiIndex | null): Promise<SkiTile | null> => {
+        if (index?.tiles.includes(key)) {
+          const res = await fetch(`/ski/${key}.json`);
+          return res.ok ? ((await res.json()) as SkiTile) : null;
+        }
+        const res = await fetch(`/api/pistes?tile=${key}`);
+        if (!res.ok) return null; // not stored, so the next move retries it
+        const { pistes } = (await res.json()) as { pistes: PisteWay[] };
+        return { runs: pistes.map((p) => ({ id: p.id, difficulty: p.difficulty, lines: [p.coordinates] })), lifts: [] };
+      };
+
+      const render = (attribution: string | undefined) => {
+        // A run crossing a tile edge comes back in both tiles; keep one copy per id.
+        const runs = new Map<string | number, GeoJSON.Feature>();
+        const lifts = new Map<string | number, GeoJSON.Feature>();
+        for (const t of loaded.values()) {
+          for (const r of t.runs)
+            runs.set(r.id, { type: "Feature", properties: { difficulty: r.difficulty ?? "intermediate" }, geometry: { type: "MultiLineString", coordinates: r.lines } });
+          for (const l of t.lifts)
+            lifts.set(l.id, { type: "Feature", properties: { name: l.name ?? "" }, geometry: { type: "MultiLineString", coordinates: l.lines } });
+        }
+        const runsData: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [...runs.values()] };
+        const liftsData: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [...lifts.values()] };
+        const runSource = map.getSource("pistes") as GeoJSONSource | undefined;
+        if (runSource) {
+          runSource.setData(runsData);
+          (map.getSource("lifts") as GeoJSONSource | undefined)?.setData(liftsData);
+          return;
+        }
+        if (!styleReadyRef.current) return;
+        const dark = darkBackdropRef.current;
+        map.addSource("pistes", { type: "geojson", data: runsData, attribution });
+        map.addSource("lifts", { type: "geojson", data: liftsData });
+        map.addLayer({
+          id: "pistes-line",
+          type: "line",
+          source: "pistes",
+          minzoom: PISTE_MIN_VIEW_ZOOM - 0.5,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": runColorExpression(dark),
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3] as unknown as DataDrivenPropertyValueSpecification<number>,
+          },
+        });
+        map.addLayer({
+          id: "lifts-line",
+          type: "line",
+          source: "lifts",
+          minzoom: PISTE_MIN_VIEW_ZOOM - 0.5,
+          paint: {
+            "line-color": dark ? BLACK_ON_DARK : "#111827",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1, 14, 2] as unknown as DataDrivenPropertyValueSpecification<number>,
+            "line-dasharray": [3, 1.5],
+          },
+        });
+      };
 
       const loadPistes = async () => {
-        const bounds = map.getBounds();
-        const bbox = [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()].join(",");
-        try {
-          const res = await fetch(`/api/pistes?bbox=${bbox}`);
-          if (!res.ok) return;
-          const { pistes } = (await res.json()) as { pistes: PisteWay[] };
-
-          const geojson: GeoJSON.FeatureCollection = {
-            type: "FeatureCollection",
-            features: pistes.map((p) => ({
-              type: "Feature",
-              properties: { difficulty: p.difficulty ?? "intermediate" },
-              geometry: { type: "LineString", coordinates: p.coordinates },
-            })),
-          };
-
-          const source = map.getSource("pistes") as GeoJSONSource | undefined;
-          if (source) {
-            source.setData(geojson);
-          } else if (styleReadyRef.current) {
-            map.addSource("pistes", { type: "geojson", data: geojson });
-            map.addLayer({
-              id: "pistes-line",
-              type: "line",
-              source: "pistes",
-              paint: {
-                "line-color": [
-                  "match",
-                  ["get", "difficulty"],
-                  ...Object.entries(DIFFICULTY_COLORS).flat(),
-                  "#6b7280",
-                ] as unknown as DataDrivenPropertyValueSpecification<string>,
-                "line-width": 2,
-              },
-            });
-          }
-        } catch {
-          // Overpass can be slow/rate-limited — a missing piste overlay
-          // shouldn't break the rest of the map.
-        }
+        if (map.getZoom() < PISTE_MIN_VIEW_ZOOM) return;
+        const b = map.getBounds();
+        const keys = tilesForBbox([b.getSouth(), b.getWest(), b.getNorth(), b.getEast()], PISTE_TILE_ZOOM)
+          .map((t) => `${t.z}/${t.x}/${t.y}`)
+          .filter((k) => !loaded.has(k) && !inFlight.has(k))
+          .slice(0, PISTE_MAX_TILES_PER_VIEW);
+        if (keys.length === 0) return;
+        const index = await getIndex();
+        await Promise.all(
+          keys.map(async (key) => {
+            inFlight.add(key);
+            try {
+              const tile = await fetchTile(key, index);
+              if (tile) loaded.set(key, tile);
+            } catch {
+              // A missing overlay shouldn't break the rest of the map.
+            } finally {
+              inFlight.delete(key);
+            }
+          })
+        );
+        render(index?.attribution);
       };
 
       map.on("load", loadPistes);
       map.on("moveend", () => {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(loadPistes, 500);
+        debounceTimer = setTimeout(loadPistes, 400);
       });
     }
 
@@ -733,6 +809,50 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map is initialized once; props are read at mount time
   }, []);
 
+  // Resort pins — colored by today's forecast snowfall when known (MAP-10
+  // Powder Finder). Kept in sync with `resorts`, which "My resorts"
+  // (PERS-08) can change after the map exists: missing pins are created,
+  // and pins for resorts no longer in the list are hidden (not removed, so
+  // re-adding a resort is instant).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const resort of resorts) {
+      if (resortMarkerElsRef.current.has(resort.id)) continue;
+      // MapLibre's Marker sets `transform` on the element it's given, to
+      // position it on the map — scaling that same element for a hover/
+      // selected highlight would fight that positioning transform every
+      // time the map moves. An inner wrapper div carries the visual
+      // styling instead; the outer `el` stays untouched by anything but
+      // MapLibre itself.
+      const el = document.createElement("div");
+      const inner = document.createElement("div");
+      const color = powderColor(resort.snowfallTodayIn);
+      // z-index above webcam pins: a few resorts (Alta, Brighton, Park City,
+      // Powder Mountain) have a webcam sitting at effectively the same
+      // coordinates, and without this the webcam pin — added after, so
+      // painted on top by default — silently ate the click (its own handler
+      // only stops propagation, no navigation), live-verified as the actual
+      // cause of "clicking the map does nothing" for those resorts.
+      inner.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .15s,box-shadow .15s;`;
+      inner.title = resort.snowfallTodayIn != null ? `${resort.name} — ${resort.snowfallTodayIn.toFixed(1)}" today` : resort.name;
+      el.style.zIndex = "2";
+      el.appendChild(inner);
+      inner.addEventListener("click", (ev) => {
+        ev.stopPropagation(); // don't also trigger the map's pin-drop handler
+        if (onResortSelect) onResortSelect(resort.id);
+        else router.push(`/location/${resort.id}`);
+      });
+      inner.addEventListener("mouseenter", () => onResortHover?.(resort.id));
+      inner.addEventListener("mouseleave", () => onResortHover?.(null));
+      resortMarkerElsRef.current.set(resort.id, { wrapper: el, inner });
+      new Marker({ element: el }).setLngLat([resort.lon, resort.lat]).addTo(map);
+    }
+    const ids = new Set(resorts.map((r) => r.id));
+    for (const [id, { wrapper }] of resortMarkerElsRef.current) wrapper.style.display = ids.has(id) ? "" : "none";
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- click/hover handlers are stable callbacks from the parent
+  }, [resorts]);
+
   // Highlight the hovered/selected resort pin — separate from the mount
   // effect above so it can react to prop changes without recreating every
   // marker (those only exist once, created at mount).
@@ -761,20 +881,32 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   }, [snowOverlayOn, onSnowOverlayChange]);
 
   useEffect(() => {
+    snowpackOnRef.current = snowpackOn;
+    const map = mapRef.current;
+    if (!map || !map.getLayer("snowpack-layer")) return;
+    map.setLayoutProperty("snowpack-layer", "visibility", snowpackOn ? "visible" : "none");
+  }, [snowpackOn]);
+
+  useEffect(() => {
     onAvalancheObservationsChange?.(obsOn);
   }, [obsOn, onAvalancheObservationsChange]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    // "osm" has a real dark counterpart (osm-dark); topo/satellite don't
+    // The street map has a real dark style; topo/satellite don't
     // (inverting relief shading or a satellite photo produces a
-    // false-color mess), so only the street layer swaps by theme.
-    const visibleId = baseLayer === "osm" && isDark ? "osm-dark" : baseLayer;
+    // false-color mess), so only the street map swaps by theme.
+    const visible = visibleBaseLayerIds(baseLayer, isDark);
+    // Black runs/lifts would vanish on the dark street map; satellite is dark too.
+    const darkBackdrop = (baseLayer === "osm" && isDark) || baseLayer === "satellite";
+    darkBackdropRef.current = darkBackdrop;
     const apply = () => {
-      for (const id of ["osm", "osm-dark", "topo", "satellite"]) {
-        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", id === visibleId ? "visible" : "none");
+      for (const id of ALL_BASE_LAYER_IDS) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible.has(id) ? "visible" : "none");
       }
+      if (map.getLayer("pistes-line")) map.setPaintProperty("pistes-line", "line-color", runColorExpression(darkBackdrop));
+      if (map.getLayer("lifts-line")) map.setPaintProperty("lifts-line", "line-color", darkBackdrop ? BLACK_ON_DARK : "#111827");
     };
     // On mount this can fire before the initial style has finished loading
     // (setLayoutProperty throws on an unloaded style); everything after
@@ -936,7 +1068,7 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
   // body, escaping that ancestor's stacking context entirely — MapLibre's
   // container node is relocated, not recreated, so the map instance
   // itself is undisturbed.
-  const activeLayerCount = [radarOn, snowOverlayOn, obsOn, stationsOn].filter(Boolean).length;
+  const activeLayerCount = [radarOn, snowOverlayOn, snowpackOn, obsOn, stationsOn].filter(Boolean).length;
 
   const mapContent = (
     <div className={isFullscreen ? "fixed inset-0 z-50 h-dvh w-dvw bg-background" : "relative h-full w-full"}>
@@ -1039,8 +1171,27 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
                   `${filteredObservations.length} UAC observation${filteredObservations.length === 1 ? "" : "s"} loaded statewide — pan or zoom out if none are visible near this spot.`}
           </div>
         )}
+        {snowpackOn && (
+          <div className="max-w-[280px] rounded-2xl border border-border bg-card/90 px-3 py-2 text-xs shadow-sm backdrop-blur-sm">
+            <div className="mb-1 font-semibold text-foreground">Snow depth (modeled) · tap the map for a spot</div>
+            <div className="flex flex-wrap gap-x-2 gap-y-1 text-muted-foreground">
+              {SNOW_DEPTH_LEGEND.map((c) => (
+                <span key={c.label} className="flex items-center gap-1">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: c.color }} />
+                  {c.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {layersOpen && (
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSnowpackOn((v) => !v)}
+              className="rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur-sm transition hover:border-primary hover:text-primary"
+            >
+              {snowpackOn ? "Hide" : "Show"} snowpack depth · NOAA
+            </button>
             {showRadarToggle && radarReady && (
               <button
                 onClick={() => setRadarOn((v) => !v)}
@@ -1086,5 +1237,70 @@ const SkiMap = forwardRef<SkiMapHandle, SkiMapProps>(function SkiMap(
 
   return isFullscreen && typeof document !== "undefined" ? createPortal(mapContent, document.body) : mapContent;
 });
+
+interface SnowpackPoint {
+  depthIn: number | null;
+  sweIn: number | null;
+  validTime: string | null;
+  elevationFt: number | null;
+  nearestSnotel: { stationName: string; distanceMi: number; elevationFt: number; depthIn: number } | null;
+}
+
+/**
+ * Popup body for a snowpack-layer tap: shows "Loading…" right away, then
+ * fills in NOAA's modeled depth/SWE, the spot's elevation, and the nearest
+ * SNOTEL's measured depth for comparison. Built with DOM nodes (station
+ * names are third-party text).
+ */
+function snowpackPopupContent(lat: number, lon: number, navigate: (href: string) => void): HTMLElement {
+  const root = document.createElement("div");
+  root.style.cssText = "font-size:12px;line-height:1.45;min-width:180px";
+  const line = (text: string, style = "") => {
+    const el = document.createElement("div");
+    el.textContent = text;
+    if (style) el.style.cssText = style;
+    root.append(el);
+    return el;
+  };
+  const loading = line("Loading snowpack…", "color:#6b7280");
+
+  fetch(`/api/snowpack/point?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`)
+    .then((r) => (r.ok ? (r.json() as Promise<SnowpackPoint>) : Promise.reject()))
+    .then((p) => {
+      loading.remove();
+      const elev = p.elevationFt != null ? ` at ${p.elevationFt.toLocaleString()} ft` : "";
+      if (p.depthIn == null) {
+        line(`No NOAA snowpack data here${elev} (lower 48 only).`);
+      } else {
+        line(`${p.depthIn}" snow depth${elev}`, "font-weight:700;font-size:14px");
+        line(`${p.sweIn ?? 0}" water equivalent (SWE)`);
+        const asOf = p.validTime
+          ? new Date(p.validTime).toLocaleString([], { month: "short", day: "numeric", hour: "numeric" })
+          : null;
+        line(`NOAA model, 1 km average${asOf ? ` · ${asOf}` : ""}`, "color:#6b7280;font-size:11px");
+      }
+      if (p.nearestSnotel) {
+        const s = p.nearestSnotel;
+        line(
+          `Measured: ${s.depthIn}" at ${s.stationName} SNOTEL (${s.distanceMi.toFixed(1)} mi, ${s.elevationFt.toLocaleString()} ft)`,
+          "margin-top:4px"
+        );
+      }
+      const link = document.createElement("a");
+      const href = `/location/pin?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`;
+      link.href = href;
+      link.textContent = "Forecast for this spot →";
+      link.style.cssText = "display:block;margin-top:6px;font-weight:600;color:var(--color-primary, #2563eb)";
+      link.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        navigate(href);
+      });
+      root.append(link);
+    })
+    .catch(() => {
+      loading.textContent = "Couldn't load snowpack for this spot.";
+    });
+  return root;
+}
 
 export default SkiMap;

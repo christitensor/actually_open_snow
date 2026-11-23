@@ -1,7 +1,10 @@
 import type { LocationDashboardData } from "@/lib/location-dashboard";
+import { formatSnotelAsOf } from "@/lib/data-sources/snotel";
 import FavoriteButton from "@/components/location/FavoriteButton";
+import LocationTitle, { LocationNamedText } from "@/components/location/LocationTitle";
 import WakeAlarmForm from "@/components/location/WakeAlarmForm";
 import ForecastTable from "@/components/location/ForecastTable";
+import { ElevationProvider, TodaySnowTile } from "@/components/location/ElevationContext";
 import HourlyForecast from "@/components/location/HourlyForecast";
 import ForecastDiscussion from "@/components/location/ForecastDiscussion";
 import AvalancheCard from "@/components/location/AvalancheCard";
@@ -65,16 +68,19 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{location.name}</h1>
+          <LocationTitle location={location} />
           <p className="text-sm text-muted-foreground">
             {location.lat.toFixed(4)}, {location.lon.toFixed(4)}
             {elevationFt != null ? ` · ${elevationFt.toLocaleString()} ft` : ""}
             {location.source === "pin" ? " · Backcountry pin" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Wraps on phones: the favorite button gets its own line instead of squeezing into three. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <SectionControls />
-          <FavoriteButton location={location} />
+          <div className="whitespace-nowrap">
+            <FavoriteButton location={location} />
+          </div>
         </div>
       </header>
 
@@ -94,9 +100,17 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           scrolling through a long page, instead of only reachable at the
           very bottom of a stretched single column. */}
       <div className="md:flex md:items-start md:gap-6">
-        <div className="space-y-5 md:min-w-0 md:flex-1">
-          <Section id="conditions-summary" title="Conditions summary" summary={conditionsSummary.narrative}>
-            <p className="text-sm leading-relaxed text-foreground/90">{conditionsSummary.narrative}</p>
+        <ElevationProvider location={location} elevationFt={elevationFt} elevationModel={data.elevationModel}>
+        {/* flex column (not space-y) so each Section can position itself with CSS order from the person's saved layout. */}
+        <div className="flex flex-col gap-5 md:min-w-0 md:flex-1">
+          <Section
+            id="conditions-summary"
+            title="Conditions summary"
+            summary={<LocationNamedText location={location} text={conditionsSummary.narrative} />}
+          >
+            <p className="text-sm leading-relaxed text-foreground/90">
+              <LocationNamedText location={location} text={conditionsSummary.narrative} />
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className={`pill ${conditionsSummary.corroboration.modelsAgree ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"}`}>
                 {conditionsSummary.corroboration.modelsAgree ? "Models agree" : "Models disagree"}
@@ -124,7 +138,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="Snow level" value={currentSnowLevelFt != null ? `${currentSnowLevelFt.toLocaleString()} ft` : "—"} sub={snowLevel.nwsAvailable ? "NWS" : "Open-Meteo est."} />
             <StatTile label="Elevation vs. snow line" value={snowLineStatus === "unknown" ? "—" : snowLineStatus === "above" ? "Above" : "Below"} />
-            <StatTile label="Today's new snow" value={`${forecast.daily[0]?.snowfallSumIn.toFixed(1) ?? "0.0"}"`} />
+            <TodaySnowTile date={forecast.daily[0]?.date} rawIn={forecast.daily[0]?.snowfallSumIn ?? 0} />
             <StatTile label="Powder quality" value={powderQualityToday?.quality ?? "No new snow"} sub={powderQualityToday ? `~${powderQualityToday.estimatedRatio}:1 (est.)` : undefined} />
             <StatTile label="Trail conditions (est.)" value={trailConditions?.label ?? "—"} sub={trailConditions?.detail} />
             <StatTile label="Wet-bulb temp" value={wetBulbNowF != null ? `${Math.round(wetBulbNowF)}°F` : "—"} sub="Snowmaking-relevant" />
@@ -137,8 +151,6 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
           </Section>
 
           <ForecastTable
-            location={location}
-            elevationFt={elevationFt}
             dailyForecast={forecast.daily}
             dailySnowLines={dailySnowLines}
             elevationModel={data.elevationModel}
@@ -253,7 +265,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
                 <p className="text-sm text-foreground/90">
                   <strong>SNOTEL</strong> — {nearestSnotel.station.name} ({nearestSnotel.station.distanceMi.toFixed(1)} mi away, {nearestSnotel.station.elevationFt.toLocaleString()} ft) —{" "}
                   {nearestSnotel.snowDepthIn != null ? `${nearestSnotel.snowDepthIn}" snow depth` : "no depth reading"}
-                  {nearestSnotel.sweIn != null ? `, ${nearestSnotel.sweIn}" SWE` : ""} as of {nearestSnotel.date}.
+                  {nearestSnotel.sweIn != null ? `, ${nearestSnotel.sweIn}" SWE` : ""} as of {formatSnotelAsOf(nearestSnotel.date, forecast.utcOffsetSeconds)}.
                 </p>
               )}
               {nearestNwsStations.length > 0 && (
@@ -270,6 +282,8 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             <WakeAlarmForm location={location} />
           </Section>
         </div>
+
+        </ElevationProvider>
 
         <aside className="mt-5 md:mt-0 md:w-80 md:shrink-0 lg:w-96">
           <section className="card h-72 overflow-hidden md:sticky md:top-20 md:h-[calc(100dvh-7rem)]">

@@ -30,13 +30,26 @@ npx eslint .                      # lint
 
 | Variable | Purpose |
 |---|---|
-| `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Account sign-in emails, via `lib/email.ts`. Without these, sign-in links are logged to the server console instead of emailed. Set both to actually deliver email via [Resend](https://resend.com). |
+| `DATABASE_URL` (or `POSTGRES_URL`) | Postgres for accounts, sessions, passkeys and favorites. Neon URLs use Neon's HTTP driver; any other Postgres (self-hosted, Supabase, RDS, local) uses a normal TCP connection. Without it, sign-in is unavailable and favorites stay in the browser. |
+| `SESSION_SECRET` | Signs session cookies and email codes. **Required in production**: a long random string, the same on every instance (`openssl rand -base64 32`). Without it each server instance makes up its own, and sign-ins don't stick. |
+| `RESEND_API_KEY`, `ALERTS_FROM_EMAIL` | Sign-in code emails, via `lib/email.ts`. Without these, the code is logged to the server console instead of emailed (handy for local dev). Set both to actually deliver email via [Resend](https://resend.com). |
+| `AUTH_ORIGIN` | Optional. The public origin(s) passkeys are bound to, comma-separated (e.g. `https://snow.example.com`). Defaults to the request's host, which is right on Vercel; set it when running behind a proxy that rewrites the host. Passkeys only work on the origin they were created on. |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Powder wake-up push notifications (PERS-06). Generate once with `npx web-push generate-vapid-keys`; without them the wake-up card says it isn't set up. |
 | `DATABASE_URL` (or `POSTGRES_URL`) | Postgres (Neon) for accounts, favorites, sign-in codes and push subscriptions. Tables are created/updated automatically on first use (`lib/db/postgres.ts`). Required for sign-in. |
 | `SESSION_SECRET` | **Required in production.** HMAC key for session cookies, sign-in links and stored sign-in code hashes (e.g. `openssl rand -hex 32`). In production, sign-in refuses to work without it; local dev falls back to a random per-process key. |
 | `CRON_SECRET` | **Required in production** for `/api/push/check` and the operator-only `/api/diag/*` routes, which all require `Authorization: Bearer <secret>`. With it unset, production rejects every call to them; local dev lets them through. |
 
 `/api/push/check` runs daily via Vercel Cron (`vercel.json`, 11:00 UTC) once deployed there. Vercel automatically sends `CRON_SECRET` as the `Authorization: Bearer` header on its own cron-triggered requests, so nothing else needs to change once the variable is set.
+
+## Accounts and sign-in
+
+New people use **Create account** in the sign-in panel: step 1 confirms their email with a 6-digit code (this also creates the account, and the email is the recovery method); step 2 creates a passkey right away (skippable). After that, people sign in with a **passkey** (Face ID / Touch ID / device PIN; synced across their devices by iCloud Keychain or Google Password Manager) or a **6-digit email code**, which is always available as the backup. Both happen inside the page, so they work in an iOS home-screen app too. The account page (`/account`) lets each person add, rename and remove passkeys, and see and sign out their signed-in devices.
+
+Sessions are rows in Postgres (`lib/auth/sessions.ts`) behind an HMAC-signed cookie. They last 180 days from last use, so you stay signed in on any device you keep using. Email codes are single-use and rate-limited (sends and guesses) per address.
+
+## Personal settings
+
+A first visit shows every resort. **My resorts** are the ones you star (☆): once you star any, the home list and map show just those, with "Browse all" for the rest. The first time someone signs in, a short welcome asks them to pick resorts and shows how to save a backcountry spot. `/settings` lets each person manage their resorts, arrange the **location page** (section order and which sections start open), and choose the **map style**. Signed in, settings are saved to the account (`user_preferences` table, `/api/preferences`) and follow you to every device; signed out, they're kept in the browser and carried into the account on first sign-in.
 
 ## Project layout
 

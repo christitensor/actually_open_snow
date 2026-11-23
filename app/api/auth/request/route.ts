@@ -44,18 +44,18 @@ export async function POST(req: NextRequest) {
     }
 
     const { token } = createMagicLinkToken(email);
-    const code = generateSignInCode();
+    const code = generateSignInCode(); // random, so every emailed code differs
     await storeSignInCode(email, code);
     const origin = req.nextUrl.origin;
     const verifyUrl = `${origin}/api/auth/verify?token=${token}&next=${encodeURIComponent(nextPath)}`;
 
     await sendEmail({
       to: email,
-      subject: "Sign in to Actually Open Snow",
-      text: `Click to sign in: ${verifyUrl}\n\nUsing this saved to your home screen? Tapping the link above opens Safari instead of the saved app, so it won't sign that in. Open the app and enter this code instead: ${code}\n\nThe link and code expire in 15 minutes, and the code works once (requesting another one replaces it). If you didn't request this, ignore it.`,
+      subject: `${code} is your Actually Open Snow code`,
+      text: `Your sign-in code: ${code}\n\nEnter it in the app where you asked for it. It expires in 15 minutes.\n\nOr sign in this browser with this link: ${verifyUrl}\n\nTip: once you're in, add a passkey (Account → Sign-in methods) and next time it's just Face ID or Touch ID, on any of your devices.\n\nIf you didn't request this, ignore this email.`,
     });
 
-    return NextResponse.json({ message: `Check ${email} for a sign-in link and code.` });
+    return NextResponse.json({ message: `We sent a 6-digit code to ${email}.` });
   } catch (err) {
     console.error("Sign-in request failed:", err);
     return NextResponse.json({ error: "Couldn't send a sign-in email right now — try again." }, { status: 502 });

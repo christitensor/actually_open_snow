@@ -28,6 +28,7 @@ import { estimateTrailConditions, type TrailConditionsEstimate } from "@/lib/der
 import { wetBulbF } from "@/lib/derive/wet-bulb";
 import { buildConditionsSummary } from "@/lib/derive/conditions-summary";
 import { getElevationModelInputs } from "@/lib/elevation-model";
+import { computeElevationForecast } from "@/lib/derive/elevation-snow";
 import type {
   AfdProduct,
   AirQuality,
@@ -154,9 +155,20 @@ export async function getLocationDashboardData(location: Location): Promise<Loca
     ? Object.fromEntries(Object.entries(multiModel).map(([model, days]) => [model, days[0] ?? 0]))
     : null;
 
+  // The summary sentence quotes today's/tomorrow's snow — use the same
+  // elevation model at the base elevation that the Snow Summary, today
+  // tile and 14-day table show, so the page agrees with itself.
+  const baseModeled =
+    elevationModel && elevationResult?.elevationFt != null
+      ? new Map(computeElevationForecast(elevationModel, elevationResult.elevationFt).map((d) => [d.date, d.snowfallSumIn]))
+      : null;
+  const forecastForSummary = baseModeled
+    ? { ...forecast, daily: forecast.daily.map((d) => ({ ...d, snowfallSumIn: baseModeled.get(d.date) ?? d.snowfallSumIn })) }
+    : forecast;
+
   const conditionsSummary = buildConditionsSummary({
     location: { lat, lon, name: location.name },
-    forecast,
+    forecast: forecastForSummary,
     multiModelTodaySnowfallIn: multiModelTodaySnowfallIn ? Object.values(multiModelTodaySnowfallIn) : [],
     afd,
     recentSnotel: snotelResult,

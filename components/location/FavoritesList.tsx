@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { pinHref } from "@/data/resorts";
 import { useFavorites } from "@/lib/favorites";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import { useDragReorder } from "@/lib/use-drag-reorder";
@@ -80,7 +81,7 @@ export default function FavoritesList({ onGoToMap }: { onGoToMap?: () => void })
     <ul className="space-y-2">
       {spots.map((f, i) => {
         const key = favoriteKey(f);
-        const href = `/location/pin?lat=${f.lat}&lon=${f.lon}`;
+        const href = pinHref(f.lat, f.lon, f.name);
         const s = stats[pointKey(f.lat, f.lon)];
         const dragging = key === drag.dragKey;
         return (

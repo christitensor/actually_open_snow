@@ -56,6 +56,7 @@ export function toZone(feature: AvalancheZoneMapLayer["features"][number]): Aval
     offSeason: p.off_season ?? false,
     travelAdvice: p.travel_advice ?? null,
     timezone: p.timezone ?? null,
+    warning: p.warning?.product ?? null,
   };
 }
 

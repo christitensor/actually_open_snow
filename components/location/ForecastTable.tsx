@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { DailyForecastDay, DailySnowLine, ElevationModelInputs, Location } from "@/lib/models/types";
-import { computeElevationForecast } from "@/lib/derive/elevation-snow";
+import type { DailyForecastDay, DailySnowLine, ElevationModelInputs } from "@/lib/models/types";
+import { ElevationSlider, useElevation } from "@/components/location/ElevationContext";
 import { degToCompass } from "@/lib/util/wind";
 import { describeWeather } from "@/lib/util/weather-code";
 import Section from "@/components/ui/Section";
 
 // FC-10 + FC-10-adj: the 14-day forecast table, with an elevation slider
 // that recalculates High/Low, New snow, and Precip for the whole forecast.
+// The elevation is shared page-wide (ElevationContext), so the Snow
+// Summary and today's-snow tile move with it.
 //
 // Those three columns come from lib/derive/elevation-snow.ts at every
 // slider position, including the base: NWS gridpoint precip/snow for days
@@ -22,43 +23,23 @@ import Section from "@/components/ui/Section";
 // elevation, so they don't change with the slider.
 
 const FORECAST_DISPLAY_DAYS = 14;
-const PIN_RANGE_FT = 3000;
 
 function fmtDate(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
-function bounds(location: Location, elevationFt: number | null): { min: number; max: number } {
-  if (location.minElevationFt != null && location.maxElevationFt != null) {
-    return { min: location.minElevationFt, max: location.maxElevationFt };
-  }
-  const center = elevationFt ?? 6000;
-  return { min: Math.max(0, center - PIN_RANGE_FT), max: center + PIN_RANGE_FT };
-}
-
 const pct = (x: number) => `${(x * 100).toFixed(x * 100 >= 10 ? 0 : 1)}%`;
 
 export default function ForecastTable({
-  location,
-  elevationFt,
   dailyForecast,
   dailySnowLines,
   elevationModel,
 }: {
-  location: Location;
-  elevationFt: number | null;
   dailyForecast: DailyForecastDay[];
   dailySnowLines: DailySnowLine[];
   elevationModel: ElevationModelInputs | null;
 }) {
-  const { min, max } = bounds(location, elevationFt);
-  const [selected, setSelected] = useState(elevationFt ?? Math.round((min + max) / 2));
-  const isAdjusted = elevationFt == null || selected !== elevationFt;
-
-  const modeledByDate = useMemo(
-    () => (elevationModel ? new Map(computeElevationForecast(elevationModel, selected).map((d) => [d.date, d])) : null),
-    [elevationModel, selected]
-  );
+  const { selected, isAdjusted, modeledByDate } = useElevation();
   const days = dailyForecast.slice(0, FORECAST_DISPLAY_DAYS);
   const nwsDays = modeledByDate ? days.filter((d) => modeledByDate.get(d.date)?.precipSource !== "open-meteo").length : 0;
   const gradient = elevationModel?.gradient;
@@ -78,30 +59,7 @@ export default function ForecastTable({
         treat them as a heads-up on pattern changes, not a packing list.
       </p>
 
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={50}
-        value={selected}
-        onChange={(e) => setSelected(Number(e.target.value))}
-        disabled={!modeledByDate}
-        className="w-full accent-primary disabled:opacity-40"
-        aria-label="Elevation (feet)"
-      />
-      <div className="mb-4 mt-1 flex justify-between text-xs text-muted-foreground">
-        <span>{min.toLocaleString()} ft</span>
-        <span className="font-semibold text-foreground">
-          {selected.toLocaleString()} ft
-          {isAdjusted && elevationFt != null && (
-            <span className="ml-1 font-normal text-muted-foreground">
-              ({selected > elevationFt ? "+" : ""}
-              {(selected - elevationFt).toLocaleString()} ft vs. {elevationFt.toLocaleString()} ft base)
-            </span>
-          )}
-        </span>
-        <span>{max.toLocaleString()} ft</span>
-      </div>
+      <ElevationSlider />
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[780px] text-sm">

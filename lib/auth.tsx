@@ -7,6 +7,9 @@
 // localStorage or the server.
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { FAVORITES_CHANGE_EVENT, FAVORITES_STORAGE_KEY } from "@/lib/favorites-storage";
+import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import type { FavoriteLocation } from "@/lib/models/types";
+import type { InitialAccount } from "@/lib/auth/initial";
 
 type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -18,6 +21,26 @@ interface AuthContextValue {
   requestMagicLink: (email: string) => Promise<{ ok: boolean; message: string }>;
   verifyCode: (email: string, code: string) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => Promise<void>;
+  /** This browser can use passkeys at all. */
+  passkeySupported: boolean;
+  /** The signed-in account has at least one passkey. */
+  hasPasskey: boolean;
+  /** True right after an email sign-in on an account with no passkey: the moment to suggest adding one. */
+  offerPasskey: boolean;
+  /** The account was created by this sign-in (first time this email signed in). */
+  justCreated: boolean;
+  dismissPasskeyOffer: () => void;
+  signInWithPasskey: () => Promise<{ ok: boolean; message?: string }>;
+  /** The account's favorites as loaded by the server for this page (seed for useFavorites), or null. */
+  initialFavorites: FavoriteLocation[] | null;
+  addPasskey: (name?: string) => Promise<{ ok: boolean; message?: string }>;
+}
+
+// WebAuthn rejects with NotAllowedError when the person cancels the sheet; that's not an error to show.
+function passkeyErrorMessage(err: unknown): string | undefined {
+  if (err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError")) return undefined;
+  if (err instanceof Error && err.name === "InvalidStateError") return "This device already has a passkey for your account.";
+  return err instanceof Error ? err.message : "Passkey didn't work. Try again or use an email code.";
 }
 
 // Shared by both sign-in paths: the link-click redirect (query-param
@@ -43,10 +66,21 @@ async function importLocalFavorites() {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
-  const [email, setEmail] = useState<string | null>(null);
+export function AuthProvider({ children, initial = null }: { children: ReactNode; initial?: InitialAccount }) {
+  // When the server already knows who's signed in (lib/auth/initial.ts), start
+  // from that instead of "loading", so the first render is the person's page.
+  const [status, setStatus] = useState<AuthStatus>(initial?.status ?? "loading");
+  const [email, setEmail] = useState<string | null>(initial?.status === "signed-in" ? initial.email : null);
+  const initialFavorites = initial?.status === "signed-in" ? initial.favorites : null;
   const [signInError, setSignInError] = useState(false);
+  const [hasPasskey, setHasPasskey] = useState(initial?.status === "signed-in" ? initial.hasPasskey : false);
+  const [offerPasskey, setOfferPasskey] = useState(false);
+  const [justCreated, setJustCreated] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+
+  useEffect(() => {
+    (async () => setPasskeySupported(browserSupportsWebAuthn()))();
+  }, []);
   const importedRef = useRef(false);
 
   // The verify route redirects here with `signInError=1` when a link was
@@ -67,9 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const res = await fetch("/api/auth/me");
-        const body = (await res.json()) as { email: string | null };
+        const body = (await res.json()) as { email: string | null; hasPasskey?: boolean };
         if (cancelled) return;
         setEmail(body.email);
+        setHasPasskey(Boolean(body.hasPasskey));
+        // Arrived from the emailed link: same moment as a code sign-in to suggest a passkey.
+        const qs = new URLSearchParams(window.location.search);
+        if (body.email && !body.hasPasskey && qs.get("signedIn") === "1") setOfferPasskey(true);
+        if (body.email && qs.get("accountCreated") === "1") setJustCreated(true);
         setStatus(body.email ? "signed-in" : "signed-out");
       } catch {
         if (!cancelled) setStatus("signed-out");
@@ -93,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await importLocalFavorites();
       } finally {
         params.delete("signedIn");
+        params.delete("accountCreated");
         const qs = params.toString();
         window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
       }
@@ -120,12 +160,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailInput, code }),
       });
-      const body = (await res.json()) as { email?: string; error?: string };
+      const body = (await res.json()) as { email?: string; created?: boolean; error?: string };
       if (!res.ok || !body.email) return { ok: false, message: body.error ?? "That code didn't work." };
 
+      setJustCreated(Boolean(body.created));
       setEmail(body.email);
       setStatus("signed-in");
       await importLocalFavorites();
+      // Find out whether this account already has a passkey; if not, suggest one.
+      const me = (await fetch("/api/auth/me").then((r) => r.json()).catch(() => ({}))) as { hasPasskey?: boolean };
+      setHasPasskey(Boolean(me.hasPasskey));
+      if (!me.hasPasskey) setOfferPasskey(true);
       return { ok: true };
     } catch {
       return { ok: false, message: "Network error — try again." };
@@ -135,7 +180,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setEmail(null);
+    setHasPasskey(false);
+    setOfferPasskey(false);
     setStatus("signed-out");
+  }, []);
+
+  const signInWithPasskey = useCallback(async () => {
+    try {
+      const optionsJSON = await fetch("/api/auth/passkey/login/options", { method: "POST" }).then((r) => r.json());
+      const response = await startAuthentication({ optionsJSON });
+      const res = await fetch("/api/auth/passkey/login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response }),
+      });
+      const body = (await res.json()) as { email?: string; error?: string };
+      if (!res.ok || !body.email) return { ok: false, message: body.error ?? "Passkey sign-in failed." };
+      setEmail(body.email);
+      setHasPasskey(true);
+      setStatus("signed-in");
+      await importLocalFavorites();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: passkeyErrorMessage(err) };
+    }
+  }, []);
+
+  const addPasskey = useCallback(async (name?: string) => {
+    try {
+      const optionsRes = await fetch("/api/auth/passkey/register/options", { method: "POST" });
+      if (!optionsRes.ok) return { ok: false, message: "Sign in first." };
+      const response = await startRegistration({ optionsJSON: await optionsRes.json() });
+      const res = await fetch("/api/auth/passkey/register/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response, name }),
+      });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) return { ok: false, message: body.error ?? "Couldn't add the passkey." };
+      setHasPasskey(true);
+      setOfferPasskey(false);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: passkeyErrorMessage(err) };
+    }
   }, []);
 
   return (
@@ -148,6 +236,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         requestMagicLink,
         verifyCode,
         signOut,
+        passkeySupported,
+        hasPasskey,
+        offerPasskey,
+        justCreated,
+        dismissPasskeyOffer: () => {
+          setOfferPasskey(false);
+          setJustCreated(false);
+        },
+        signInWithPasskey,
+        addPasskey,
+        initialFavorites,
       }}
     >
       {children}

@@ -5,12 +5,9 @@
 // start a session instead of removing a subscription. Magic links
 // themselves are stateless (lib/auth/magic-link.ts) — see that file for why.
 import { getSql } from "./postgres";
-import { createSessionToken, verifySessionToken } from "@/lib/auth/session-token";
 import { favoriteKey } from "@/lib/util/favorite-key";
 import { normalizeEmail } from "@/lib/auth/email";
 import type { FavoriteLocation, Location } from "@/lib/models/types";
-
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export interface User {
   id: number;
@@ -28,7 +25,8 @@ interface UserRow {
 // favorites actually durable across Vercel's separate serverless instances,
 // unlike the ephemeral per-instance SQLite this used before.
 
-export async function getOrCreateUser(rawEmail: string): Promise<User> {
+/** Finds the account for an email, creating it on first sign-in. `created` is true for a brand-new account. */
+export async function getOrCreateUser(rawEmail: string): Promise<User & { created: boolean }> {
   const email = normalizeEmail(rawEmail);
   const sql = await getSql();
   // Case-insensitive: accounts created before emails were normalized may be
@@ -38,29 +36,14 @@ export async function getOrCreateUser(rawEmail: string): Promise<User> {
     SELECT id, email FROM users WHERE lower(email) = ${email}
     ORDER BY (email = ${email}) DESC, id ASC LIMIT 1
   `) as UserRow[];
-  if (existing[0]) return existing[0];
+  if (existing[0]) return { ...existing[0], created: false };
 
   const inserted = (await sql`
     INSERT INTO users (email, created_at) VALUES (${email}, ${new Date().toISOString()})
     ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
     RETURNING id, email
   `) as UserRow[];
-  return inserted[0];
-}
-
-// --- Sessions ----------------------------------------------------------
-
-// Stateless: the token itself carries {userId, email, expiresAt} plus an
-// HMAC (lib/auth/session-token.ts), so validating it needs no database
-// lookup — see that file's comment for why (ephemeral SQLite on Vercel).
-export function createSession(userId: number, email: string): { token: string; expiresAt: Date } {
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  return { token: createSessionToken(userId, email, expiresAt), expiresAt };
-}
-
-export function getUserBySessionToken(token: string): User | null {
-  const verified = verifySessionToken(token);
-  return verified ? { id: verified.userId, email: verified.email } : null;
+  return { ...inserted[0], created: true };
 }
 
 // --- Favorites -----------------------------------------------------------
@@ -124,4 +107,10 @@ export async function importFavoritesForUser(userId: number, favorites: Favorite
     `;
   }
   return listFavoritesForUser(userId);
+}
+
+export async function getUserById(id: number): Promise<User | null> {
+  const sql = await getSql();
+  const rows = (await sql`SELECT id, email FROM users WHERE id = ${id}`) as UserRow[];
+  return rows[0] ?? null;
 }

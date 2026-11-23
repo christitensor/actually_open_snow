@@ -9,6 +9,7 @@
 // Template-based, not LLM-generated — no LLM API is wired into this app.
 
 import { afdMentionsUncertainty } from "@/lib/data-sources/nws-products";
+import { formatSnotelAsOf } from "@/lib/data-sources/snotel";
 import type {
   AfdProduct,
   ConditionsSummary,
@@ -74,7 +75,7 @@ export function buildConditionsSummary(inputs: ConditionsSummaryInputs): Conditi
         1
       )} mi away) last reported ` +
         `${recentSnotel.snowDepthIn != null ? `${recentSnotel.snowDepthIn}" snow depth` : "no snow depth reading"}` +
-        `${recentSnotel.sweIn != null ? ` and ${recentSnotel.sweIn}" SWE` : ""} as of ${recentSnotel.date}.`
+        `${recentSnotel.sweIn != null ? ` and ${recentSnotel.sweIn}" SWE` : ""} as of ${formatSnotelAsOf(recentSnotel.date, forecast.utcOffsetSeconds)}.`
     );
   }
 
