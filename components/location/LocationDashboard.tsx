@@ -154,6 +154,7 @@ export default function LocationDashboard({ data }: { data: LocationDashboardDat
             dailyForecast={forecast.daily}
             dailySnowLines={dailySnowLines}
             elevationModel={data.elevationModel}
+            hourly={forecast.hourly}
           />
 
           <HourlyForecast hours={upcomingHours} daily={forecast.daily} />

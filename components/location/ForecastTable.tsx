@@ -1,6 +1,9 @@
 "use client";
 
-import type { DailyForecastDay, DailySnowLine, ElevationModelInputs } from "@/lib/models/types";
+import { Fragment, useState } from "react";
+import type { DailyForecastDay, DailySnowLine, ElevationModelInputs, HourlyForecastPoint } from "@/lib/models/types";
+import { splitDayNightSnow, type DayNightSplit } from "@/lib/derive/day-night";
+import { estimateDailyPowderQuality, type PowderQualityEstimate } from "@/lib/derive/powder-quality";
 import { ElevationSlider, useElevation } from "@/components/location/ElevationContext";
 import { degToCompass } from "@/lib/util/wind";
 import { describeWeather } from "@/lib/util/weather-code";
@@ -21,6 +24,14 @@ import Section from "@/components/ui/Section";
 //
 // Snow line and Wind describe the storm as a whole, not a spot
 // elevation, so they don't change with the slider.
+//
+// FC-13 (issue #28) + FC-07 per-day (issue #26): tapping a day expands a
+// detail row with the overnight (5pm-8am) vs. daytime (8am-5pm) split of
+// that ski day's snow, from the raw hourly model (lib/derive/day-night.ts),
+// plus the day's powder-quality estimate under its New snow figure. The
+// split is deliberately NOT rescaled to the elevation-adjusted daily
+// total — the parts describe when the snow falls, the headline number
+// describes how much at the selected elevation.
 
 const FORECAST_DISPLAY_DAYS = 14;
 
@@ -34,13 +45,21 @@ export default function ForecastTable({
   dailyForecast,
   dailySnowLines,
   elevationModel,
+  hourly,
 }: {
   dailyForecast: DailyForecastDay[];
   dailySnowLines: DailySnowLine[];
   elevationModel: ElevationModelInputs | null;
+  hourly: HourlyForecastPoint[];
 }) {
   const { selected, isAdjusted, modeledByDate } = useElevation();
   const days = dailyForecast.slice(0, FORECAST_DISPLAY_DAYS);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  // Cheap enough to compute per render (14 days x ~400 hourly points).
+  const splits = new Map(days.map((d) => [d.date, splitDayNightSnow(hourly, d.date)]));
+  const qualities = new Map(
+    days.map((d) => [d.date, estimateDailyPowderQuality(hourly.filter((h) => h.time.startsWith(d.date)))])
+  );
   const nwsDays = modeledByDate ? days.filter((d) => modeledByDate.get(d.date)?.precipSource !== "open-meteo").length : 0;
   const gradient = elevationModel?.gradient;
   const highlight = modeledByDate != null && isAdjusted;
@@ -56,7 +75,8 @@ export default function ForecastTable({
     >
       <p className="mb-3 text-xs text-muted-foreground">
         Days 8+ are lower-confidence trend guidance from Open-Meteo&apos;s model blend, not a precise day-by-day call —
-        treat them as a heads-up on pattern changes, not a packing list.
+        treat them as a heads-up on pattern changes, not a packing list. Tap any day for its overnight vs. daytime
+        snow split and snow quality.
       </p>
 
       <ElevationSlider />
@@ -80,25 +100,49 @@ export default function ForecastTable({
               const modeled = modeledByDate?.get(d.date);
               const row = modeled ?? d;
               const adjusted = highlight && modeled != null;
+              const quality = qualities.get(d.date) ?? null;
+              const expanded = expandedDate === d.date;
               return (
-                <tr key={d.date} className={`border-t border-border ${i >= 7 ? "text-muted-foreground" : ""}`}>
-                  <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">{fmtDate(d.date)}</td>
-                  <td className="py-1.5 pr-4 pl-4">
-                    <SkyCell day={d} />
-                  </td>
-                  <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
-                    {Math.round(row.tempMaxF)}° / {Math.round(row.tempMinF)}°
-                  </td>
-                  <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
-                    {row.snowfallSumIn > 0 ? `${row.snowfallSumIn.toFixed(1)}"` : "—"}
-                  </td>
-                  <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>{row.precipitationSumIn.toFixed(2)}&quot;</td>
-                  <td className="py-1.5 pr-4">{snowLine?.snowLineFt != null ? `${snowLine.snowLineFt.toLocaleString()} ft` : "—"}</td>
-                  <td className="py-1.5">
-                    {Math.round(d.windSpeedMaxMph)}
-                    {d.windGustMaxMph > d.windSpeedMaxMph + 3 ? ` G${Math.round(d.windGustMaxMph)}` : ""} mph {degToCompass(d.windDirectionDominantDeg)}
-                  </td>
-                </tr>
+                <Fragment key={d.date}>
+                  <tr
+                    className={`cursor-pointer border-t border-border hover:bg-muted/40 ${i >= 7 ? "text-muted-foreground" : ""} ${expanded ? "bg-muted/40" : ""}`}
+                    onClick={() => setExpandedDate(expanded ? null : d.date)}
+                    aria-expanded={expanded}
+                    title="Tap for overnight vs. daytime split"
+                  >
+                    <td className="sticky left-0 z-10 border-r border-border bg-card py-1.5 pr-4 font-medium">
+                      {fmtDate(d.date)}{" "}
+                      <span className="text-[10px] text-muted-foreground" aria-hidden="true">
+                        {expanded ? "▾" : "▸"}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-4 pl-4">
+                      <SkyCell day={d} />
+                    </td>
+                    <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
+                      {Math.round(row.tempMaxF)}° / {Math.round(row.tempMinF)}°
+                    </td>
+                    <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>
+                      {row.snowfallSumIn > 0 ? `${row.snowfallSumIn.toFixed(1)}"` : "—"}
+                      {quality && row.snowfallSumIn > 0 && (
+                        <div className="text-[11px] font-normal text-muted-foreground">{quality.quality}</div>
+                      )}
+                    </td>
+                    <td className={`py-1.5 pr-4 ${adjusted ? "font-semibold text-primary" : ""}`}>{row.precipitationSumIn.toFixed(2)}&quot;</td>
+                    <td className="py-1.5 pr-4">{snowLine?.snowLineFt != null ? `${snowLine.snowLineFt.toLocaleString()} ft` : "—"}</td>
+                    <td className="py-1.5">
+                      {Math.round(d.windSpeedMaxMph)}
+                      {d.windGustMaxMph > d.windSpeedMaxMph + 3 ? ` G${Math.round(d.windGustMaxMph)}` : ""} mph {degToCompass(d.windDirectionDominantDeg)}
+                    </td>
+                  </tr>
+                  {expanded && (
+                    <tr className="border-t border-border/50 bg-muted/30">
+                      <td colSpan={7} className="py-3 pr-4 pl-4">
+                        <DayDetail split={splits.get(d.date) ?? { overnightIn: 0, daytimeIn: 0 }} quality={quality} isToday={i === 0} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
@@ -127,8 +171,66 @@ export default function ForecastTable({
           Precip (liquid) is rain + snow water content, so it won&apos;t match New snow on warm days. Snow line and Wind describe the storm as a whole and
           don&apos;t change with the slider.
         </p>
+        <p>
+          In a day&apos;s detail: overnight is 5pm the day before through 8am — what&apos;s on the ground at first chair — and daytime is 8am–5pm, what
+          falls while lifts spin. Snow quality under a day&apos;s New snow is FC-07&apos;s temperature-based estimate for that day.
+        </p>
       </div>
     </Section>
+  );
+}
+
+// FC-13: the expanded day detail — overnight vs. daytime split with a
+// proportional bar, plus the day's powder-quality estimate. The split is
+// from the raw hourly model (see lib/derive/day-night.ts), so its parts
+// may not sum to the elevation-adjusted daily total in the row above;
+// the caption says so rather than silently rescaling.
+function DayDetail({
+  split,
+  quality,
+  isToday,
+}: {
+  split: DayNightSplit;
+  quality: PowderQualityEstimate | null;
+  isToday: boolean;
+}) {
+  const total = split.overnightIn + split.daytimeIn;
+  if (total <= 0.05) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No snow in the hourly model for this ski day (5pm–5pm), so there&apos;s no overnight/daytime split to show.
+      </p>
+    );
+  }
+  const nightPct = Math.round((split.overnightIn / total) * 100);
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+        <span>
+          🌙 <strong>Overnight</strong>{" "}
+          <span className="text-muted-foreground">{isToday ? "(midnight–8am)" : "(5pm–8am)"}</span>:{" "}
+          <strong>{split.overnightIn.toFixed(1)}&quot;</strong>
+        </span>
+        <span>
+          ☀️ <strong>Daytime</strong> <span className="text-muted-foreground">(8am–5pm)</span>:{" "}
+          <strong>{split.daytimeIn.toFixed(1)}&quot;</strong>
+        </span>
+        {quality && (
+          <span className="pill bg-primary/10 text-primary">
+            Snow quality: {quality.quality} · ~{quality.estimatedRatio}:1 est.
+          </span>
+        )}
+      </div>
+      <div className="flex h-2 w-full max-w-md overflow-hidden rounded-full" aria-hidden="true">
+        <div className="bg-blue-800 dark:bg-blue-600" style={{ width: `${nightPct}%` }} />
+        <div className="bg-amber-400" style={{ width: `${100 - nightPct}%` }} />
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Split from Open-Meteo&apos;s hourly model — it shows when the snow falls, so the parts may not sum to the
+        elevation-adjusted daily total above.
+        {isToday && " Today's overnight reaches back only to midnight; the hourly feed doesn't include yesterday evening."}
+      </p>
+    </div>
   );
 }
 
