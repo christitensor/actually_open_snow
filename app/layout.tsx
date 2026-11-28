@@ -5,6 +5,7 @@ import "./globals.css";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import UndoToast from "@/components/UndoToast";
+import InstallPrompt from "@/components/InstallPrompt";
 import { AuthProvider } from "@/lib/auth";
 import { PreferencesProvider } from "@/lib/preferences/context";
 import Welcome from "@/components/onboarding/Welcome";
@@ -82,6 +83,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
           <BottomNav />
           <UndoToast />
+          <InstallPrompt />
           <Welcome />
           </PreferencesProvider>
         </AuthProvider>
